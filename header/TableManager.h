@@ -28,6 +28,10 @@ public:
 	// cost
 	std::unordered_map<CostEnum, int> CalculateTableCost();
 
+	std::unordered_map<CostEnum, int> GetCostMap() { return costMap; }
+
+	bool EqualTableToSelf(TableManager& otherTable);
+
 
 private:
 	std::vector<std::vector<Group>> table;

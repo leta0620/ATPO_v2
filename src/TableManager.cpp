@@ -93,3 +93,13 @@ bool TableManager::MoveGroup(int srcRow, int srcCol, int destRow, int destCol)
 {
 	return false;
 }
+
+
+bool TableManager::EqualTableToSelf(TableManager& otherTable)
+{
+	// first concate the table into string
+	std::vector<std::string> thisTableStrings = this->GetTableStringFormat();
+	std::vector<std::string> otherTableStrings = otherTable.GetTableStringFormat();
+
+	return thisTableStrings == otherTableStrings;
+}
