@@ -10,7 +10,7 @@ class Group
 {
 public:
 	Group() = default;
-	Group(const std::string& name);
+	Group(const std::string& name, int groupNum);
 
 	// Gets the name of the group
 	std::string GetName();
@@ -31,6 +31,7 @@ private:
 	std::string name;
 	std::vector<DeviceUnit> deviceUnits;
 	int typeHash = 0;
+	int groupNum = 0;
 
 	// Recalculates the type hash based on the current device units, called whenever device units are modified
 	void CalculateTypeHash();

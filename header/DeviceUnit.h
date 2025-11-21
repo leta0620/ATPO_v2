@@ -3,6 +3,11 @@
 #include <vector>
 #include <string>
 
+enum class CellRotation {
+	R0,
+	MY,
+};
+
 class DeviceUnit
 {
 public:
@@ -24,7 +29,16 @@ public:
 		name = n;
 	}
 
+	void SetRotation(CellRotation dir) {
+		rotation = dir;
+	}
+	CellRotation GetRotation() const {
+		return rotation;
+	}
+
 private:
 	std::string name;
 	std::string analogCellType;
+	
+	CellRotation rotation = CellRotation::R0;
 };

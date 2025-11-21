@@ -1,8 +1,11 @@
 #include "Group.h"
 
-Group::Group(const std::string& name)
+Group::Group(const std::string& name, int groupNum)
 {
 	this->name = name;
+	this->groupNum = groupNum;
+
+	this->typeHash = 0;
 }
 
 std::string Group::GetName()
@@ -35,5 +38,5 @@ void Group::CalculateTypeHash()
 		concatenatedTypes += unit.GetAnalogCellType();
 	}
 
-	this->typeHash = std::hash<std::string>{}(concatenatedTypes);
+	this->typeHash = int(std::hash<std::string>{}(concatenatedTypes));
 }
