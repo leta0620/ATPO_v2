@@ -12,11 +12,11 @@ class DeviceUnit
 {
 public:
 	DeviceUnit() = default;
-	DeviceUnit(const std::string& name, const std::string& analogCellType)
-		: name(name), analogCellType(analogCellType) {
+	DeviceUnit(const std::string& symbol, const std::string& analogCellType)
+		: symbol(symbol), analogCellType(analogCellType) {
 	}
-	std::string GetName() const {
-		return name;
+	std::string GetSymbol() const {
+		return symbol;
 	}
 	std::string GetAnalogCellType() const {
 		return analogCellType;
@@ -25,8 +25,8 @@ public:
 	void SetAnalogCellType(const std::string& type) {
 		analogCellType = type;
 	}
-	void SetName(const std::string& n) {
-		name = n;
+	void SetSymbol(const std::string& symbol) {
+		this->symbol = symbol;
 	}
 
 	void SetRotation(CellRotation dir) {
@@ -36,7 +36,7 @@ public:
 		return rotation;
 	}
 
-	void SetConnections(DeviceUnit* drain, DeviceUnit* gate, DeviceUnit* source) {
+	/*void SetConnections(DeviceUnit* drain, DeviceUnit* gate, DeviceUnit* source) {
 		d = drain;
 		g = gate;
 		s = source;
@@ -64,13 +64,17 @@ public:
 
 	DeviceUnit* GetSourcePin() const {
 		return s;
-	}
+	}*/
 
 private:
-	std::string name;
+	// synbol 沒寫
+
+	std::string symbol;
 	std::string analogCellType;
 
-	DeviceUnit* d = nullptr, *g = nullptr, *s = nullptr;
+	//DeviceUnit* d = nullptr, *g = nullptr, *s = nullptr;
+	// 共端的識別、連接關係腳位標示
+	std::vector<std::string> d, g, s;
 	
 	CellRotation rotation = CellRotation::R0;
 };

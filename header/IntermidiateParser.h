@@ -1,10 +1,13 @@
 #include <string>
 #include <vector>
-#include "Group.h"
-#include "TableManager.h"
+#include <unordered_map>
+
+#include "NetListLookupTable.h"
 
 class IntermidiateParser
 {
 public:
 private:
+	std::vector<std::string> commonSourceCellList;
+	
 };

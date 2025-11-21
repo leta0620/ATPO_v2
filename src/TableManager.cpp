@@ -51,7 +51,7 @@ std::vector<std::string> TableManager::GetTableRotationFormat()
 
 
 // cost main function
-std::unordered_map<CostEnum, int> TableManager::CalculateTableCost()
+std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
 {
 	this->costMap.clear();
 	this->CalculateCCCost();

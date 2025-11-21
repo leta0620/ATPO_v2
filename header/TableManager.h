@@ -26,11 +26,13 @@ public:
 	std::vector<std::string> GetTableRotationFormat();
 
 	// cost
-	std::unordered_map<CostEnum, int> CalculateTableCost();
+	std::unordered_map<CostEnum, double> CalculateTableCost();
 
-	std::unordered_map<CostEnum, int> GetCostMap() { return costMap; }
+	std::unordered_map<CostEnum, double> GetCostMap() { return costMap; }
 
 	bool EqualTableToSelf(TableManager& otherTable);
+
+	void SetNFin(int nfin) { this->nfin = nfin; }
 
 
 private:
@@ -39,6 +41,8 @@ private:
 	int colSize = 0;
 	int groupSize = 0;
 
+	int nfin = 4; // default 4 fin number per device unit
+
 	void InitializeTable();
 	// check colume rule(same type sequential)
 	bool ColumnRuleCheck(int rowPlace, int colPlace, const Group& group);
@@ -46,7 +50,7 @@ private:
 	bool RowRuleCheck(int rowPlace, int colPlace, const Group& group);
 
 	// cost part
-	std::unordered_map<CostEnum, int> costMap;
+	std::unordered_map<CostEnum, double> costMap;
 
 	void CalculateCCCost();
 	void CalculateRCost();

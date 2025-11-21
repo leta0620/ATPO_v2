@@ -13,9 +13,9 @@
 using namespace std;
 
 int main(int argc, char* argv[]) {
-	// input commandLine arguments : groupSize, row_num, itermidiate_code_file_path, output_file_path
+	// input commandLine arguments : groupSize, rowSize, itermidiate_code_file_path, output_file_path
 	if (argc != 5) {
-		cerr << "Usage: " << argv[0] << " <groupSize> <row_num> <intermediate_code_file_path> <output_file_path>" << endl;
+		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <intermediate_code_file_path> <output_file_path>" << endl;
 		return 1;
 	}
 

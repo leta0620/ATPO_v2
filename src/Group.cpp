@@ -1,20 +1,10 @@
 #include "Group.h"
 
-Group::Group(const std::string& name, int groupNum)
+Group::Group(int groupNum)
 {
-	this->name = name;
 	this->groupNum = groupNum;
 
 	this->typeHash = 0;
-}
-
-std::string Group::GetName()
-{
-	return name;
-}
-void Group::SetName(const std::string& n)
-{
-	name = n;
 }
 
 
