@@ -36,9 +36,41 @@ public:
 		return rotation;
 	}
 
+	void SetConnections(DeviceUnit* drain, DeviceUnit* gate, DeviceUnit* source) {
+		d = drain;
+		g = gate;
+		s = source;
+	}
+
+	void SetDrainPin(DeviceUnit* drain) {
+		d = drain;
+	}
+
+	void SetGatePin(DeviceUnit* gate) {
+		g = gate;
+	}
+
+	void SetSourcePin(DeviceUnit* source) {
+		s = source;
+	}
+
+	DeviceUnit* GetDrainPin() const {
+		return d;
+	}
+
+	DeviceUnit* GetGatePin() const {
+		return g;
+	}
+
+	DeviceUnit* GetSourcePin() const {
+		return s;
+	}
+
 private:
 	std::string name;
 	std::string analogCellType;
+
+	DeviceUnit* d = nullptr, *g = nullptr, *s = nullptr;
 	
 	CellRotation rotation = CellRotation::R0;
 };
