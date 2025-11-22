@@ -37,9 +37,14 @@ int main(int argc, char* argv[]) {
 		cerr << "Error: Failed to parse intermediate code file." << endl;
 		return 1;
 	}
-	auto netListLookupTableList = parser.GetNetListLookupTableList();
+	
+	if (!parser.GenerateNetlistLookupTable()) {
+		cerr << "Error: Failed to generate netlist lookup table." << endl;
+		return 1;
+	}
 
-	InitialPlacement initialPlacement(groupSize, row_num, netListLookupTableList[0]);
+
+	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable());
 	vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
 
 	// 
