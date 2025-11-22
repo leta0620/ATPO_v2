@@ -7,7 +7,7 @@
 class Output
 {
 public:
-	Output(int group, int rowSize, std::vector<int> deviceNumList) : group(group), rowSize(rowSize), deviceNumList(deviceNumList) { ; }
+	Output(int group, int rowSize, std::map<int, std::vector<TableManager>>& allNondominatedSolutions) : group(group), rowSize(rowSize), allNondominatedSolutions(allNondominatedSolutions) { ; }
 
 	void AddResultSingle(int round, TableManager& cTable);
 	void AddResultList(int round, std::vector<TableManager> cTableList);
@@ -28,5 +28,4 @@ private:
 
 	int group;
 	int rowSize;
-	std::vector<int> deviceNumList;
 };

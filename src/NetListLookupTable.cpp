@@ -29,7 +29,7 @@ void NetListLookupTable::AddD(std::string d)
 	}
 }
 
-tuple<std::string, std::string, std::string> NetListLookupTable::GetTerminals(const std::string& key) const
+tuple<std::string, std::string, std::string> NetListLookupTable::GetAllPins(const std::string& key) const
 {
 	auto it = this->lookupTable.find(key);
 	if (it != this->lookupTable.end())

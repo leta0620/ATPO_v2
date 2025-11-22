@@ -25,7 +25,7 @@ public:
 	void AddS(std::string);
 	void AddG(std::string);
 	void AddD(std::string);
-	tuple<std::string, std::string, std::string> GetTerminals(const std::string& key) const;
+	tuple<std::string, std::string, std::string> GetAllPins(const std::string& key) const;
 
 private:
 	string cellName;
