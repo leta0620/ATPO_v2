@@ -1,43 +1,46 @@
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include "NetListLookupTable.h"
+#include "NetlistLookupTable.h"
 
-using namespace std;
-
-void NetListLookupTable::AddS(std::string s)
+std::string NetlistLookupTable::FindPinS(std::string synbolName)
 {
-	for (auto& [key, terminals] : this->lookupTable)
+	auto it = this->netlistUnitMap.find(synbolName);
+	if (it != this->netlistUnitMap.end())
 	{
-		std::get<2>(terminals) = s;
+		return it->second.GetPinS(synbolName);
 	}
+	return "";
 }
 
-void NetListLookupTable::AddG(std::string g)
+std::string NetlistLookupTable::FindPinG(std::string synbolName)
 {
-	for (auto& [key, terminals] : this->lookupTable)
+	auto it = this->netlistUnitMap.find(synbolName);
+	if (it != this->netlistUnitMap.end())
 	{
-		std::get<1>(terminals) = g;
+		return it->second.GetPinG(synbolName);
 	}
+	return "";
 }
 
-void NetListLookupTable::AddD(std::string d)
+std::string NetlistLookupTable::FindPinD(std::string synbolName)
 {
-	for (auto& [key, terminals] : this->lookupTable)
+	auto it = this->netlistUnitMap.find(synbolName);
+	if (it != this->netlistUnitMap.end())
 	{
-		std::get<0>(terminals) = d;
+		return it->second.GetPinD(synbolName);
 	}
+	return "";
 }
 
-tuple<std::string, std::string, std::string> NetListLookupTable::GetAllPins(const std::string& key) const
+void NetlistLookupTable::AddNetlistUnit(const NetlistUnit& netlistUnit)
 {
-	auto it = this->lookupTable.find(key);
-	if (it != this->lookupTable.end())
+	this->netlistUnitMap[netlistUnit.GetSynbolName()] = netlistUnit;
+}
+
+NetlistUnit NetlistLookupTable::GetNetlistUnit(const std::string& synbolName)
+{
+	auto it = this->netlistUnitMap.find(synbolName);
+	if (it != this->netlistUnitMap.end())
 	{
 		return it->second;
 	}
-	else
-	{
-		return make_tuple("", "", "");
-	}
+	return NetlistUnit();
 }

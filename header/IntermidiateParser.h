@@ -12,16 +12,19 @@ public:
 	{ ;	}
 
 	bool Parse();
+	bool GenerateNetlistLookupTable();
+
+	NetlistLookupTable& GetNetlistLookupTable() { return this->netlistLookupTable; }
 
 	std::vector<std::string> GetCommonSourceCellList() const { return this->commonSourceCellList; }
-	std::vector<NetListLookupTable> GetNetListLookupTableList() const { return this->netListLookupTableList; }
+
 
 
 private:
 	std::string intrrmediateFilePath;
 
 	std::vector<std::string> commonSourceCellList;
-	std::vector<NetListLookupTable> netListLookupTableList;
+	NetlistLookupTable netlistLookupTable;
 
 	// Device instances tmp data
 	std::vector<tuple< std::string, std::string, std::string, int>> deviceInstanceList; // cellName, synbolName, analogcellType, unitCount), Device instances tmp data. e.g. MM0 A analogcell 720
