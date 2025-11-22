@@ -7,8 +7,9 @@
 
 using namespace std;
 
-SAManager::SAManager(TableManager& initialTable, double coolRate, double initialTemp, double finalTemp, int iterationPerTemp, bool openCommandLineOutput)
+SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate, double initialTemp, double finalTemp, int iterationPerTemp, bool openCommandLineOutput)
 	: initialTable(initialTable)
+	, netlistLookupTable(netlist)
 	, nowUseTable(initialTable)
 	, coolRate(coolRate)
 	, initialTemp(initialTemp)
@@ -16,11 +17,11 @@ SAManager::SAManager(TableManager& initialTable, double coolRate, double initial
 	, currentTemp(initialTemp)
 	, iterationPerTemp(iterationPerTemp)
 	, openCommandLineOutput(openCommandLineOutput)
+	
 {
 	// 計算成本並初始化 nondominatedSolution
 	this->initialTable.CalculateTableCost();
 	this->nondominatedSolution.push_back(this->initialTable);
-
 	// 開始 SA 流程
 	this->SAProcess();
 }
@@ -95,7 +96,7 @@ void SAManager::Perturbation(std::mt19937& gen)
 
 }
 
-bool doesADominateB(const std::unordered_map<CostEnum, int>& aCost, const std::unordered_map<CostEnum, int>& bCost)
+bool doesADominateB(const std::unordered_map<CostEnum, double>& aCost, const std::unordered_map<CostEnum, double>& bCost)
 {
 	bool aBetterInAtLeastOne = false;
 	for (size_t i = 0; i < aCost.size(); ++i)
@@ -236,7 +237,7 @@ void SAManager::UpdateNondominatedSolution()
 	for (auto& newTable : this->newTableList)
 	{
 		bool newIsDominated = false;
-		std::unordered_map<CostEnum, int> newCost = newTable.GetCostMap();
+		std::unordered_map<CostEnum, double> newCost = newTable.GetCostMap();
 		for (size_t i = 0; i < this->nondominatedSolution.size(); i++)
 		{
 			if (doesADominateB(newCost, this->nondominatedSolution[i].GetCostMap()))

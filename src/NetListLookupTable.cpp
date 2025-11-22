@@ -1,6 +1,6 @@
 #include "NetlistLookupTable.h"
 
-std::string NetlistLookupTable::FindPinS(std::string synbolName)
+std::string NetlistLookupTable::GetPinSLinkWho(std::string synbolName)
 {
 	auto it = this->netlistUnitMap.find(synbolName);
 	if (it != this->netlistUnitMap.end())
@@ -10,7 +10,7 @@ std::string NetlistLookupTable::FindPinS(std::string synbolName)
 	return "";
 }
 
-std::string NetlistLookupTable::FindPinG(std::string synbolName)
+std::string NetlistLookupTable::GetPinGLinkWho(std::string synbolName)
 {
 	auto it = this->netlistUnitMap.find(synbolName);
 	if (it != this->netlistUnitMap.end())
@@ -20,7 +20,7 @@ std::string NetlistLookupTable::FindPinG(std::string synbolName)
 	return "";
 }
 
-std::string NetlistLookupTable::FindPinD(std::string synbolName)
+std::string NetlistLookupTable::GetPinDLinkWho(std::string synbolName)
 {
 	auto it = this->netlistUnitMap.find(synbolName);
 	if (it != this->netlistUnitMap.end())

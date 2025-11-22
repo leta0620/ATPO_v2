@@ -2,6 +2,7 @@
 #include <string>
 #include <unordered_map>
 #include "Group.h"
+#include "NetlistLookupTable.h"
 
 enum class CostEnum
 {
@@ -14,7 +15,20 @@ enum class CostEnum
 class TableManager
 {
 public:
-	TableManager(int groupSize, int rowSize, int colSize);
+	TableManager() = default;
+	TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist);
+
+	void SetNetlistLookupTable(NetlistLookupTable& netlist) { this->netlist = netlist; }
+
+	// **this function will re-initialize the table, make sure the old data is not needed**
+	void SetTableSize(int rowSize, int colSize);
+	void SetGroupSize(int groupSize) { this->groupSize = groupSize; }
+	int GetRowSize() const { return rowSize; }
+	int GetColSize() const { return colSize; }
+	int GetGroupSize() const { return groupSize; }
+
+	Group GetGroup(int row, int col) const { return table[row][col]; }
+
 
 	// placement operations
 	bool PlaceGroup(const Group& group, int& placedRow, int& placedCol);
@@ -42,6 +56,8 @@ private:
 	int groupSize = 0;
 
 	int nfin = 4; // default 4 fin number per device unit
+
+	NetlistLookupTable netlist;
 
 	void InitializeTable();
 	// check colume rule(same type sequential)

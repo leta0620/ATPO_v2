@@ -1,5 +1,6 @@
 #pragma once
 #include "TableManager.h"
+#include "NetlistLookupTable.h"
 #include <random>
 
 class SAManager
@@ -18,6 +19,8 @@ private:
 	TableManager nowUseTable;
 	std::vector<TableManager> newTableList;
 
+	NetlistLookupTable netlistLookupTable;
+
 
 	// simulated annealing process
 	void SAProcess();
@@ -31,7 +34,7 @@ private:
 	// compare newTableList with nondominatedSolution and update nondominatedSolution
 	void UpdateNondominatedSolution();
 public:
-	SAManager(TableManager& initialTable, double coolRate = 0.95, double initialTemp = 1000.0, double finalTemp = 1.0, int iterationPerTemp = 100, bool openCommandLineOutput = false);
+	SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate = 0.95, double initialTemp = 1000.0, double finalTemp = 1.0, int iterationPerTemp = 100, bool openCommandLineOutput = false);
 
 	std::vector<TableManager> GetNondominatedSolution() { return nondominatedSolution; }
 

@@ -1,10 +1,11 @@
 #include "TableManager.h"
 
-TableManager::TableManager(int groupSize, int rowSize, int colSize)
+TableManager::TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist)
 {
 	this->groupSize = groupSize;
 	this->rowSize = rowSize;
 	this->colSize = colSize;
+	this->netlist = netlist;
 	InitializeTable();
 }
 
@@ -23,7 +24,10 @@ std::vector<std::string> TableManager::GetTableStringFormat()
 		std::string rowString;
 		for (auto& group : row)
 		{
-			rowString += group.GetName();
+			for (const auto& deviceUnit : group.GetDeviceUnits())
+			{
+				rowString += deviceUnit.GetSymbol();
+			}
 		}
 		tableStrings.push_back(rowString);
 	}
@@ -102,4 +106,11 @@ bool TableManager::EqualTableToSelf(TableManager& otherTable)
 	std::vector<std::string> otherTableStrings = otherTable.GetTableStringFormat();
 
 	return thisTableStrings == otherTableStrings;
+}
+
+void TableManager::SetTableSize(int rowSize, int colSize)
+{
+	this->rowSize = rowSize;
+	this->colSize = colSize;
+	InitializeTable();
 }
