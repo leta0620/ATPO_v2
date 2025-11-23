@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 #include <vector>
 #include "TableManager.h"
@@ -7,9 +8,9 @@
 class InitialPlacement
 {
 public:
-	InitialPlacement(int groupSize, int rowSize, NetListLookupTable netlist) : groupSize(groupSize), rowSize(rowSize), colSize(0), netListLookupTable(netlist)
+	InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist) : groupSize(groupSize), rowSize(rowSize), colSize(0), netListLookupTable(netlist)
 	{
-		InitialTableList.resize(rowSize, TableManager(groupSize, rowSize, colSize));
+		InitialTableList.resize(rowSize, TableManager(groupSize, rowSize, colSize, netListLookupTable));
 	}
 
 	std::vector<TableManager>& GetInitialTableList() 
@@ -18,7 +19,7 @@ public:
 	}
 
 private:
-	NetListLookupTable netListLookupTable;
+	NetlistLookupTable netListLookupTable;
 
 	std::vector<TableManager> InitialTableList;
 	int groupSize;

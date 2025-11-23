@@ -1,4 +1,4 @@
-#include "NetlistLookupTable.h"
+#include "NetListLookupTable.h"
 
 std::string NetlistLookupTable::GetPinSLinkWho(std::string synbolName)
 {
