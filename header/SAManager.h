@@ -1,6 +1,6 @@
 #pragma once
 #include "TableManager.h"
-#include "NetlistLookupTable.h"
+#include "NetListLookupTable.h"
 #include <random>
 
 class SAManager

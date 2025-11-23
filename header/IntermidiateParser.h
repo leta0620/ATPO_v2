@@ -3,7 +3,7 @@
 #include <vector>
 #include <unordered_map>
 
-#include "NetlistLookupTable.h"
+#include "NetListLookupTable.h"
 
 class IntermidiateParser
 {

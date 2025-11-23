@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include "Group.h"
-#include "NetlistLookupTable.h"
+#include "NetListLookupTable.h"
 
 enum class CostEnum
 {

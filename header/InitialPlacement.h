@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include "TableManager.h"
-#include "NetlistLookupTable.h"
+#include "NetListLookupTable.h"
 
 
 class InitialPlacement
