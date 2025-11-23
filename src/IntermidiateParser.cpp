@@ -11,7 +11,7 @@ bool IntermidiateParser::Parse()
 	if (!infile.is_open())
 	{
 		cerr << "Error: Unable to open file " << this->intrrmediateFilePath << endl;
-		return;
+		return false;
 	}
 
 	string line;
