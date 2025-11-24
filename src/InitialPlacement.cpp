@@ -171,5 +171,5 @@ void InitialPlacement::CalculateColSize()
 	}
 	totalGroups = (totalUnits + groupSize - 1) / groupSize; // ceiling division
 	this->colSize = (totalGroups + rowSize - 1) / rowSize; // ceiling division
-	std::cout << "Calculated column size: " << this->colSize << std::endl;
+	//std::cout << "Calculated column size: " << this->colSize << std::endl;
 }

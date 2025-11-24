@@ -127,7 +127,6 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 		unit.SetSynbolName(synbolName);
 		unit.SetDeviceUnitCount(unitCount);
 		tempNetlistMap[synbolName] = unit;
-		this->netlistLookupTable.AddNetlistUnit(unit);
 	}
 
 	// build real common source device list
@@ -268,6 +267,15 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 			cerr << "Error: Empty connection list in other connection list." << endl;
 			return false;
 		}
+	}
+	for (const auto& deviceInstance : this->deviceInstanceList)
+	{
+		// 使用 C++17 結構綁定直接取出 tuple 的各個欄位
+		const auto& [cellName, synbolName, analogcellType, unitCount] = deviceInstance;
+
+		NetlistUnit unit;
+		unit = tempNetlistMap[synbolName];
+		this->netlistLookupTable.AddNetlistUnit(unit);
 	}
 
 
