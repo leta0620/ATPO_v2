@@ -44,3 +44,14 @@ NetlistUnit NetlistLookupTable::GetNetlistUnit(const std::string& synbolName)
 	}
 	return NetlistUnit();
 }
+
+std::vector<std::string> NetlistLookupTable::GetAllSymbolNames()
+{
+	std::vector<std::string> symbolNames;
+	symbolNames.reserve(this->netlistUnitMap.size());
+	for (const auto& pair : this->netlistUnitMap)
+	{
+		symbolNames.push_back(pair.first);
+	}
+	return symbolNames;
+}

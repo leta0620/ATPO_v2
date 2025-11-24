@@ -35,6 +35,14 @@ public:
 	CellRotation GetRotation() const {
 		return rotation;
 	}
+	void FlipRotation() {
+		if (rotation == CellRotation::R0) {
+			rotation = CellRotation::MY;
+		}
+		else {
+			rotation = CellRotation::R0;
+		}
+	}
 
 	/*void SetConnections(DeviceUnit* drain, DeviceUnit* gate, DeviceUnit* source) {
 		d = drain;
