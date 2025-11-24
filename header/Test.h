@@ -6,6 +6,7 @@
 #include "DeviceUnit.h"
 #include "InitialPlacement.h"
 #include "SAManager.h"
+#include "IntermidiateParser.h"
 
 
 class Test
@@ -15,4 +16,6 @@ public:
 
 private:
 	// Add your test functions here, and call them in the constructor
+
+	void TestInitialPlacement(int groupSize, int rowNum);
 };

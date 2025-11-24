@@ -34,6 +34,7 @@ bool IntermidiateParser::Parse()
 				string deviceToken;
 				tuple<string, string, string, int> deviceInstance;
 				deviceSS >> get<0>(deviceInstance) >> get<1>(deviceInstance) >> get<2>(deviceInstance) >> get<3>(deviceInstance);
+				this->deviceInstanceList.push_back(deviceInstance);
 			}
 		}
 
@@ -126,6 +127,7 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 		unit.SetSynbolName(synbolName);
 		unit.SetDeviceUnitCount(unitCount);
 		tempNetlistMap[synbolName] = unit;
+		this->netlistLookupTable.AddNetlistUnit(unit);
 	}
 
 	// build real common source device list

@@ -163,10 +163,13 @@ void InitialPlacement::CalculateColSize()
 {
 	// Implementation for calculating column size
 	int totalUnits = 0;
+	int totalGroups = 0;
 	for(auto& device : netListLookupTable.GetAllSymbolNames())
 	{
 		NetlistUnit unit = netListLookupTable.GetNetlistUnit(device);
 		totalUnits += unit.GetDeviceUnitCount();
 	}
-	this->colSize = (totalUnits + groupSize - 1) / groupSize; // ceiling division
+	totalGroups = (totalUnits + groupSize - 1) / groupSize; // ceiling division
+	this->colSize = (totalGroups + rowSize - 1) / rowSize; // ceiling division
+	std::cout << "Calculated column size: " << this->colSize << std::endl;
 }

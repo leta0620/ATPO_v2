@@ -87,7 +87,13 @@ bool TableManager::RowRuleCheck(int rowPlace, int colPlace, const Group& group)
 // placement operations implementation
 bool TableManager::PlaceGroup(const Group& group, int& placedRow, int& placedCol)
 {
-	return false;
+	if (placedRow < 0 || placedRow >= this->rowSize || placedCol < 0 || placedCol >= this->colSize)
+		return false;
+	else
+	{
+		table[placedRow][placedCol] = group;
+		return true;
+	}
 }
 bool TableManager::SwapGroups(int row1, int col1, int row2, int col2)
 {
