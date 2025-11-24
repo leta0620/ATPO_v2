@@ -18,7 +18,7 @@ public:
 	void SetCommonSourceList(const std::vector<std::string>& sourceList) { this->commonSourceList = sourceList; }
 	std::vector<std::string> GetCommonSourceList() const { return this->commonSourceList; }
 
-
+	std::vector<std::string> GetAllSymbolNames();
 
 private:
 	std::vector<std::string> commonSourceList;

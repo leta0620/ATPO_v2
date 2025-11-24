@@ -27,8 +27,8 @@ private:
 	// Calculate initial placement tables list
 	void CalculateInitialTableList();
 
-	void CalculatecolSize();
+	void CalculateColSize();
 
-	void InitialPahtOrder();
+	void InitialPathOrder();
 
 };
