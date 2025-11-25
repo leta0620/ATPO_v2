@@ -47,6 +47,7 @@ void InitialPlacement::CalculateInitialTableList()
 
 			// 反轉整個 pathVec，從尾排到頭
 			std::reverse(pathVec.begin(), pathVec.end());
+			int rowCount = 0;
 
 			for (int currentRow : currentRowOrder)
 			{
@@ -58,7 +59,7 @@ void InitialPlacement::CalculateInitialTableList()
 					{
 						DeviceUnit currentUnit = pathVec.back();
 						pathVec.pop_back();
-						if (currentRow % 2 == 1)
+						if (rowCount % 2 == 1)
 						{
 							currentUnit.FlipRotation();
 							groupUnits.insert(groupUnits.begin(), currentUnit);
@@ -83,7 +84,7 @@ void InitialPlacement::CalculateInitialTableList()
 					currentgroup.SetDeviceUnits(groupUnits);
 					// 把 currentgroup 放入 tableManager（假設 API 為 PlaceGroup）
 					
-					if (currentRow % 2 == 1)
+					if (rowCount % 2 == 1)
 					{
 						int assignCol = this->colSize - 1 - currentCol;
 						tableManager.PlaceGroup(currentgroup, currentRow, assignCol);
@@ -93,8 +94,8 @@ void InitialPlacement::CalculateInitialTableList()
 						tableManager.PlaceGroup(currentgroup, currentRow, currentCol);
 					}
 				}
+				rowCount++;
 			}
-
 			// 將 tableManager 加入 InitialTableList
 			this->InitialTableList.push_back(std::move(tableManager));
 		}
@@ -132,9 +133,9 @@ void InitialPlacement::InitialPathOrder()
 				--unitCount;
 
 				
-				if (netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]) != "")
+				if (netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).second != "")
 				{
-					NetlistUnit shareDeviceUnit = netListLookupTable.GetNetlistUnit(netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]));
+					NetlistUnit shareDeviceUnit = netListLookupTable.GetNetlistUnit(netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).first);
 					deviceUnit.SetSymbol(shareDeviceUnit.GetSynbolName());
 					deviceUnit.SetAnalogCellType(shareDeviceUnit.GetAnalogType());
 					deviceUnit.SetRotation(CellRotation::MY);

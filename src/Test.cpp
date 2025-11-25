@@ -8,8 +8,9 @@ Test::Test()
 {
 	// Add your test functions here, and call them in the constructor
 	//this->TestParsing()
-	this->TestInitialPlacement(8, 8)
-	;
+	this->TestInitialPlacement(8, 8);
+	//this->TestInitialPlacement(6, 6);
+
 }
 void Test::TestParsing()
 {
@@ -34,7 +35,7 @@ void Test::TestParsing()
 
 void Test::TestInitialPlacement(int groupSize, int rowNum)
 {
-	IntermidiateParser parser("test.txt");
+	IntermidiateParser parser("test2.txt");
 	if (!parser.Parse()) {
 		std::cerr << "Error: Failed to parse intermediate code file." << std::endl;
 		return;
@@ -85,7 +86,25 @@ void Test::TestInitialPlacement(int groupSize, int rowNum)
 			}
 			std::cout << std::endl;
 		}
+		std::cout << "Type :" << std::endl;
+		for (int rowIdx = 0; rowIdx < table.GetRowSize(); ++rowIdx)
+		{
+			for (int colIdx = 0; colIdx < table.GetColSize(); ++colIdx)
+			{
+				const Group& group = table.GetGroup(rowIdx, colIdx);
+				// 可以在這裡對 group 做進一步檢查或輸出
+				for (auto& unit : group.GetDeviceUnits())
+				{
 
+					if (unit.GetAnalogCellType() == "analogcell") std::cout << "A";
+					else if (unit.GetAnalogCellType() == "cascodecell") std::cout << "C";
+
+					// 可以在這裡對 device 做進一步檢查或輸出
+				}
+				std::cout << '|';
+			}
+			std::cout << std::endl;
+		}
 		std::cout << "Rotation :" << std::endl;
 
 		for (int rowIdx = 0; rowIdx < table.GetRowSize(); ++rowIdx)
