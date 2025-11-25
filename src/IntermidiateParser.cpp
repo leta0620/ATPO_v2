@@ -92,6 +92,7 @@ bool IntermidiateParser::Parse()
 					string gateLine;
 					stringstream gateSS(line);
 					string gateToken;
+					gateSS >> gateToken;
 
 					if (gateToken == ".net")
 					{
@@ -178,7 +179,7 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 		}
 	}
 
-	for (const auto& linkList : this->otherConnectionList)
+	for (const auto& linkList : this->connectionList)
 	{
 		if (linkList.size() > 2)
 		{
@@ -287,6 +288,12 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 
 		}
 	}*/
+
+	// put all device to netlistlookuptable
+	for (const auto& pair : tempNetlistMap)
+	{
+		this->netlistLookupTable.AddNetlistUnit(pair.second);
+	}
 
 	return true;
 }

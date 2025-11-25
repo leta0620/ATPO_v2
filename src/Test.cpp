@@ -1,10 +1,35 @@
 #include "Test.h"
+#include <string>
+#include <vector>
+
+using namespace std;
 
 Test::Test()
 {
 	// Add your test functions here, and call them in the constructor
+	//this->TestParsing()
 	this->TestInitialPlacement(8, 8)
 	;
+}
+void Test::TestParsing()
+{
+	string intermediate_code_file_path = "test.txt";
+	IntermidiateParser parser(intermediate_code_file_path);
+
+	parser.Parse();
+	parser.GenerateNetlistLookupTable();
+
+	NetlistLookupTable& netlist = parser.GetNetlistLookupTable();
+	// test get pin
+	pair<string, string> dWho = netlist.GetPinDLinkWho("A");
+	pair<string, string> gWho = netlist.GetPinGLinkWho("A");
+	pair<string, string> sWho = netlist.GetPinSLinkWho("A");
+
+	pair<string, string> dWho1 = netlist.GetPinDLinkWho("B");
+	pair<string, string> gWho1 = netlist.GetPinGLinkWho("B");
+	pair<string, string> sWho1 = netlist.GetPinSLinkWho("B");
+
+	return;
 }
 
 void Test::TestInitialPlacement(int groupSize, int rowNum)
@@ -42,7 +67,7 @@ void Test::TestInitialPlacement(int groupSize, int rowNum)
 		return;
 	}
 	// Further checks can be added here to validate the contents of initialTableList
-	for(auto& table : initialTableList)
+	for (auto& table : initialTableList)
 	{
 		std::cout << "Symbol :" << std::endl;
 		for (int rowIdx = 0; rowIdx < table.GetRowSize(); ++rowIdx)
@@ -71,7 +96,7 @@ void Test::TestInitialPlacement(int groupSize, int rowNum)
 				// 可以在這裡對 group 做進一步檢查或輸出
 				for (auto& unit : group.GetDeviceUnits())
 				{
-					if (unit.GetRotation() == CellRotation::R0) 
+					if (unit.GetRotation() == CellRotation::R0)
 					{
 						std::cout << std::string("R0");
 					}
@@ -94,4 +119,3 @@ void Test::TestInitialPlacement(int groupSize, int rowNum)
 		std::cout << std::endl;
 	}
 }
-
