@@ -269,15 +269,7 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 			return false;
 		}
 	}
-	for (const auto& deviceInstance : this->deviceInstanceList)
-	{
-		// 使用 C++17 結構綁定直接取出 tuple 的各個欄位
-		const auto& [cellName, synbolName, analogcellType, unitCount] = deviceInstance;
 
-		NetlistUnit unit;
-		unit = tempNetlistMap[synbolName];
-		this->netlistLookupTable.AddNetlistUnit(unit);
-	}
 
 
 	// gate link 先不處理
