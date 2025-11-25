@@ -7,16 +7,28 @@ void NetlistUnit::AddPin(const std::string& synbolName, const std::string& pinD,
 
 void NetlistUnit::AddPinD(const std::string& synbolName, const std::string& pinD)
 {
+	if (this->pinMap.find(synbolName) == this->pinMap.end())
+	{
+		this->pinMap[synbolName] = std::vector<std::string>(3, "");
+	}
 	this->pinMap[synbolName][0] = pinD;
 }
 
 void NetlistUnit::AddPinG(const std::string& synbolName, const std::string& pinG)
 {
+	if (this->pinMap.find(synbolName) == this->pinMap.end())
+	{
+		this->pinMap[synbolName] = std::vector<std::string>(3, "");
+	}
 	this->pinMap[synbolName][1] = pinG;
 }
 
 void NetlistUnit::AddPinS(const std::string& synbolName, const std::string& pinS)
 {
+	if (this->pinMap.find(synbolName) == this->pinMap.end())
+	{
+		this->pinMap[synbolName] = std::vector<std::string>(3, "");
+	}
 	this->pinMap[synbolName][2] = pinS;
 }
 

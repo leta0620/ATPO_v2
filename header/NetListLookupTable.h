@@ -8,9 +8,9 @@
 class NetlistLookupTable
 {
 public:
-	std::string GetPinSLinkWho(std::string synbolName);
-	std::string GetPinGLinkWho(std::string synbolName);
-	std::string GetPinDLinkWho(std::string synbolName);
+	std::pair<std::string, std::string> GetPinSLinkWho(std::string synbolName);
+	std::pair<std::string, std::string> GetPinGLinkWho(std::string synbolName);
+	std::pair<std::string, std::string> GetPinDLinkWho(std::string synbolName);
 
 	void AddNetlistUnit(const NetlistUnit& netlistUnit);
 	NetlistUnit GetNetlistUnit(const std::string& synbolName);
