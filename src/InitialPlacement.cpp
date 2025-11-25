@@ -16,7 +16,7 @@ void InitialPlacement::CalculateInitialTableList()
 	std::vector<int> rowOrder;
 	if (rowSize > 0)
 	{
-		int mid = (rowSize - 1) / 2; // 璝案计熬オいみ
+		int mid = rowSize  / 2; // 璝案计熬オいみ
 		rowOrder.push_back(mid);
 		for (int offset = 1; (int)rowOrder.size() < rowSize; ++offset)
 		{
