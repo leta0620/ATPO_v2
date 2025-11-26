@@ -21,6 +21,12 @@ using namespace std;
 
 int main(int argc, char* argv[]) {
 	// input commandLine arguments : groupSize, rowSize, itermidiate_code_file_path, output_file_path, thread_num
+	if (argc == 2 && string(argv[1]) == "test") {
+		// Run tests
+		Test test;
+		return 0;
+	}
+
 	if (argc != 6) {
 		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <intermediate_code_file_path> <output_file_path> <thread_num>" << endl;
 		return 1;
