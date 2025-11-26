@@ -188,3 +188,15 @@ void TableManager::SetTableSize(int rowSize, int colSize)
 	this->colSize = colSize;
 	InitializeTable();
 }
+
+bool TableManager::CheckCanSwapGroups(int row1, int col1, int row2, int col2)
+{
+	Group group1 = table[row1][col1];
+	Group group2 = table[row2][col2];
+	if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
+		this->ColumnRuleCheck(row2, col2, group1) && this->RowRuleCheck(row2, col2, group1))
+	{
+		return true;
+	}
+	return false;
+}

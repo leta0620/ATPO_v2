@@ -68,6 +68,29 @@ void SAManager::SAProcess()
 
 void SAManager::Perturbation(std::mt19937& gen)
 {
+	auto SwapTwoGroupUnit = [](TableManager& table, mt19937& gen) {
+		int rowSize = table.GetRowSize();
+		int colSize = table.GetColSize();
+		uniform_int_distribution<> disRow(0, rowSize - 1);
+		uniform_int_distribution<> disCol(0, colSize - 1);
+		int row1 = disRow(gen);
+		int col1 = disCol(gen);
+		int row2 = 0;
+		int col2 = 0;
+		do
+		{
+			row2 = disRow(gen);
+			col2 = disCol(gen);
+		} while (table.GetGroup(row1, col1).GetTypeHash() == table.GetGroup(row2, col2).GetTypeHash() && !table.CheckCanSwapGroups(row1, col1, row2, col2));
+
+		table.SwapGroups(row1, col1, row2, col2);
+		};
+
+	// generate new solutions by swapping two group unit
+	TableManager newTable = this->nowUseTable;
+	SwapTwoGroupUnit(newTable, gen);
+	this->newTableList.push_back(newTable);
+
 	//auto SwapTwoDeviceUnit = [](CostTableManager& table, mt19937& gen) {
 	//	int rowSize = table.GetRowSize();
 	//	int colSize = table.GetColSize();
