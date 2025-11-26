@@ -62,9 +62,9 @@ private:
 
 	void InitializeTable();
 	// check colume rule(same type sequential)
-	bool ColumnRuleCheck(int rowPlace, int colPlace, const Group& group);
+	bool ColumnRuleCheck(int rowPlace, int colPlace, Group& group);
 	// check row rule(neighborhood group can link)
-	bool RowRuleCheck(int rowPlace, int colPlace, const Group& group);
+	bool RowRuleCheck(int rowPlace, int colPlace, Group& group);
 
 	// cost part
 	std::unordered_map<CostEnum, double> costMap;

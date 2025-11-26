@@ -1,4 +1,8 @@
+#include <vector>
+
 #include "TableManager.h"
+
+using namespace std;
 
 TableManager::TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist)
 {
@@ -73,13 +77,56 @@ void TableManager::CalculateSpetationCost() { ; }
 
 
 // check colume rule(same type sequential)
-bool TableManager::ColumnRuleCheck(int rowPlace, int colPlace, const Group& group)
+bool TableManager::ColumnRuleCheck(int rowPlace, int colPlace, Group& group)
 {
+	int nowGroupTypeHash = group.GetTypeHash();
+
+	// check above
+	if (rowPlace - 1 >= 0)
+	{
+		int aboveGroupTypeHash = table[rowPlace - 1][colPlace].GetTypeHash();
+		if (nowGroupTypeHash == aboveGroupTypeHash)
+		{
+			return false;
+		}
+	}
+
+	// check below
+	if (rowPlace + 1 < rowSize)
+	{
+		int belowGroupTypeHash = table[rowPlace + 1][colPlace].GetTypeHash();
+		if (nowGroupTypeHash == belowGroupTypeHash)
+		{
+			return false;
+		}
+	}
+
 	return true;
 }
 // check row rule(neighborhood group can link)
-bool TableManager::RowRuleCheck(int rowPlace, int colPlace, const Group& group)
+bool TableManager::RowRuleCheck(int rowPlace, int colPlace, Group& group)
 {
+	vector<DeviceUnit> groupDeviceUnits = group.GetDeviceUnits();
+	
+	// check left
+	DeviceUnit firstDeviceUnit = groupDeviceUnits[0];
+	if (colPlace - 1 >= 0)
+	{
+		Group leftGroup = table[rowPlace][colPlace - 1];
+		pair<string, string> leftGroupLastWhoAndOuterPin = leftGroup.GetLastDeviceUnitWhoAndOuterPin();
+
+		if (leftGroupLastWhoAndOuterPin.first != firstDeviceUnit.GetSymbol()) return false;
+	}
+
+	// check right
+	DeviceUnit lastDeviceUnit = groupDeviceUnits.back();
+	if (colPlace + 1 < colSize)
+	{
+		Group rightGroup = table[rowPlace][colPlace + 1];
+		pair<string, string> rightGroupFirstWhoAndOuterPin = rightGroup.GetFirstDeviceUnitWhoAndOuterPin();
+		if (rightGroupFirstWhoAndOuterPin.first != lastDeviceUnit.GetSymbol()) return false;
+	}
+
 	return true;
 }
 
