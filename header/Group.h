@@ -33,8 +33,8 @@ public:
 		return typeHash;
 	}
 
-	std::pair<std::string, std::string> GetFirstDeviceUnitWhoAndOuterPin();
-	std::pair<std::string, std::string> GetLastDeviceUnitWhoAndOuterPin();
+	std::pair<std::string, CellRotation> GetFirstDeviceUnitWhoAndRotation();
+	std::pair<std::string, CellRotation> GetLastDeviceUnitWhoAndRotation();
 
 private:
 	//std::string name;

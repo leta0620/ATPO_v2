@@ -26,6 +26,10 @@ pair<std::string, std::string> NetlistLookupTable::GetPinSLinkWho(std::string sy
 			{
 				return pair<string, string>(who, "S");
 			}
+			else if (itWho->second.GetPinS(who) == "COMMON_SOURCE")
+			{
+				return pair<string, string>(who, "COMMON_SOURCE");
+			}
 		}
 		else
 		{

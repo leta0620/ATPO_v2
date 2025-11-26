@@ -10,7 +10,7 @@ enum class CostEnum
 	ccCost,
 	rCost,
 	cCost,
-	spetationCost
+	sperationCost
 };
 
 class TableManager

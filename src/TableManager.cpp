@@ -81,9 +81,9 @@ std::vector<std::string> TableManager::GetTableRotationFormat()
         std::string rowRotation;
         for (auto& group : row)
         {
-            for (const auto& deviceUnit : group.GetDeviceUnits())
+            for (auto& deviceUnit : group.GetDeviceUnits())
             {
-                rowRotation += std::to_string(static_cast<int>(deviceUnit.GetRotation()));
+				rowRotation += deviceUnit.GetStringRotation();
             }
         }
         tableRotations.push_back(rowRotation);
@@ -296,7 +296,7 @@ void TableManager::CalculateSpetationCost() {
     }
 
     if (cells.size() < 2) {
-        costMap[CostEnum::spetationCost] = 0.0;
+        costMap[CostEnum::sperationCost] = 0.0;
         return;
     }
 
@@ -351,7 +351,7 @@ void TableManager::CalculateSpetationCost() {
         }
     }
 
-    costMap[CostEnum::spetationCost] = total_sigma;
+    costMap[CostEnum::sperationCost] = total_sigma;
 }
 
 // =======================
@@ -367,7 +367,7 @@ bool TableManager::ColumnRuleCheck(int rowPlace, int colPlace, Group& group)
 	if (rowPlace - 1 >= 0)
 	{
 		int aboveGroupTypeHash = table[rowPlace - 1][colPlace].GetTypeHash();
-		if (nowGroupTypeHash == aboveGroupTypeHash)
+		if (nowGroupTypeHash != aboveGroupTypeHash)
 		{
 			return false;
 		}
@@ -377,7 +377,7 @@ bool TableManager::ColumnRuleCheck(int rowPlace, int colPlace, Group& group)
 	if (rowPlace + 1 < rowSize)
 	{
 		int belowGroupTypeHash = table[rowPlace + 1][colPlace].GetTypeHash();
-		if (nowGroupTypeHash == belowGroupTypeHash)
+		if (nowGroupTypeHash != belowGroupTypeHash)
 		{
 			return false;
 		}
@@ -395,9 +395,30 @@ bool TableManager::RowRuleCheck(int rowPlace, int colPlace, Group& group)
 	if (colPlace - 1 >= 0)
 	{
 		Group leftGroup = table[rowPlace][colPlace - 1];
-		pair<string, string> leftGroupLastWhoAndOuterPin = leftGroup.GetLastDeviceUnitWhoAndOuterPin();
+		pair<string, CellRotation> leftGroupLastWhoAndRotation = leftGroup.GetLastDeviceUnitWhoAndRotation();
 
-		if (leftGroupLastWhoAndOuterPin.first != firstDeviceUnit.GetSymbol()) return false;
+        if (leftGroupLastWhoAndRotation.second == CellRotation::R0)
+        {
+            auto tmp = this->netlist.GetPinSLinkWho(leftGroupLastWhoAndRotation.first).first;
+
+            if (this->netlist.GetPinSLinkWho(leftGroupLastWhoAndRotation.first).first != firstDeviceUnit.GetSymbol() && !(this->netlist.GetPinSLinkWho(leftGroupLastWhoAndRotation.first).first == "COMMON_SOURCE" && firstDeviceUnit.GetRotation() == CellRotation::MY && this->netlist.GetPinSLinkWho(firstDeviceUnit.GetSymbol()).first == "COMMON_SOURCE"))
+            {
+                return false;
+            }
+        }
+        else if (leftGroupLastWhoAndRotation.second == CellRotation::MY)
+        {
+            auto tmp = this->netlist.GetPinSLinkWho(leftGroupLastWhoAndRotation.first).first;
+
+            if (this->netlist.GetPinDLinkWho(leftGroupLastWhoAndRotation.first).first != firstDeviceUnit.GetSymbol())
+            {
+                return false;
+            }
+		}
+        else
+        {
+			return false;
+        }
 	}
 
 	// check right
@@ -405,8 +426,31 @@ bool TableManager::RowRuleCheck(int rowPlace, int colPlace, Group& group)
 	if (colPlace + 1 < colSize)
 	{
 		Group rightGroup = table[rowPlace][colPlace + 1];
-		pair<string, string> rightGroupFirstWhoAndOuterPin = rightGroup.GetFirstDeviceUnitWhoAndOuterPin();
-		if (rightGroupFirstWhoAndOuterPin.first != lastDeviceUnit.GetSymbol()) return false;
+		pair<string, CellRotation> rightGroupFirstWhoAndRotation = rightGroup.GetFirstDeviceUnitWhoAndRotation();
+		//if (rightGroupFirstWhoAndOuterPin.first != lastDeviceUnit.GetSymbol()) return false;
+
+        if (rightGroupFirstWhoAndRotation.second == CellRotation::R0)
+        {
+            auto tmp = this->netlist.GetPinSLinkWho(rightGroupFirstWhoAndRotation.first).first;
+
+            if (this->netlist.GetPinDLinkWho(rightGroupFirstWhoAndRotation.first).first != lastDeviceUnit.GetSymbol())
+            {
+                return false;
+            }
+        }
+		else  if (rightGroupFirstWhoAndRotation.second == CellRotation::MY)
+        {
+            auto tmp = this->netlist.GetPinSLinkWho(rightGroupFirstWhoAndRotation.first).first;
+
+            if (this->netlist.GetPinSLinkWho(rightGroupFirstWhoAndRotation.first).first != lastDeviceUnit.GetSymbol() && !(this->netlist.GetPinSLinkWho(rightGroupFirstWhoAndRotation.first).first == "COMMON_SOURCE" && lastDeviceUnit.GetRotation() == CellRotation::R0 && this->netlist.GetPinSLinkWho(lastDeviceUnit.GetSymbol()).first == "COMMON_SOURCE"))
+            {
+                return false;
+            }
+		}
+        else
+        {
+			return false;
+        }
 	}
 
 	return true;
