@@ -136,13 +136,18 @@ bool TableManager::PlaceGroup(const Group& group, int& placedRow, int& placedCol
 {
 	if (placedRow < 0 || placedRow >= this->rowSize || placedCol < 0 || placedCol >= this->colSize)
 		return false;
-
-	Group placedGroup = group;
-	if (this->ColumnRuleCheck(placedRow, placedCol, placedGroup) && this->RowRuleCheck(placedRow, placedCol, placedGroup))
+	else
 	{
-		this->table[placedRow][placedCol] = placedGroup;
+		this->table[placedRow][placedCol] = group;
 		return true;
 	}
+
+	//Group placedGroup = group;
+	//if (this->ColumnRuleCheck(placedRow, placedCol, placedGroup) && this->RowRuleCheck(placedRow, placedCol, placedGroup))
+	//{
+	//	this->table[placedRow][placedCol] = placedGroup;
+	//	return true;
+	//}
 
 	return false;
 }
