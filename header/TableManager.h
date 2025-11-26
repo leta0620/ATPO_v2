@@ -34,7 +34,7 @@ public:
 	// placement operations
 	bool PlaceGroup(const Group& group, int& placedRow, int& placedCol);
 	bool SwapGroups(int row1, int col1, int row2, int col2);
-	bool MoveGroup(int srcRow, int srcCol, int destRow, int destCol);
+	bool MoveGroup(int srcRow, int srcCol, int destRow, int destCol);	// caution: the src position will be cleared
 
 	//output
 	std::vector<std::string> GetTableStringFormat();

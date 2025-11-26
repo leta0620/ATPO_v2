@@ -134,14 +134,41 @@ bool TableManager::RowRuleCheck(int rowPlace, int colPlace, Group& group)
 // placement operations implementation
 bool TableManager::PlaceGroup(const Group& group, int& placedRow, int& placedCol)
 {
+	Group placedGroup = group;
+	if (this->ColumnRuleCheck(placedRow, placedCol, placedGroup) && this->RowRuleCheck(placedRow, placedCol, placedGroup))
+	{
+		this->table[placedRow][placedCol] = placedGroup;
+		return true;
+	}
+
 	return false;
 }
 bool TableManager::SwapGroups(int row1, int col1, int row2, int col2)
 {
+	Group group1 = table[row1][col1];
+	Group group2 = table[row2][col2];
+
+	if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
+		this->ColumnRuleCheck(row2, col2, group1) && this->RowRuleCheck(row2, col2, group1))
+	{
+		this->table[row1][col1] = group2;
+		this->table[row2][col2] = group1;
+		return true;
+	}
+
 	return false;
 }
 bool TableManager::MoveGroup(int srcRow, int srcCol, int destRow, int destCol)
 {
+	Group srcGroup = table[srcRow][srcCol];
+	if (this->ColumnRuleCheck(destRow, destCol, srcGroup) && this->RowRuleCheck(destRow, destCol, srcGroup))
+	{
+		this->table[destRow][destCol] = srcGroup;
+		// clear source position
+		this->table[srcRow][srcCol] = Group();
+		return true;
+	}
+
 	return false;
 }
 
