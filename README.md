@@ -6,20 +6,28 @@ A small C++ project organized with CMake so it can be built on Visual Studio (Wi
 ```
 ├─ CMakeLists.txt
 ├─ header/
+│  ├─ DeviceUnit.h
+│  ├─ Group.h
 │  ├─ InitialPlacement.h
+│  ├─ IntermidiatePlacement.h
+│  ├─ NetListLookupTable.h
+│  ├─ NetlistUnit.h
+│  ├─ Output.h
 │  ├─ SAManager.h
-|  ├─ CostTableManager.h
 │  ├─ TableManager.h
-|  ├─ DeviceUnit.h
-|  └─ test.h
+|  └─ Test.h
 └─ src/
    ├─ main.cpp
-   ├─ InitialPlacement.cpp
-   ├─ SAManager.cpp
-   ├─ CostTableManager.cpp
-   ├─ TableManager.cpp
    ├─ DeviceUnit.cpp
-   └─ test.cpp
+   ├─ Group.cpp
+   ├─ InitialPlacement.cpp
+   ├─ IntermidiatePlacement.cpp
+   ├─ NetListLookupTable.cpp
+   ├─ NetlistUnit.cpp
+   ├─ Output.cpp
+   ├─ SAManager.cpp
+   ├─ TableManager.cpp
+   └─ Test.cpp
 ```
 
 ## Prerequisites | 先決條件
@@ -36,20 +44,21 @@ cmake --build build --config Debug
 ```
 
 接著用 VS 打開：build/AnalogTransistorPlacementOptimizer.sln
-在 Solution Explorer 對 atpo 右鍵 → 設為啟動專案 → ctrl+F5執行。
+在 Solution Explorer 對 ATPO_v2 右鍵 → 設為啟動專案 → ctrl+F5執行。
 
 ## Testinng
-在傳入的參數中，若僅傳入一個參數，會進入測試模式(test class)，請不要更動main funtion中的內容，將你的test function定義在test class中，並透過test class的建構式運行實作(test.cpp)。
+在傳入的參數中，若僅傳入 "test"，會進入測試模式(test class)，請不要更動main funtion中的內容，將你的test function定義在test class中，並透過test class的建構式運行實作(test.cpp)。
 
 ## Coding Style
 變數：首字母小寫，後續字母大寫開頭。
 ``` e.g. string circuitType;```
 
 函式、類別：全字母開頭大寫。
-``` 
+```
 e.g. InItialPlacenent initialPlacement();
 e.g. class SAManager{};
 ```
 
 若要新增variable/function，請新增在類別中的private or protected中，保持class的封裝，需新增public variable/function請先和其他人確認此部分是否會影響並討論其合理性。
-*合併主幹請使用github網頁提交merge request，或發生衝突無法提交合併申請，請先將自己的main pull下來到最新版，並且將目前main分支的內容合併到自己的分支中，解決完衝突後，重新將自己的分支推上去，再從網頁提交合。併。
+*合併遠端(github)主幹請使用github網頁提交merge request，若發生衝突無法提交合併申請，請先在本地端將main分支pull下來到最新版，並且將目前main分支的內容合併到自己的分支中，解決完衝突後，重新將自己的分支推上去，再從網頁提交合併。
+
