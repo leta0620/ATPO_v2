@@ -271,6 +271,7 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 	}
 
 
+
 	// gate link 先不處理
 	/*for (const auto& linkList : this->gateConnectionList)
 	{

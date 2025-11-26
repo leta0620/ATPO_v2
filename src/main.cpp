@@ -28,6 +28,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (argc != 6) {
+		Test test; // Run tests
 		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <intermediate_code_file_path> <output_file_path> <thread_num>" << endl;
 		return 1;
 	}

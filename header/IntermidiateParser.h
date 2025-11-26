@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "NetListLookupTable.h"
+#include "NetlistUnit.h"
 
 class IntermidiateParser
 {

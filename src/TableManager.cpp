@@ -134,6 +134,9 @@ bool TableManager::RowRuleCheck(int rowPlace, int colPlace, Group& group)
 // placement operations implementation
 bool TableManager::PlaceGroup(const Group& group, int& placedRow, int& placedCol)
 {
+	if (placedRow < 0 || placedRow >= this->rowSize || placedCol < 0 || placedCol >= this->colSize)
+		return false;
+
 	Group placedGroup = group;
 	if (this->ColumnRuleCheck(placedRow, placedCol, placedGroup) && this->RowRuleCheck(placedRow, placedCol, placedGroup))
 	{
