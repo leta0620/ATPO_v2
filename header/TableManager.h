@@ -46,6 +46,7 @@ public:
 	// cost
 	std::unordered_map<CostEnum, double> CalculateTableCost();
 	std::unordered_map<CostEnum, double> GetCostMap() { return costMap; }
+	std::vector<std::pair<std::string, double>> GetCostNameAndCostValueString();
 
 	bool EqualTableToSelf(TableManager& otherTable);
 

@@ -34,10 +34,10 @@ void Output::WriteAllResultToFile(std::string fileName)
 			outFile << "Table " << i + 1 << ":\n";
 
 			// 遍歷cost並輸出，要有項目名稱和數值
-			//outFile << tableList[i].GetCostMap()[CostEnum::]
-			for (auto cost : tableList[i].GetCostMap())
+			auto costNameAndValue = tableList[i].GetCostNameAndCostValueString();
+			for (auto cost : costNameAndValue)
 			{
-				outFile << static_cast<int>(cost.first) << ":" << cost.second << "\t";
+				outFile << cost.first << ":" << cost.second << "\t";
 			}
 			outFile << "\n";
 
@@ -68,9 +68,10 @@ void Output::PrintAllResult()
 		for (size_t i = 0; i < tableList.size(); ++i)
 		{
 			cout << "Table " << i + 1 << ":\n";
-			for (auto cost : tableList[i].GetCostMap())
+			auto costNameAndValue = tableList[i].GetCostNameAndCostValueString();
+			for (auto cost : costNameAndValue)
 			{
-				cout << static_cast<int>(cost.first) << ":" << cost.second << "\t";
+				cout << cost.first << ":" << cost.second << "\t";
 			}
 			cout << "\n";
 
