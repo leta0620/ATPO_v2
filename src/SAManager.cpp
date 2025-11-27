@@ -10,7 +10,6 @@ using namespace std;
 SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate, double initialTemp, double finalTemp, int iterationPerTemp, bool openCommandLineOutput)
 	: initialTable(initialTable)
 	, netlistLookupTable(netlist)
-	, nowUseTable(initialTable)
 	, coolRate(coolRate)
 	, initialTemp(initialTemp)
 	, finalTemp(finalTemp)
@@ -21,6 +20,7 @@ SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, do
 {
 	// 計算成本並初始化 nondominatedSolution
 	this->initialTable.CalculateTableCost();
+	this->nowUseTable = this->initialTable;
 	this->nondominatedSolution.push_back(this->initialTable);
 	// 開始 SA 流程
 	this->SAProcess();
@@ -68,6 +68,36 @@ void SAManager::SAProcess()
 
 void SAManager::Perturbation(std::mt19937& gen)
 {
+	auto SwapTwoGroupUnit = [](TableManager& table, mt19937& gen) {
+		int rowSize = table.GetRowSize();
+		int colSize = table.GetColSize();
+		uniform_int_distribution<> disRow(0, rowSize - 1);
+		uniform_int_distribution<> disCol(0, colSize - 1);
+		int row1 = disRow(gen);
+		int col1 = disCol(gen);
+		int row2 = 0;
+		int col2 = 0;
+		do
+		{
+			row2 = disRow(gen);
+			col2 = disCol(gen);
+			Group group1 = table.GetGroup(row1, col1);
+			Group group2 = table.GetGroup(row2, col2);
+
+			int c = 0;
+		} while (table.GetGroup(row1, col1).GetDeviceUnits() == table.GetGroup(row2, col2).GetDeviceUnits() || !table.CheckCanSwapGroups(row1, col1, row2, col2));
+
+		if (!table.SwapGroups(row1, col1, row2, col2))
+		{
+			cerr << "Swap two group unit fail." << endl;
+		}
+		};
+
+	// generate new solutions by swapping two group unit
+	TableManager newTable = this->nowUseTable;
+	SwapTwoGroupUnit(newTable, gen);
+	this->newTableList.push_back(newTable);
+
 	//auto SwapTwoDeviceUnit = [](CostTableManager& table, mt19937& gen) {
 	//	int rowSize = table.GetRowSize();
 	//	int colSize = table.GetColSize();

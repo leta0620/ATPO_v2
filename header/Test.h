@@ -17,4 +17,5 @@ public:
 private:
 	// Add your test functions here, and call them in the constructor
 	void TestParsing();
+	void TestInitialPlacement(int groupSize, int rowNum);
 };

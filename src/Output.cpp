@@ -28,9 +28,19 @@ void Output::WriteAllResultToFile(std::string fileName)
 	for (auto& [round, tableList] : allNondominatedSolutions)
 	{
 		outFile << "Round " << round << " Results:\n";
+
 		for (size_t i = 0; i < tableList.size(); ++i)
 		{
 			outFile << "Table " << i + 1 << ":\n";
+
+			// 遍歷cost並輸出，要有項目名稱和數值
+			//outFile << tableList[i].GetCostMap()[CostEnum::]
+			for (auto cost : tableList[i].GetCostMap())
+			{
+				outFile << static_cast<int>(cost.first) << ":" << cost.second << "\t";
+			}
+			outFile << "\n";
+
 			auto tableStrings = tableList[i].GetTableStringFormat();
 			auto rotationStrings = tableList[i].GetTableRotationFormat();
 			for (const auto& rowString : tableStrings)
@@ -58,6 +68,12 @@ void Output::PrintAllResult()
 		for (size_t i = 0; i < tableList.size(); ++i)
 		{
 			cout << "Table " << i + 1 << ":\n";
+			for (auto cost : tableList[i].GetCostMap())
+			{
+				cout << static_cast<int>(cost.first) << ":" << cost.second << "\t";
+			}
+			cout << "\n";
+
 			auto tableStrings = tableList[i].GetTableStringFormat();
 			auto rotationStrings = tableList[i].GetTableRotationFormat();
 			for (const auto& rowString : tableStrings)

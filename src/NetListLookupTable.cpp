@@ -26,6 +26,10 @@ pair<std::string, std::string> NetlistLookupTable::GetPinSLinkWho(std::string sy
 			{
 				return pair<string, string>(who, "S");
 			}
+			else if (itWho->second.GetPinS(who) == "COMMON_SOURCE")
+			{
+				return pair<string, string>(who, "COMMON_SOURCE");
+			}
 		}
 		else
 		{
@@ -113,4 +117,15 @@ NetlistUnit NetlistLookupTable::GetNetlistUnit(const std::string& synbolName)
 		return it->second;
 	}
 	return NetlistUnit();
+}
+
+std::vector<std::string> NetlistLookupTable::GetAllSymbolNames()
+{
+	std::vector<std::string> symbolNames;
+	symbolNames.reserve(this->netlistUnitMap.size());
+	for (const auto& pair : this->netlistUnitMap)
+	{
+		symbolNames.push_back(pair.first);
+	}
+	return symbolNames;
 }

@@ -28,6 +28,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (argc != 6) {
+		Test test; // Run tests
 		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <intermediate_code_file_path> <output_file_path> <thread_num>" << endl;
 		return 1;
 	}
@@ -60,17 +61,24 @@ int main(int argc, char* argv[]) {
 		map<int, vector<TableManager>> allNondominatedSolutions;
 		for (int i = 0; i < initialTableList.size(); ++i)
 		{
-			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.95, 1000.0, 1.0, 100, true);
+			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
+			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.95, 100.0, 1.0, 10, true);
 			allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
+			
+			cout << "\r";
+			cout << "                                        ";
+			cout << "\r";
+			cout << "\b";
 		}
+		cout << endl;
 
 		Output output(groupSize, row_num, allNondominatedSolutions);
 
-		output.WriteAllResultToFile(output_file_path);
+		output.WriteAllResultToFile(output_file_path + ".txt");
 		output.PrintAllResult();
 
 		output.SelectSignificantNondominatedSolutions();
-		output.WriteSignificantNondominatedSolutionsToFile("significant_" + output_file_path);
+		output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "_significant.txt");
 		output.PrintSignificantNondominatedSolutions();
 	}
 	else
@@ -92,7 +100,7 @@ int main(int argc, char* argv[]) {
 				if (i >= total) break;
 
 				// 建立 SAManager（關閉命令列輸出以避免多執行緒輸出衝突）
-				SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.95, 1000.0, 1.0, 100, false);
+				SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.95, 100.0, 1.0, 1, false);
 				// 若 SAManager 內部需要 rng 注入，需額外修改 SAManager；此處假設它內部自行處理。
 				auto result = saManager.GetNondominatedSolution();
 

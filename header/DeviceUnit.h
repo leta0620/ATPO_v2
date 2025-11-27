@@ -6,6 +6,7 @@
 enum class CellRotation {
 	R0,
 	MY,
+	ERROR,
 };
 
 class DeviceUnit
@@ -34,6 +35,21 @@ public:
 	}
 	CellRotation GetRotation() const {
 		return rotation;
+	}
+	void FlipRotation() {
+		if (rotation == CellRotation::R0) {
+			rotation = CellRotation::MY;
+		}
+		else {
+			rotation = CellRotation::R0;
+		}
+	}
+
+	std::string GetStringRotation() const;
+
+	// == operators
+	bool operator==(const DeviceUnit& other) const {
+		return (symbol == other.symbol);
 	}
 
 	/*void SetConnections(DeviceUnit* drain, DeviceUnit* gate, DeviceUnit* source) {

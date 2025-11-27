@@ -10,7 +10,7 @@ enum class CostEnum
 	ccCost,
 	rCost,
 	cCost,
-	spetationCost
+	sperationCost
 };
 
 class TableManager
@@ -27,6 +27,7 @@ public:
 	int GetRowSize() const { return rowSize; }
 	int GetColSize() const { return colSize; }
 	int GetGroupSize() const { return groupSize; }
+	void SetNFin(int nfin) { this->nfin = nfin; }
 
 	Group GetGroup(int row, int col) const { return table[row][col]; }
 
@@ -34,7 +35,9 @@ public:
 	// placement operations
 	bool PlaceGroup(const Group& group, int& placedRow, int& placedCol);
 	bool SwapGroups(int row1, int col1, int row2, int col2);
-	bool MoveGroup(int srcRow, int srcCol, int destRow, int destCol);
+	bool MoveGroup(int srcRow, int srcCol, int destRow, int destCol);	// caution: the src position will be cleared
+
+	bool CheckCanSwapGroups(int row1, int col1, int row2, int col2);
 
 	//output
 	std::vector<std::string> GetTableStringFormat();
@@ -42,13 +45,9 @@ public:
 
 	// cost
 	std::unordered_map<CostEnum, double> CalculateTableCost();
-
 	std::unordered_map<CostEnum, double> GetCostMap() { return costMap; }
 
 	bool EqualTableToSelf(TableManager& otherTable);
-
-	void SetNFin(int nfin) { this->nfin = nfin; }
-
 
 private:
 	std::vector<std::vector<Group>> table;
@@ -62,9 +61,9 @@ private:
 
 	void InitializeTable();
 	// check colume rule(same type sequential)
-	bool ColumnRuleCheck(int rowPlace, int colPlace, const Group& group);
+	bool ColumnRuleCheck(int rowPlace, int colPlace, Group& group);
 	// check row rule(neighborhood group can link)
-	bool RowRuleCheck(int rowPlace, int colPlace, const Group& group);
+	bool RowRuleCheck(int rowPlace, int colPlace, Group& group);
 
 	// cost part
 	std::unordered_map<CostEnum, double> costMap;

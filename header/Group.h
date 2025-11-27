@@ -16,7 +16,8 @@ public:
 	void AddDeviceUnit(const DeviceUnit& deviceUnit);
 	// Sets the device units of the group and recalculates the type hash
 	void SetDeviceUnits(const std::vector<DeviceUnit>& units);
-	// Gets the type hash of the group
+
+	// Gets the device unit list of the group
 	const std::vector<DeviceUnit>& GetDeviceUnits() const 
 	{
 		return deviceUnits;
@@ -26,6 +27,14 @@ public:
 	{
 		groupNum = num;
 	}
+
+	int GetTypeHash() const 
+	{
+		return typeHash;
+	}
+
+	std::pair<std::string, CellRotation> GetFirstDeviceUnitWhoAndRotation();
+	std::pair<std::string, CellRotation> GetLastDeviceUnitWhoAndRotation();
 
 private:
 	//std::string name;
