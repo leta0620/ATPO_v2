@@ -539,3 +539,32 @@ bool TableManager::CheckCanSwapGroups(int row1, int col1, int row2, int col2)
 	}
 	return false;
 }
+
+std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValueString()
+{
+    std::vector< std::pair<std::string, double>> costNameAndValue;
+    for (const auto& [costEnum, costValue] : this->costMap)
+    {
+        std::string costName;
+        switch (costEnum)
+        {
+        case CostEnum::ccCost:
+            costName = "CC Cost";
+            break;
+        case CostEnum::rCost:
+            costName = "R Cost";
+            break;
+        case CostEnum::cCost:
+            costName = "C Cost";
+            break;
+        case CostEnum::sperationCost:
+            costName = "Speration Cost";
+            break;
+        default:
+            costName = "Unknown Cost";
+            break;
+        }
+		costNameAndValue.push_back(pair<string, double>(costName, costValue));
+    }
+    return costNameAndValue;
+}

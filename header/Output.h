@@ -17,14 +17,16 @@ public:
 
 	void SelectSignificantNondominatedSolutions();
 
-	std::vector<TableManager> GetSignificantNondominatedSolutions() { return significantNondominatedSolutions; }
+	//std::vector<TableManager> GetSignificantNondominatedSolutions() { return significantNondominatedSolutions; }
 	void PrintSignificantNondominatedSolutions();
 	void WriteSignificantNondominatedSolutionsToFile(std::string fileName);
 
 private:
 	std::map<int, std::vector<TableManager>> allNondominatedSolutions;
 
-	std::vector<TableManager> significantNondominatedSolutions;
+	std::map<CostEnum, std::vector<TableManager>> significantNondominatedSolutions;
+
+	void SelectTopNByCostEnum(CostEnum costEnum, int N);
 
 	int group;
 	int rowSize;
