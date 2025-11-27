@@ -299,7 +299,9 @@ void TableManager::CalculateSpetationCost() {
         }
     }
 
+    // 如果只有一種 cell，就直接給一個「小 sigma → 大 cost」的情況
     if (cells.size() < 2) {
+        // 這裡你可以依照整體 scale 自己調，先給 0 當然也行
         costMap[CostEnum::sperationCost] = 0.0;
         return;
     }
@@ -355,8 +357,14 @@ void TableManager::CalculateSpetationCost() {
         }
     }
 
-    costMap[CostEnum::sperationCost] = total_sigma;
+    // ---- 這裡開始是關鍵：把 total_sigma 轉成「越小越好」的 cost ----
+    // 避免除以 0，給一個很小的 epsilon
+    const double eps = 1e-9;
+    double cost = 1.0 / (total_sigma + eps);
+
+    costMap[CostEnum::sperationCost] = cost;
 }
+
 
 // =======================
 // Rule checks (currently always return true)
