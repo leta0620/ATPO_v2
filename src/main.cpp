@@ -69,6 +69,7 @@ int main(int argc, char* argv[]) {
 			cout << "                                        ";
 			cout << "\r";
 			cout << "\b";
+			break;
 		}
 		cout << endl;
 
