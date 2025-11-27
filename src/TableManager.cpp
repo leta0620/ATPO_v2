@@ -109,7 +109,7 @@ std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
 // Cost part implementation
 // =======================
 
-// ---- CC (Center Closure): compute £g for each device name and average them ----
+// ---- CC (Center Closure): compute £g for each device name and average their |£g| ----
 void TableManager::CalculateCCCost() {
     // For each row: flatten the row into unit-cell tokens (same logic as GetTableStringFormat)
     std::unordered_map<std::string, long long> sum_x;   // £U x for each symbol
@@ -120,7 +120,9 @@ void TableManager::CalculateCCCost() {
         std::vector<std::string> rowTok;
         for (int c = 0; c < colSize; ++c) {
             const auto& units = table[r][c].GetDeviceUnits();
-            for (const auto& du : units) rowTok.push_back(du.GetSymbol());
+            for (const auto& du : units) {
+                rowTok.push_back(du.GetSymbol());
+            }
         }
 
         const int W = static_cast<int>(rowTok.size());
@@ -134,7 +136,8 @@ void TableManager::CalculateCCCost() {
             const std::string& name = rowTok[i];
             if (name.empty() || name == "d") continue;
 
-            long long x = even ? ((i < k) ? (i - k) : (i - k + 1))
+            long long x = even
+                ? ((i < k) ? (i - k) : (i - k + 1))
                 : (i - m);
 
             sum_x[name] += x;
@@ -142,8 +145,8 @@ void TableManager::CalculateCCCost() {
         }
     }
 
-    // Compute £g for each name and average them (signed, not absolute)
-    double sum_mu = 0.0;
+    // Compute £g for each name and average their absolute values |£g|
+    double sum_abs_mu = 0.0;
     int n = 0;
     for (const auto& kv : sum_x) {
         const std::string& name = kv.first;
@@ -151,12 +154,13 @@ void TableManager::CalculateCCCost() {
         if (c <= 0) continue;
 
         double mu = static_cast<double>(kv.second) / static_cast<double>(c);
-        sum_mu += mu;
+        sum_abs_mu += std::fabs(mu);   //ABS!!!
         ++n;
     }
 
-    costMap[CostEnum::ccCost] = (n == 0) ? 0.0 : (sum_mu / static_cast<double>(n));
+    costMap[CostEnum::ccCost] = (n == 0) ? 0.0 : (sum_abs_mu / static_cast<double>(n));
 }
+
 
 // ---- R (Row Spread): column distance ¡Ñ unit count ¡÷ per-name mean ¡÷ population stddev ----
 void TableManager::CalculateRCost() {
