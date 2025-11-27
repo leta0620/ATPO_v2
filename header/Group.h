@@ -36,11 +36,18 @@ public:
 	std::pair<std::string, CellRotation> GetFirstDeviceUnitWhoAndRotation();
 	std::pair<std::string, CellRotation> GetLastDeviceUnitWhoAndRotation();
 
+	bool HasDummyUnit() const 
+	{
+		return dummyNum > 0;
+	}
+
 private:
 	//std::string name;
 	std::vector<DeviceUnit> deviceUnits;
 	int typeHash = 0;
 	int groupNum = 0;
+
+	int dummyNum = 0;
 
 	// Recalculates the type hash based on the current device units, called whenever device units are modified
 	void CalculateTypeHash();
