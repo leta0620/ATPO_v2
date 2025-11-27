@@ -68,6 +68,12 @@ void Output::PrintAllResult()
 		for (size_t i = 0; i < tableList.size(); ++i)
 		{
 			cout << "Table " << i + 1 << ":\n";
+			for (auto cost : tableList[i].GetCostMap())
+			{
+				cout << static_cast<int>(cost.first) << ":" << cost.second << "\t";
+			}
+			cout << "\n";
+
 			auto tableStrings = tableList[i].GetTableStringFormat();
 			auto rotationStrings = tableList[i].GetTableRotationFormat();
 			for (const auto& rowString : tableStrings)

@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
 		for (int i = 0; i < initialTableList.size(); ++i)
 		{
 			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
-			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.95, 100.0, 10.0, 1, true);
+			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.95, 100.0, 1.0, 10, true);
 			allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
 			
 			cout << "\r";
@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
 				if (i >= total) break;
 
 				// 建立 SAManager（關閉命令列輸出以避免多執行緒輸出衝突）
-				SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.95, 1000.0, 1.0, 100, false);
+				SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.95, 100.0, 1.0, 1, false);
 				// 若 SAManager 內部需要 rng 注入，需額外修改 SAManager；此處假設它內部自行處理。
 				auto result = saManager.GetNondominatedSolution();
 
