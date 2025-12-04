@@ -20,8 +20,8 @@ public:
 
 private:
 	std::string cdlFile, patternFile;
-	std::vector<std::string> labelNameList;
-	std::unordered_map<std::string, int> labelNameToInstNme;
+	std::unordered_map<std::string, std::string> labelNameMapInstName; // label name -> inst name
 
-
+	std::vector<std::string> initialPatternTable;	// initial pattern from pattern file
+	std::vector<std::string> initialPatternRotationTable;	// initial pattern rotation from pattern file
 };
