@@ -200,3 +200,17 @@ bool OuterInput::ParseCdlFile() {
 
 	return true;
 }
+
+bool OuterInput::GenIntermidiateFile() {
+	ofstream outfile(intermidiateFile);
+
+	if (!outfile.is_open()) {
+		cerr << "Error: Unable to open intermidiate file: " << intermidiateFile << endl;
+		return false;
+	}
+
+	// Write instStructList to intermidiate file
+
+	outfile.close();
+	return true;
+}

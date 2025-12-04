@@ -13,13 +13,14 @@ public:
 
 	void SetCdlFile(const std::string& filename) { cdlFile = filename; }
 	void SetPatternFile(const std::string& filename) { patternFile = filename; }
+	void SetIntermidiateFile(const std::string& filename) { intermidiateFile = filename; }
 
 	// function
 	bool ParsePatternFile();
 	bool ParseCdlFile();
 
 private:
-	std::string cdlFile, patternFile;
+	std::string cdlFile, patternFile, intermidiateFile;
 	std::unordered_map<std::string, std::string> labelNameMapInstName; // label name -> inst name
 	std::unordered_map<std::string, std::string> instNameMapLabelName; // inst name -> label name
 
@@ -36,4 +37,6 @@ private:
 	};
 
 	std::vector<InstStruct> instStructList;
+
+	bool GenIntermidiateFile();
 };
