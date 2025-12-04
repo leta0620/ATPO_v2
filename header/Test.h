@@ -7,6 +7,7 @@
 #include "InitialPlacement.h"
 #include "SAManager.h"
 #include "IntermidiateParser.h"
+#include "OuterInput.h"
 
 
 class Test
@@ -18,4 +19,6 @@ private:
 	// Add your test functions here, and call them in the constructor
 	void TestParsing();
 	void TestInitialPlacement(int groupSize, int rowNum);
+
+	void TestOuterInputParsing();
 };

@@ -6,8 +6,6 @@
 using namespace std;
 
 bool OuterInput::ParsePatternFile() {
-	// Implementation for parsing the pattern file
-	// This is a placeholder implementation
 	ifstream patternStream(patternFile);
 
 	if (!patternStream.is_open()) {
@@ -25,9 +23,8 @@ bool OuterInput::ParsePatternFile() {
 			continue;
 		}
 
-		switch (spaceCount)
+		if (spaceCount == 0)
 		{
-		case 0:
 			stringstream ss(line);
 			string tmp;
 			while(ss >> tmp)
@@ -36,9 +33,9 @@ bool OuterInput::ParsePatternFile() {
 					tmp = tmp.substr(0, tmp.size() - 1);
 				this->initialPatternTable.push_back(tmp);
 			}
-
-			break;
-		case 1:
+		}
+		else if (spaceCount == 1)
+		{
 			stringstream ss(line);
 			string tmp;
 			while (ss >> tmp)
@@ -47,21 +44,66 @@ bool OuterInput::ParsePatternFile() {
 					tmp = tmp.substr(0, tmp.size() - 1);
 				this->initialPatternRotationTable.push_back(tmp);
 			}
+		}
+		else if (spaceCount == 2)
+		{
+			stringstream ss(line);
+			string instName, labelName;
+			ss >> instName >> labelName;
+			instName = instName.substr(0, instName.size() - 1);
 
-			break;
-		default:
-			break;
+			this->labelNameMapInstName[labelName] = instName;
+			this->instNameMapLabelName[instName] = labelName;
 		}
 	}
-
-
 
 	patternStream.close();
 	return true;
 }
 
 bool OuterInput::ParseCdlFile() {
+	ifstream cdlStream(cdlFile);
+	if (!cdlStream.is_open()) {
+		cerr << "Error: Unable to open CDL file: " << cdlFile << endl;
+		return false;
+	}
+
 	// Implementation for parsing the CDL file
-	// This is a placeholder implementation
+	string line;
+	while (cin >> line)
+	{
+		stringstream ss(line);
+
+		if (line == "")
+		{
+			continue;
+		}
+
+		string tmp;
+		ss >> tmp;
+		if (tmp == ".SUBCKT")
+		{
+			ss >> tmp;
+			string subcktName = tmp;
+						
+			if (ss.eof())
+			{
+				// target subskt
+			}
+			else
+			{
+				// set instNameMapCdlPosition
+				string d, g, s, b, m;
+				ss >> d >> g >> s >> b >> m;
+				m = m.substr(2, m.size() - 3);
+				
+				this->instNameMapCdlPosition[subcktName] = make_tuple(d, s, g, b, stoi(m));
+			}
+		}
+
+	}
+
+	cdlStream.close();
+
 	return true;
 }
