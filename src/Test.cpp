@@ -143,14 +143,17 @@ void Test::TestInitialPlacement(int groupSize, int rowNum)
 
 void Test::TestOuterInputParsing()
 {
-	OuterInput outerInput("test.cdl", "pattern.txt");
-	if (!outerInput.ParseCdlFile()) {
-		std::cerr << "Error: Failed to parse CDL file." << std::endl;
-		return;
-	}
+	OuterInput outerInput("cdl_test.txt", "pattern.txt");
 	if (!outerInput.ParsePatternFile()) {
 		std::cerr << "Error: Failed to parse pattern file." << std::endl;
 		return;
 	}
+	
+	
+	if (!outerInput.ParseCdlFile()) {
+		std::cerr << "Error: Failed to parse CDL file." << std::endl;
+		return;
+	}
+	
 	return;
 }
