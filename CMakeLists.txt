@@ -22,3 +22,6 @@ else()
 endif()
 
 source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${SOURCES})
+
+find_package(Threads REQUIRED)
+target_link_libraries(ATPO_v2 PRIVATE Threads::Threads)
