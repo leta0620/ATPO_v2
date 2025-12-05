@@ -36,6 +36,7 @@ public:
 	CellRotation GetRotation() const {
 		return rotation;
 	}
+
 	void FlipRotation() {
 		if (rotation == CellRotation::R0) {
 			rotation = CellRotation::MY;
@@ -52,44 +53,13 @@ public:
 		return (symbol == other.symbol);
 	}
 
-	/*void SetConnections(DeviceUnit* drain, DeviceUnit* gate, DeviceUnit* source) {
-		d = drain;
-		g = gate;
-		s = source;
-	}
 
-	void SetDrainPin(DeviceUnit* drain) {
-		d = drain;
-	}
-
-	void SetGatePin(DeviceUnit* gate) {
-		g = gate;
-	}
-
-	void SetSourcePin(DeviceUnit* source) {
-		s = source;
-	}
-
-	DeviceUnit* GetDrainPin() const {
-		return d;
-	}
-
-	DeviceUnit* GetGatePin() const {
-		return g;
-	}
-
-	DeviceUnit* GetSourcePin() const {
-		return s;
-	}*/
 
 private:
-	// synbol 沒寫
-
 	std::string symbol;
 	std::string analogCellType;
 
 	//DeviceUnit* d = nullptr, *g = nullptr, *s = nullptr;
-	// 共端的識別、連接關係腳位標示
 	std::vector<std::string> d, g, s;
 	
 	CellRotation rotation = CellRotation::R0;

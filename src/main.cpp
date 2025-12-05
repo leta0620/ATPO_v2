@@ -82,17 +82,18 @@ int main(int argc, char* argv[]) {
 		for (int i = 0; i < initialTableList.size(); ++i)
 		{
 			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
-			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, 5, true);
+			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, 1, true);
 			allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
 			
 			cout << "\r";
 			cout << "                                        ";
 			cout << "\r";
 			cout << "\b";
+			break;
 		}
 		cout << endl;
 
-		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D);
+		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName());
 
 		output.WriteAllResultToFile(output_file_path + "output.txt");
 		output.PrintAllResult();
