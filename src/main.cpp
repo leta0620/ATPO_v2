@@ -27,18 +27,37 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 
-	if (argc != 6) {
+	if (argc != 7) {
 		Test test; // Run tests
-		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <intermediate_code_file_path> <output_file_path> <thread_num>" << endl;
+		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <Pattern_input_file_path> <output_file_path> <thread_num>" << endl;
 		return 1;
 	}
 
 	int groupSize = stoi(argv[1]);
 	int row_num = stoi(argv[2]);
-	string intermediate_code_file_path = argv[3];
-	string output_file_path = argv[4];
-	int thread_num = stoi(argv[5]);
+	string cdl_input_file_path = argv[3];
+	string pattern_input_file_path = argv[4];
+	string output_file_path = argv[5];
+	int thread_num = stoi(argv[6]);
 
+	// Generate intermediate file from CDL and Pattern files
+	string intermediate_code_file_path = "intermediate_temp.txt";
+	OuterInput outerInput(cdl_input_file_path, pattern_input_file_path);
+	outerInput.SetIntermidiateFile(intermediate_code_file_path);
+	if (!outerInput.ParsePatternFile()) {
+		cerr << "Error: Failed to parse pattern file." << endl;
+		return 1;
+	}
+	if (!outerInput.ParseCdlFile()) {
+		cerr << "Error: Failed to parse CDL file." << endl;
+		return 1;
+	}
+	if (!outerInput.GenIntermidiateFile()) {
+		cerr << "Error: Failed to generate intermediate file." << endl;
+		return 1;
+	}
+
+	//IntermidiateParser parser(intermediate_code_file_path);
 	IntermidiateParser parser(intermediate_code_file_path);
 	if (!parser.Parse()) {
 		cerr << "Error: Failed to parse intermediate code file." << endl;
@@ -75,11 +94,11 @@ int main(int argc, char* argv[]) {
 
 		Output output(groupSize, row_num, allNondominatedSolutions);
 
-		output.WriteAllResultToFile(output_file_path + ".txt");
+		output.WriteAllResultToFile(output_file_path + "output.txt");
 		output.PrintAllResult();
 
 		output.SelectSignificantNondominatedSolutions();
-		output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "_significant.txt");
+		output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "output_significant.txt");
 		output.PrintSignificantNondominatedSolutions();
 	}
 	else

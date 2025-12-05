@@ -215,7 +215,7 @@ bool OuterInput::GenIntermidiateFile() {
 	{
 		outfile << inst.instName << " " << inst.labelName << " " << inst.cellType << " " << inst.m << "\n";
 	}
-	outfile << "DEVICE_END\n";
+	outfile << "END_DEVICE\n";
 	
 	outfile << "NET_BEGIN\n";
 
@@ -231,7 +231,7 @@ bool OuterInput::GenIntermidiateFile() {
 
 	// find common source
 	vector<string>* commonSourceNets = nullptr;
-	outfile << "COMMON_SOURCE_BEGIN\n";
+	outfile << "COMMON_NODE_BEGIN\n";
 	int mostCommonSourceCount = -1;
 	for (auto& dsNetConnection : netNameMapLabelDotPinDS)
 	{
@@ -239,6 +239,17 @@ bool OuterInput::GenIntermidiateFile() {
 		auto& labelDotPinList = dsNetConnection.second;
 		if (int(labelDotPinList.size()) > mostCommonSourceCount)
 		{
+			bool skip = false;
+			for (const auto& labelDotPin : labelDotPinList)
+			{
+				if (labelDotPin.back() != 'S')
+				{
+					skip = true;
+					break;
+				}
+			}
+			if (skip) continue;
+
 			mostCommonSourceCount = labelDotPinList.size();
 			commonSourceNets = &labelDotPinList;
 		}
