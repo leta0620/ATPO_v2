@@ -73,7 +73,7 @@ std::vector<std::string> TableManager::GetTableStringFormat()
     return tableStrings;
 }
 
-std::vector<std::string> TableManager::GetTableRotationFormat()
+std::vector<std::string> TableManager::GetTableRotationFormat(bool leftS)
 {
     std::vector<std::string> tableRotations;
     for (auto& row : table)
@@ -83,7 +83,7 @@ std::vector<std::string> TableManager::GetTableRotationFormat()
         {
             for (auto& deviceUnit : group.GetDeviceUnits())
             {
-				rowRotation += deviceUnit.GetStringRotation();
+				rowRotation += deviceUnit.GetStringRotation(leftS);
             }
         }
         tableRotations.push_back(rowRotation);

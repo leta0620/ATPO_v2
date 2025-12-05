@@ -27,9 +27,9 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 
-	if (argc != 7) {
+	if (argc != 8) {
 		Test test; // Run tests
-		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <Pattern_input_file_path> <output_file_path> <thread_num>" << endl;
+		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <Pattern_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D>" << endl;
 		return 1;
 	}
 
@@ -39,6 +39,7 @@ int main(int argc, char* argv[]) {
 	string pattern_input_file_path = argv[4];
 	string output_file_path = argv[5];
 	int thread_num = stoi(argv[6]);
+	string left_is_S_or_D = argv[7];
 
 	// Generate intermediate file from CDL and Pattern files
 	string intermediate_code_file_path = "intermediate_temp.txt";
@@ -81,18 +82,17 @@ int main(int argc, char* argv[]) {
 		for (int i = 0; i < initialTableList.size(); ++i)
 		{
 			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
-			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.95, 100.0, 1.0, 1, true);
+			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, 5, true);
 			allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
 			
 			cout << "\r";
 			cout << "                                        ";
 			cout << "\r";
 			cout << "\b";
-			break;
 		}
 		cout << endl;
 
-		Output output(groupSize, row_num, allNondominatedSolutions);
+		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D);
 
 		output.WriteAllResultToFile(output_file_path + "output.txt");
 		output.PrintAllResult();
@@ -103,53 +103,9 @@ int main(int argc, char* argv[]) {
 	}
 	else
 	{
-		// Multi-thread SA
-		map<int, vector<TableManager>> allNondominatedSolutions;
-		std::mutex resultsMutex;
-		std::atomic<int> nextIndex{0};
-		const int total = static_cast<int>(initialTableList.size());
+		//
 
-		auto worker = [&]() {
-			// 建立每個 thread 自己的隨機数產生器種子（如果 SAManager 內使用外部 rng，可視情況調整）
-			std::random_device rd;
-			auto tid_hash = std::hash<std::thread::id>{}(std::this_thread::get_id());
-			std::mt19937 gen(static_cast<unsigned int>(rd() ^ tid_hash));
-
-			while (true) {
-				int i = nextIndex.fetch_add(1);
-				if (i >= total) break;
-
-				// 建立 SAManager（關閉命令列輸出以避免多執行緒輸出衝突）
-				SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.95, 100.0, 1.0, 1, false);
-				// 若 SAManager 內部需要 rng 注入，需額外修改 SAManager；此處假設它內部自行處理。
-				auto result = saManager.GetNondominatedSolution();
-
-				{
-					std::lock_guard<std::mutex> lock(resultsMutex);
-					allNondominatedSolutions[i] = std::move(result);
-				}
-			}
-		};
-
-		// 啟動 thread_pool
-		vector<std::thread> threads;
-		threads.reserve(thread_num);
-		for (int t = 0; t < thread_num; ++t) {
-			threads.emplace_back(worker);
-		}
-		for (auto& th : threads) {
-			if (th.joinable()) th.join();
-		}
-
-		// 使用 Output 處理結果（與單執行緒相同）
-		Output output(groupSize, row_num, allNondominatedSolutions);
-
-		output.WriteAllResultToFile(output_file_path);
-		output.PrintAllResult();
-
-		output.SelectSignificantNondominatedSolutions();
-		output.WriteSignificantNondominatedSolutionsToFile("significant_" + output_file_path);
-		output.PrintSignificantNondominatedSolutions();
+		cerr << "Error: Multi-threaded SA is not implemented in this version." << endl;
 	}
 
 	return 0;
