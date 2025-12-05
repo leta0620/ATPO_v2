@@ -154,6 +154,12 @@ void Test::TestOuterInputParsing()
 		std::cerr << "Error: Failed to parse CDL file." << std::endl;
 		return;
 	}
+
+	outerInput.SetIntermidiateFile("intermediate_output.txt");
+	if (!outerInput.GenIntermidiateFile()) {
+		std::cerr << "Error: Failed to generate intermediate file." << std::endl;
+		return;
+	}
 	
 	return;
 }

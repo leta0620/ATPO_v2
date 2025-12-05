@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <map>
 
 using namespace std;
 
@@ -159,14 +160,14 @@ bool OuterInput::ParseCdlFile() {
 							SetPinNets(cT3, pin3);
 							SetPinNets(cT4, pin4);
 
-							this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m) * cTM, instName, this->instNameMapLabelName[instName] });
+							this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m) * cTM, instName, this->instNameMapLabelName[instName], cellType });
 						}
 						else
 						{
 							// default celltype pin information
 							string dNet = pin1, gNet = pin2, sNet = pin3, bNet = pin4;
 
-							this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m), instName, this->instNameMapLabelName[instName] });
+							this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m), instName, this->instNameMapLabelName[instName], cellType });
 						}
 					}
 					else
@@ -209,8 +210,93 @@ bool OuterInput::GenIntermidiateFile() {
 		return false;
 	}
 
-	// Write instStructList to intermidiate file
+	outfile << "DEVICE_BEGIN\n";
+	for (const auto& inst : this->instStructList)
+	{
+		outfile << inst.instName << " " << inst.labelName << " " << inst.cellType << " " << inst.m << "\n";
+	}
+	outfile << "DEVICE_END\n";
+	
+	outfile << "NET_BEGIN\n";
 
+
+	map<string, vector<string>> netNameMapLabelDotPinDS;
+	map<string, vector<string>> netNameMapLabelDotPinG;
+	for (const auto& inst : this->instStructList)
+	{
+		netNameMapLabelDotPinDS[inst.dNet].push_back(inst.labelName + ".D");
+		netNameMapLabelDotPinG[inst.gNet].push_back(inst.labelName + ".G");
+		netNameMapLabelDotPinDS[inst.sNet].push_back(inst.labelName + ".S");
+	}
+
+	// find common source
+	vector<string>* commonSourceNets = nullptr;
+	outfile << "COMMON_SOURCE_BEGIN\n";
+	int mostCommonSourceCount = -1;
+	for (auto& dsNetConnection : netNameMapLabelDotPinDS)
+	{
+		auto& netName = dsNetConnection.first;
+		auto& labelDotPinList = dsNetConnection.second;
+		if (int(labelDotPinList.size()) > mostCommonSourceCount)
+		{
+			mostCommonSourceCount = labelDotPinList.size();
+			commonSourceNets = &labelDotPinList;
+		}
+	}
+
+	if (commonSourceNets == nullptr)
+	{
+		cerr << "Error: No common source net found." << endl;
+		outfile.close();
+		return false;
+	}
+	else 
+	{
+		outfile << ".net_S ";
+		for (const auto& labelDotPin : *commonSourceNets)
+		{
+			outfile << labelDotPin << " ";
+
+			if (labelDotPin.back() != 'S')
+			{
+				cerr << "Error: Common source net contains non-source pin: " << labelDotPin << endl;
+				outfile.close();
+				return false;
+			}
+		}
+		outfile << "\n";
+
+		for (const auto& dsConnection : netNameMapLabelDotPinDS)
+		{
+			const auto& netName = dsConnection.first;
+			const auto& labelDotPinList = dsConnection.second;
+			// skip common source net
+			if (&labelDotPinList == commonSourceNets)
+				continue;
+			outfile << ".net ";
+			for (const auto& labelDotPin : labelDotPinList)
+			{
+				outfile << labelDotPin << " ";
+			}
+			outfile << "\n";
+		}
+
+		outfile << "END_COMMON_NODE\n";
+
+		for (const auto& gConnection : netNameMapLabelDotPinG)
+		{
+			const auto& netName = gConnection.first;
+			const auto& labelDotPinList = gConnection.second;
+			outfile << ".net ";
+			for (const auto& labelDotPin : labelDotPinList)
+			{
+				outfile << labelDotPin << " ";
+			}
+			outfile << "\n";
+		}
+	}
+
+	outfile << "END_NET\n";
 	outfile.close();
 	return true;
 }

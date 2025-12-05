@@ -18,6 +18,7 @@ public:
 	// function
 	bool ParsePatternFile();
 	bool ParseCdlFile();
+	bool GenIntermidiateFile();
 
 private:
 	std::string cdlFile, patternFile, intermidiateFile;
@@ -34,9 +35,8 @@ private:
 		std::string dNet, gNet, sNet, bNet;
 		int m;
 		std::string instName, labelName;
+		std::string cellType;
 	};
 
 	std::vector<InstStruct> instStructList;
-
-	bool GenIntermidiateFile();
 };
