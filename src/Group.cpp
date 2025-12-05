@@ -12,12 +12,25 @@ void Group::AddDeviceUnit(const DeviceUnit& deviceUnit)
 {
 	this->deviceUnits.push_back(deviceUnit);
 	this->CalculateTypeHash();
+
+	if (deviceUnit.GetSymbol() == "d")
+	{
+		this->dummyNum++;
+	}
 }
 
 void Group::SetDeviceUnits(const std::vector<DeviceUnit>& units)
 {
 	this->deviceUnits = units;
 	this->CalculateTypeHash();
+
+	for (const auto& unit : units)
+	{
+		if (unit.GetSymbol() == "d")
+		{
+			this->dummyNum++;
+		}
+	}
 }
 
 void Group::CalculateTypeHash()
