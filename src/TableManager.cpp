@@ -73,6 +73,36 @@ std::vector<std::string> TableManager::GetTableStringFormat()
     return tableStrings;
 }
 
+std::vector<std::string> TableManager::GetTableStringPattern()
+{
+    std::vector<std::string> tableStrings;
+
+    for (size_t rowIndex = 0; rowIndex < table.size(); rowIndex++)
+    {
+		auto& row = table[rowIndex];
+        std::string rowString;
+        for (auto& group : row)
+        {
+			auto deviceUnits = group.GetDeviceUnits();
+            for (size_t i = 0; i < deviceUnits.size(); i++)
+            {
+				rowString += deviceUnits[i].GetSymbol();
+                if (i < deviceUnits.size() - 1)
+                {
+					rowString += ", ";
+                }
+            }
+            if (&group < &row.back())
+            {
+                rowString += ", ";
+			}
+        }
+        tableStrings.push_back(rowString);
+    }
+
+    return tableStrings;
+}
+
 std::vector<std::string> TableManager::GetTableRotationFormat(bool leftS)
 {
     std::vector<std::string> tableRotations;
@@ -85,6 +115,34 @@ std::vector<std::string> TableManager::GetTableRotationFormat(bool leftS)
             {
 				rowRotation += deviceUnit.GetStringRotation(leftS);
             }
+        }
+        tableRotations.push_back(rowRotation);
+    }
+    return tableRotations;
+}
+
+std::vector<std::string> TableManager::GetTableRotationPattern(bool leftS)
+{
+    std::vector<std::string> tableRotations;
+    for (size_t rowIndex = 0; rowIndex < table.size(); rowIndex++)
+    {
+        auto& row = table[rowIndex];
+        std::string rowRotation;
+        for (auto& group : row)
+        {
+			auto deviceUnits = group.GetDeviceUnits();
+            for (size_t i = 0; i < deviceUnits.size(); i++)
+            {
+                rowRotation += deviceUnits[i].GetStringRotation(leftS);
+                if (i < deviceUnits.size() - 1)
+                {
+                    rowRotation += ", ";
+                }
+            }
+            if (&group < &row.back())
+            {
+                rowRotation += ", ";
+			}
         }
         tableRotations.push_back(rowRotation);
     }

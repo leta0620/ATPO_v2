@@ -1,5 +1,6 @@
 #pragma once
 #include "TableManager.h"
+#include "OuterInput.h"
 #include <map>
 #include <vector>
 #include <string>
@@ -7,7 +8,8 @@
 class Output
 {
 public:
-	Output(int group, int rowSize, std::map<int, std::vector<TableManager>>& allNondominatedSolutions, std::string sOrD) : group(group), rowSize(rowSize), allNondominatedSolutions(allNondominatedSolutions) 
+	Output(int group, int rowSize, std::map<int, std::vector<TableManager>>& allNondominatedSolutions, std::string sOrD, std::unordered_map<std::string, std::string> labelNameMapInstName, std::unordered_map<std::string, std::string> instNameMapLabelName) :
+		group(group), rowSize(rowSize), allNondominatedSolutions(allNondominatedSolutions), labelNameMapInstName(labelNameMapInstName), instNameMapLabelName(instNameMapLabelName)
 	{  
 		if (sOrD == "S" || sOrD == "s")
 			leftS = true;
@@ -27,6 +29,8 @@ public:
 	void PrintSignificantNondominatedSolutions();
 	void WriteSignificantNondominatedSolutionsToFile(std::string fileName);
 
+	
+
 private:
 	std::map<int, std::vector<TableManager>> allNondominatedSolutions;
 
@@ -37,4 +41,7 @@ private:
 	int group;
 	int rowSize;
 	bool leftS = true;
+
+	std::unordered_map<std::string, std::string> labelNameMapInstName; // label name -> inst name
+	std::unordered_map<std::string, std::string> instNameMapLabelName; // inst name -> label name
 };

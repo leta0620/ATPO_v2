@@ -43,7 +43,7 @@ void Output::WriteAllResultToFile(std::string fileName)
 			outFile << "\n";
 
 			auto tableStrings = tableList[i].GetTableStringFormat();
-			auto rotationStrings = tableList[i].GetTableRotationFormat();
+			auto rotationStrings = tableList[i].GetTableRotationFormat(leftS);
 			for (const auto& rowString : tableStrings)
 			{
 				outFile << rowString << "\n";
@@ -77,7 +77,7 @@ void Output::PrintAllResult()
 			cout << "\n";
 
 			auto tableStrings = tableList[i].GetTableStringFormat();
-			auto rotationStrings = tableList[i].GetTableRotationFormat();
+			auto rotationStrings = tableList[i].GetTableRotationFormat(leftS);
 			for (const auto& rowString : tableStrings)
 			{
 				cout << rowString << "\n";
@@ -133,7 +133,7 @@ void Output::PrintSignificantNondominatedSolutions()
 			cout << "\n";
 
 			auto tableStrings = sol.second[i].GetTableStringFormat();
-			auto rotationStrings = sol.second[i].GetTableRotationFormat();
+			auto rotationStrings = sol.second[i].GetTableRotationFormat(leftS);
 			for (const auto& rowString : tableStrings)
 			{
 				cout << rowString << "\n";
@@ -150,31 +150,6 @@ void Output::PrintSignificantNondominatedSolutions()
 
 void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 {
-	/*ofstream outFile(fileName);
-	if (!outFile.is_open())
-	{
-		cerr << "Error opening file: " << fileName << endl;
-		return;
-	}
-
-	for (size_t i = 0; i < significantNondominatedSolutions.size(); ++i)
-	{
-		outFile << "Significant Nondominated Solution " << i + 1 << ":\n";
-		auto tableStrings = significantNondominatedSolutions[i].GetTableStringFormat();
-		auto rotationStrings = significantNondominatedSolutions[i].GetTableRotationFormat();
-		for (const auto& rowString : tableStrings)
-		{
-			outFile << rowString << "\n";
-		}
-		outFile << "Rotations:\n";
-		for (const auto& rotationString : rotationStrings)
-		{
-			outFile << rotationString << "\n";
-		}
-		outFile << "\n";
-	}
-	outFile.close();*/
-
 	ofstream outFile(fileName);
 	if (!outFile.is_open())
 	{
@@ -184,6 +159,7 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 
 	for (auto& sol : significantNondominatedSolutions)
 	{
+		string costItem;
 		if (sol.second.empty())
 		{
 			outFile << "No significant nondominated solutions selected for this cost enum : " << static_cast<int>(sol.first) << "\n";
@@ -193,6 +169,7 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 		{
 			auto costNameAndValue = sol.second[0].GetCostNameAndCostValueString();
 			outFile << "Cost Item : " << costNameAndValue[static_cast<int>(sol.first)].first << "\n";
+			costItem = costNameAndValue[static_cast<int>(sol.first)].first;
 		}
 
 		for (size_t i = 0; i < sol.second.size(); ++i)
@@ -206,7 +183,7 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 			outFile << "\n";
 
 			auto tableStrings = sol.second[i].GetTableStringFormat();
-			auto rotationStrings = sol.second[i].GetTableRotationFormat();
+			auto rotationStrings = sol.second[i].GetTableRotationFormat(leftS);
 			for (const auto& rowString : tableStrings)
 			{
 				outFile << rowString << "\n";
@@ -217,11 +194,44 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 				outFile << rotationString << "\n";
 			}
 			outFile << "\n";
+
+			// output pattern file
+			string patternFileName = fileName + "_" + costItem + "_Solution_" + to_string(i + 1) + ".csv";
+			vector<string> pattern = sol.second[i].GetTableStringPattern();
+			vector<string> rotationPattern = sol.second[i].GetTableRotationPattern(leftS);
+
+			ofstream patternOutFile(patternFileName);
+
+			if (!patternOutFile.is_open())
+			{
+				cerr << "Error opening pattern file: " << patternFileName << endl;
+				continue;
+			}
+
+			for (const auto& patternLine : pattern)
+			{
+				patternOutFile << patternLine << "\n";
+			}
+			patternOutFile << "\n";
+			for (const auto& rotationLine : rotationPattern)
+			{
+				patternOutFile << rotationLine << "\n";
+			}
+			patternOutFile << "\n";
+
+			for (auto& [instName, labelName] : instNameMapLabelName)
+			{
+				patternOutFile << instName << ", " << labelName << "\n";
+			}
+			patternOutFile << "\n";
+
+			patternOutFile.close();
 		}
 	}
 
 	outFile.close();
 }
+
 
 void Output::SelectTopNByCostEnum(CostEnum costEnum, int N)
 {

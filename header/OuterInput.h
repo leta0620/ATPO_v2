@@ -20,6 +20,9 @@ public:
 	bool ParseCdlFile();
 	bool GenIntermidiateFile();
 
+	std::unordered_map<std::string, std::string> GetLabelNameMapInstName() { return labelNameMapInstName; }
+	std::unordered_map<std::string, std::string> GetInstNameMapLabelName() { return instNameMapLabelName; }
+
 private:
 	std::string cdlFile, patternFile, intermidiateFile;
 	std::unordered_map<std::string, std::string> labelNameMapInstName; // label name -> inst name
