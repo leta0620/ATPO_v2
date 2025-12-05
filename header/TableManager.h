@@ -41,7 +41,7 @@ public:
 
 	//output
 	std::vector<std::string> GetTableStringFormat();
-	std::vector<std::string> GetTableRotationFormat();
+	std::vector<std::string> GetTableRotationFormat(bool leftS = true);
 
 	// cost
 	std::unordered_map<CostEnum, double> CalculateTableCost();

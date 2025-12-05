@@ -7,7 +7,13 @@
 class Output
 {
 public:
-	Output(int group, int rowSize, std::map<int, std::vector<TableManager>>& allNondominatedSolutions) : group(group), rowSize(rowSize), allNondominatedSolutions(allNondominatedSolutions) { ; }
+	Output(int group, int rowSize, std::map<int, std::vector<TableManager>>& allNondominatedSolutions, std::string sOrD) : group(group), rowSize(rowSize), allNondominatedSolutions(allNondominatedSolutions) 
+	{  
+		if (sOrD == "S" || sOrD == "s")
+			leftS = true;
+		else
+			leftS = false;
+	}
 
 	void AddResultSingle(int round, TableManager& cTable);
 	void AddResultList(int round, std::vector<TableManager> cTableList);
@@ -30,4 +36,5 @@ private:
 
 	int group;
 	int rowSize;
+	bool leftS = true;
 };

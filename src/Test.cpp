@@ -8,8 +8,10 @@ Test::Test()
 {
 	// Add your test functions here, and call them in the constructor
 	//this->TestParsing()
-	this->TestInitialPlacement(8, 8);
+	//this->TestInitialPlacement(8, 8);
 	//this->TestInitialPlacement(6, 6);
+
+	this->TestOuterInputParsing();
 
 }
 void Test::TestParsing()
@@ -137,4 +139,27 @@ void Test::TestInitialPlacement(int groupSize, int rowNum)
 		std::cout << std::endl;
 		std::cout << std::endl;
 	}
+}
+
+void Test::TestOuterInputParsing()
+{
+	OuterInput outerInput("cdl_test.txt", "pattern.txt");
+	if (!outerInput.ParsePatternFile()) {
+		std::cerr << "Error: Failed to parse pattern file." << std::endl;
+		return;
+	}
+	
+	
+	if (!outerInput.ParseCdlFile()) {
+		std::cerr << "Error: Failed to parse CDL file." << std::endl;
+		return;
+	}
+
+	outerInput.SetIntermidiateFile("intermediate_output.txt");
+	if (!outerInput.GenIntermidiateFile()) {
+		std::cerr << "Error: Failed to generate intermediate file." << std::endl;
+		return;
+	}
+	
+	return;
 }

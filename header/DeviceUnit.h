@@ -45,7 +45,7 @@ public:
 		}
 	}
 
-	std::string GetStringRotation() const;
+	std::string GetStringRotation(bool leftS = true) const;
 
 	// == operators
 	bool operator==(const DeviceUnit& other) const {
