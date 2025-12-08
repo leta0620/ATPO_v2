@@ -183,7 +183,13 @@ bool OuterInput::ParseCdlFile() {
 				string pin1, pin2, pin3 ,pin4, m;
 				ss >> pin1 >> pin2 >> pin3 >> pin4 >> m;
 
-				m = m.substr(2, m.size() - 3);
+				//m = m.substr(2, m.size() - 3);
+				if (m.size() > 2 && m.rfind("m=", 0) == 0)
+				{
+					m = m.substr(2);
+					while (!m.empty() && !isdigit(static_cast<unsigned char>(m.back())))
+						m.pop_back();
+				}
 				
 				this->instNameMapCellInformation[subcktName] = make_tuple(pin1, pin2, pin3, pin4, stoi(m));
 			}
