@@ -32,8 +32,8 @@ bool IntermidiateParser::Parse()
 				string deviceLine;
 				stringstream deviceSS(line);
 				string deviceToken;
-				tuple<string, string, string, int> deviceInstance;
-				deviceSS >> get<0>(deviceInstance) >> get<1>(deviceInstance) >> get<2>(deviceInstance) >> get<3>(deviceInstance);
+				tuple<string, string, string, int, int> deviceInstance;
+				deviceSS >> get<0>(deviceInstance) >> get<1>(deviceInstance) >> get<2>(deviceInstance) >> get<3>(deviceInstance) >> get<4>(deviceInstance);
 				this->deviceInstanceList.push_back(deviceInstance);
 			}
 		}
@@ -130,17 +130,18 @@ pair<string, string> SplitCellAndPin(const string& cellWithPin)
 
 bool IntermidiateParser::GenerateNetlistLookupTable()
 {
-	unordered_map<string, NetlistUnit> tempNetlistMap;
+	unordered_map<string, NetlistUnit> tempNetlistMap;	// temporary map to build netlist units
 	// device 
 	for (const auto& deviceInstance : this->deviceInstanceList)
 	{
-		const auto& [cellName, synbolName, analogcellType, unitCount] = deviceInstance;
+		const auto& [cellName, synbolName, analogcellType, unitCount, deviceWidth] = deviceInstance;
 
 		NetlistUnit unit;
 		unit.SetAnalogType(analogcellType);
 		unit.SetCellName(cellName);
 		unit.SetSynbolName(synbolName);
 		unit.SetDeviceUnitCount(unitCount);
+		unit.SetDeviceWidth(deviceWidth);
 		tempNetlistMap[synbolName] = unit;
 	}
 

@@ -129,6 +129,7 @@ void InitialPlacement::InitialPathOrder()
 				deviceUnit.SetSymbol(unit.GetSynbolName());
 				deviceUnit.SetAnalogCellType(unit.GetAnalogType());
 				deviceUnit.SetRotation(CellRotation::MY);
+				deviceUnit.SetWidth(unit.GetDeviceWidth());
 				currentPath.push_back(deviceUnit);
 				--unitCount;
 
@@ -139,6 +140,7 @@ void InitialPlacement::InitialPathOrder()
 					deviceUnit.SetSymbol(shareDeviceUnit.GetSynbolName());
 					deviceUnit.SetAnalogCellType(shareDeviceUnit.GetAnalogType());
 					deviceUnit.SetRotation(CellRotation::MY);
+					deviceUnit.SetWidth(shareDeviceUnit.GetDeviceWidth());
 					currentPath.push_back(deviceUnit);
 
 					deviceUnit.SetRotation(CellRotation::R0);
@@ -149,6 +151,7 @@ void InitialPlacement::InitialPathOrder()
 				deviceUnit.SetSymbol(unit.GetSynbolName());
 				deviceUnit.SetAnalogCellType(unit.GetAnalogType());
 				deviceUnit.SetRotation(CellRotation::R0);
+				deviceUnit.SetWidth(unit.GetDeviceWidth());
 				currentPath.push_back(deviceUnit);
 				--unitCount;
 			}

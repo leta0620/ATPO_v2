@@ -162,11 +162,11 @@ bool OuterInput::ParseCdlFile() {
 
 							if (this->hasLable)
 							{
-								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m) * cTM, instName, this->instNameMapLabelName[instName], cellType });
+								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m) * cTM, instName, this->instNameMapLabelName[instName], cellType, cascodeInterInst});
 							}
 							else
 							{
-								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m) * cTM, instName, "", cellType });
+								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m) * cTM, instName, "", cellType, cascodeInterInst});
 							}
 
 							
@@ -178,11 +178,11 @@ bool OuterInput::ParseCdlFile() {
 
 							if (this->hasLable)
 							{
-								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m), instName, this->instNameMapLabelName[instName], cellType });
+								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m), instName, this->instNameMapLabelName[instName], cellType, 1 });
 							}
 							else
 							{
-								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m), instName, "", cellType });
+								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m), instName, "", cellType, 1 });
 							}
 						}
 					}
@@ -256,13 +256,13 @@ bool OuterInput::GenIntermidiateFile() {
 	{
 		if (hasLable)
 		{
-			outfile << inst.instName << " " << inst.labelName << " " << inst.cellType << " " << inst.m << "\n";
+			outfile << inst.instName << " " << inst.labelName << " " << inst.cellType << " " << inst.m << " " << inst.cascodeInterInst << "\n";
 		}
 		else 
 		{
 			instNameMapSelfLable[inst.instName] = string(1, selfLabelChar);
 			selfLabelChar++;
-			outfile << inst.instName << " " << instNameMapSelfLable[inst.instName] << " " << inst.cellType << " " << inst.m << "\n";
+			outfile << inst.instName << " " << instNameMapSelfLable[inst.instName] << " " << inst.cellType << " " << inst.m << " " << inst.cascodeInterInst <<"\n";
 		}
 
 	}
