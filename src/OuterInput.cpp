@@ -92,7 +92,7 @@ bool OuterInput::ParseCdlFile() {
 
 		string tmp;
 		ss >> tmp;
-		if (tmp == ".SUBCKT")
+		if (tmp == ".SUBCKT" || tmp == ".subskt")
 		{
 			ss >> tmp;
 			string subcktName = tmp;
@@ -129,8 +129,8 @@ bool OuterInput::ParseCdlFile() {
 							// 取得已登記的 cell type pin 訊息 (tuple<string,string,string,string,int>)
 							auto &cellTypeInformation = it->second;
 							string cT1, cT2, cT3, cT4;
-							int cTM;
-							tie(cT1, cT2, cT3, cT4, cTM) = cellTypeInformation;
+							int cTM = 0, cascodeInterInst = 0;
+							tie(cT1, cT2, cT3, cT4, cTM, cascodeInterInst) = cellTypeInformation;
 
 							string dNet, gNet, sNet, bNet;
 							// 正確實作的 lambda：以 cTPin 決定要把哪個 net 指派給哪個變數
@@ -160,14 +160,30 @@ bool OuterInput::ParseCdlFile() {
 							SetPinNets(cT3, pin3);
 							SetPinNets(cT4, pin4);
 
-							this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m) * cTM, instName, this->instNameMapLabelName[instName], cellType });
+							if (this->hasLable)
+							{
+								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m) * cTM, instName, this->instNameMapLabelName[instName], cellType, cascodeInterInst});
+							}
+							else
+							{
+								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m) * cTM, instName, "", cellType, cascodeInterInst});
+							}
+
+							
 						}
 						else
 						{
 							// default celltype pin information
 							string dNet = pin1, gNet = pin2, sNet = pin3, bNet = pin4;
 
-							this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m), instName, this->instNameMapLabelName[instName], cellType });
+							if (this->hasLable)
+							{
+								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m), instName, this->instNameMapLabelName[instName], cellType, 1 });
+							}
+							else
+							{
+								this->instStructList.push_back({ dNet, gNet, sNet, bNet, stoi(m), instName, "", cellType, 1 });
+							}
 						}
 					}
 					else
@@ -186,18 +202,34 @@ bool OuterInput::ParseCdlFile() {
 				//m = m.substr(2, m.size() - 3);
 				if (m.size() > 2 && m.rfind("m=", 0) == 0)
 				{
-					m = m.substr(2);
+					m = m.substr(2); // 從 index 2 開始到結尾
+					// 若有結尾的 ')' 或其他，嘗試移除非數字尾字元
 					while (!m.empty() && !isdigit(static_cast<unsigned char>(m.back())))
 						m.pop_back();
 				}
-				
-				this->instNameMapCellInformation[subcktName] = make_tuple(pin1, pin2, pin3, pin4, stoi(m));
-			}
 
-			while (getline(cdlStream, line))
-			{
-				if (line == ".ENDS" || line == ".ends") break;
-				else continue;
+				int cascodeInterInst = 0;
+				while (getline(cdlStream, line))
+				{
+					if (line == ".ENDS" || line == ".ends") break;
+
+					if (!line.empty())
+					{
+						// 確認最後兩個字是不是r2或R2
+						if (line.size() >= 2)
+						{
+							string lastTwoChars = line.substr(line.size() - 2);
+							if (/*lastTwoChars == "r2" || */lastTwoChars == "R2")
+							{
+								cascodeInterInst += 2;
+								continue;
+							}
+						}
+						cascodeInterInst++;
+					}
+				}
+				
+				this->instNameMapCellInformation[subcktName] = make_tuple(pin1, pin2, pin3, pin4, stoi(m), cascodeInterInst);
 			}
 		}
 
@@ -217,9 +249,22 @@ bool OuterInput::GenIntermidiateFile() {
 	}
 
 	outfile << "DEVICE_BEGIN\n";
+
+	unordered_map<string, string> instNameMapSelfLable;
+	char selfLabelChar = 'A';
 	for (const auto& inst : this->instStructList)
 	{
-		outfile << inst.instName << " " << inst.labelName << " " << inst.cellType << " " << inst.m << "\n";
+		if (hasLable)
+		{
+			outfile << inst.instName << " " << inst.labelName << " " << inst.cellType << " " << inst.m << " " << inst.cascodeInterInst << "\n";
+		}
+		else 
+		{
+			instNameMapSelfLable[inst.instName] = string(1, selfLabelChar);
+			selfLabelChar++;
+			outfile << inst.instName << " " << instNameMapSelfLable[inst.instName] << " " << inst.cellType << " " << inst.m << " " << inst.cascodeInterInst <<"\n";
+		}
+
 	}
 	outfile << "END_DEVICE\n";
 	
@@ -228,11 +273,24 @@ bool OuterInput::GenIntermidiateFile() {
 
 	map<string, vector<string>> netNameMapLabelDotPinDS;
 	map<string, vector<string>> netNameMapLabelDotPinG;
-	for (const auto& inst : this->instStructList)
+
+	if (this->hasLable)
 	{
-		netNameMapLabelDotPinDS[inst.dNet].push_back(inst.labelName + ".D");
-		netNameMapLabelDotPinG[inst.gNet].push_back(inst.labelName + ".G");
-		netNameMapLabelDotPinDS[inst.sNet].push_back(inst.labelName + ".S");
+		for (const auto& inst : this->instStructList)
+		{
+			netNameMapLabelDotPinDS[inst.dNet].push_back(inst.labelName + ".D");
+			netNameMapLabelDotPinG[inst.gNet].push_back(inst.labelName + ".G");
+			netNameMapLabelDotPinDS[inst.sNet].push_back(inst.labelName + ".S");
+		}
+	}
+	else
+	{
+		for (const auto& inst : this->instStructList)
+		{
+			netNameMapLabelDotPinDS[inst.dNet].push_back(instNameMapSelfLable[inst.instName] + ".D");
+			netNameMapLabelDotPinG[inst.gNet].push_back(instNameMapSelfLable[inst.instName] + ".G");
+			netNameMapLabelDotPinDS[inst.sNet].push_back(instNameMapSelfLable[inst.instName] + ".S");
+		}
 	}
 
 	// find common source

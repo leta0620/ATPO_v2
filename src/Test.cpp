@@ -57,7 +57,7 @@ void Test::TestInitialPlacement(int groupSize, int rowNum)
 	for (const auto& symbol : parser.GetNetlistLookupTable().GetAllSymbolNames()) {
 		const auto& netlistUnit = parser.GetNetlistLookupTable().GetNetlistUnit(symbol);
 		std::cout << "Symbol: " << symbol
-			<< ", Cell Name: " << netlistUnit.GetCellName()
+			<< ", Cell Name: " << netlistUnit.GetInstName()
 			<< ", Analog Type: " << netlistUnit.GetAnalogType()
 			<< ", Device Unit Count: " << netlistUnit.GetDeviceUnitCount()
 			<< std::endl;

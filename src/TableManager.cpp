@@ -86,7 +86,9 @@ std::vector<std::string> TableManager::GetTableStringPattern()
 			auto deviceUnits = group.GetDeviceUnits();
             for (size_t i = 0; i < deviceUnits.size(); i++)
             {
-				rowString += deviceUnits[i].GetSymbol();
+				//rowString += deviceUnits[i].GetSymbol();
+				rowString += deviceUnits[i].GetInstName();
+
                 if (i < deviceUnits.size() - 1)
                 {
 					rowString += ", ";

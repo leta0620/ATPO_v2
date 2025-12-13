@@ -13,14 +13,28 @@ class DeviceUnit
 {
 public:
 	DeviceUnit() = default;
-	DeviceUnit(const std::string& symbol, const std::string& analogCellType)
-		: symbol(symbol), analogCellType(analogCellType) {
+	DeviceUnit(const std::string& symbol, const std::string& instName, const std::string& analogCellType, int width)
+		: symbol(symbol), instName(instName), analogCellType(analogCellType), width(width) {
 	}
 	std::string GetSymbol() const {
 		return symbol;
 	}
 	std::string GetAnalogCellType() const {
 		return analogCellType;
+	}
+
+	std::string GetInstName() const {
+		return instName;
+	}
+	void SetInstName(const std::string& name) {
+		instName = name;
+	}
+
+	int GetWidth() const {
+		return width;
+	}
+	void SetWidth(int w) {
+		width = w;
 	}
 
 	void SetAnalogCellType(const std::string& type) {
@@ -57,7 +71,9 @@ public:
 
 private:
 	std::string symbol;
+	std::string instName;
 	std::string analogCellType;
+	int width = 0;
 
 	//DeviceUnit* d = nullptr, *g = nullptr, *s = nullptr;
 	std::vector<std::string> d, g, s;
