@@ -7,12 +7,12 @@ class NetlistUnit
 {
 public:
 	NetlistUnit() = default;
-	NetlistUnit(const std::string& cellName, const std::string& synbolName, int deviceUnitCount, const std::string& analogType, int deviceWidth)
-		: cellName(cellName), synbolName(synbolName), deviceUnitCount(deviceUnitCount), analogType(analogType), deviceWidth(deviceWidth)
+	NetlistUnit(const std::string& instName, const std::string& synbolName, int deviceUnitCount, const std::string& analogType, int deviceWidth)
+		: instName(instName), synbolName(synbolName), deviceUnitCount(deviceUnitCount), analogType(analogType), deviceWidth(deviceWidth)
 	{;}
 
-	void SetCellName(const std::string& name) { this->cellName = name; }
-	std::string GetCellName() const { return this->cellName; }
+	void SetInstName(const std::string& name) { this->instName = name; }
+	std::string GetInstName() const { return this->instName; }
 
 	void SetSynbolName(const std::string& name) { this->synbolName = name; }
 	std::string GetSynbolName() const { return this->synbolName; }
@@ -39,7 +39,7 @@ public:
 	std::string GetPinS(const std::string& synbolName) const;
 
 private:
-	std::string cellName, synbolName, analogType;
+	std::string instName, synbolName, analogType;
 	int deviceUnitCount, deviceWidth;
 
 	std::unordered_map<std::string, std::vector<std::string>> pinMap; // key(synbolName) -> , [d, g, s]

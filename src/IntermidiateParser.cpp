@@ -134,11 +134,11 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 	// device 
 	for (const auto& deviceInstance : this->deviceInstanceList)
 	{
-		const auto& [cellName, synbolName, analogcellType, unitCount, deviceWidth] = deviceInstance;
+		const auto& [instName, synbolName, analogcellType, unitCount, deviceWidth] = deviceInstance;
 
 		NetlistUnit unit;
 		unit.SetAnalogType(analogcellType);
-		unit.SetCellName(cellName);
+		unit.SetInstName(instName);
 		unit.SetSynbolName(synbolName);
 		unit.SetDeviceUnitCount(unitCount);
 		unit.SetDeviceWidth(deviceWidth);
