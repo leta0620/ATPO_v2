@@ -27,28 +27,37 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 
-	if (argc != 8) {
+	//if (argc != 8) {
+	//	Test test; // Run tests
+	//	cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <Pattern_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D>" << endl;
+	//	return 1;
+	//}
+	
+	if (argc != 7) {
 		Test test; // Run tests
-		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <Pattern_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D>" << endl;
+		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D>" << endl;
 		return 1;
 	}
+
+
 
 	int groupSize = stoi(argv[1]);
 	int row_num = stoi(argv[2]);
 	string cdl_input_file_path = argv[3];
-	string pattern_input_file_path = argv[4];
-	string output_file_path = argv[5];
-	int thread_num = stoi(argv[6]);
-	string left_is_S_or_D = argv[7];
+	//string pattern_input_file_path = argv[4];
+	string output_file_path = argv[4];
+	int thread_num = stoi(argv[5]);
+	string left_is_S_or_D = argv[6];
 
 	// Generate intermediate file from CDL and Pattern files
 	string intermediate_code_file_path = "intermediate_temp.txt";
-	OuterInput outerInput(cdl_input_file_path, pattern_input_file_path);
+	//OuterInput outerInput(cdl_input_file_path, pattern_input_file_path);
+	OuterInput outerInput(cdl_input_file_path);
 	outerInput.SetIntermidiateFile(intermediate_code_file_path);
-	if (!outerInput.ParsePatternFile()) {
+	/*if (!outerInput.ParsePatternFile()) {
 		cerr << "Error: Failed to parse pattern file." << endl;
 		return 1;
-	}
+	}*/
 	if (!outerInput.ParseCdlFile()) {
 		cerr << "Error: Failed to parse CDL file." << endl;
 		return 1;

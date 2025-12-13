@@ -9,6 +9,10 @@ public:
 	OuterInput() = default;
 	OuterInput(const std::string& cdlFilename, const std::string& patternFilename)
 		: cdlFile(cdlFilename), patternFile(patternFilename) {
+		hasLable = true;
+	}
+	OuterInput(const std::string& cdlFilename)
+		: cdlFile(cdlFilename) {
 	}
 
 	void SetCdlFile(const std::string& filename) { cdlFile = filename; }
@@ -31,7 +35,7 @@ private:
 	std::vector<std::vector<std::string>> initialPatternTable;	// initial pattern from pattern file
 	std::vector<std::vector<std::string>> initialPatternRotationTable;	// initial pattern rotation from pattern file
 
-	std::unordered_map<std::string, std::tuple<std::string, std::string, std::string, std::string, int>> instNameMapCellInformation; // inst name -> pin1, pin2, pin3, pin4, deviceNum for one cell Type
+	std::unordered_map<std::string, std::tuple<std::string, std::string, std::string, std::string, int, int>> instNameMapCellInformation; // inst name -> pin1, pin2, pin3, pin4, deviceNum for one cell Type
 
 	struct InstStruct
 	{
@@ -39,7 +43,10 @@ private:
 		int m;
 		std::string instName, labelName;
 		std::string cellType;
+		int cascodeInterInst = 0;
 	};
 
 	std::vector<InstStruct> instStructList;
+
+	bool hasLable = false;
 };
