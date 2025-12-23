@@ -549,12 +549,19 @@ bool TableManager::SwapGroups(int row1, int col1, int row2, int col2)
 	Group group1 = table[row1][col1];
 	Group group2 = table[row2][col2];
 
-	if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
+	/*if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
 		this->ColumnRuleCheck(row2, col2, group1) && this->RowRuleCheck(row2, col2, group1))
 	{
 		this->table[row1][col1] = group2;
 		this->table[row2][col2] = group1;
 		return true;
+	}*/
+
+    if (this->CheckCanSwapGroups(row1, col1, row2, col2))
+    {
+        this->table[row1][col1] = group2;
+        this->table[row2][col2] = group1;
+        return true;
 	}
 
 	return false;
@@ -604,6 +611,36 @@ bool TableManager::CheckCanSwapGroups(int row1, int col1, int row2, int col2)
 	return false;
 }
 
+bool TableManager::SwapColumns(int col1, int col2)
+{
+    if (col1 < 0 || col1 >= this->colSize || col2 < 0 || col2 >= this->colSize)
+		return false;
+
+    for (int r = 0; r < this->rowSize; r++)
+    {
+        Group group1 = table[r][col1];
+        Group group2 = table[r][col2];
+		table[r][col1] = group2;
+        table[r][col2] = group1;
+    }
+	return true;
+}
+
+bool TableManager::SwapRows(int row1, int row2)
+{
+    if (row1 < 0 || row1 >= this->rowSize || row2 < 0 || row2 >= this->rowSize)
+        return false;
+    for (int c = 0; c < this->colSize; c++)
+    {
+        Group group1 = table[row1][c];
+        Group group2 = table[row2][c];
+        table[row1][c] = group2;
+        table[row2][c] = group1;
+    }
+    return true;
+}
+
+
 std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValueString()
 {
     std::vector< std::pair<std::string, double>> costNameAndValue;
@@ -631,4 +668,19 @@ std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValu
 		costNameAndValue.push_back(pair<string, double>(costName, costValue));
     }
     return costNameAndValue;
+}
+
+void TableManager::PrintTableToConsole()
+{
+    for (auto& row : table)
+    {
+        for (auto& group : row)
+        {
+            for (const auto& deviceUnit : group.GetDeviceUnits())
+            {
+                std::cout << deviceUnit.GetSymbol();
+            }
+        }
+        std::cout << std::endl;
+    }
 }

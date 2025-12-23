@@ -91,39 +91,71 @@ void SAManager::Perturbation(std::mt19937& gen)
 		{
 			cerr << "Swap two group unit fail." << endl;
 		}
-		};
+	};
+
+	auto SwapTwoCol = [](TableManager& table, mt19937& gen) {
+		int rowSize = table.GetRowSize();
+		int colSize = table.GetColSize();
+		uniform_int_distribution<> disCol(0, colSize - 1);
+		int col1 = disCol(gen);
+		int col2 = 0;
+		do
+		{
+			col2 = disCol(gen);
+		} while (col1 == col2);
+		// swap col1 and col2
+		if (!table.SwapColumns(col1, col2))
+		{
+			cerr << "Swap two colume fail." << endl;
+		}
+	};
+
+	auto SwapTwoRow = [](TableManager& table, mt19937& gen) {
+		int rowSize = table.GetRowSize();
+		int colSize = table.GetColSize();
+		uniform_int_distribution<> disRow(0, rowSize - 1);
+		int row1 = disRow(gen);
+		int row2 = 0;
+		do
+		{
+			row2 = disRow(gen);
+		} while (row1 == row2);
+		// swap row1 and row2
+		if (!table.SwapRows(row1, row2))
+		{
+			cerr << "Swap two row fail." << endl;
+		}
+	};
 
 	// generate new solutions by swapping two group unit
 	TableManager newTable = this->nowUseTable;
-	SwapTwoGroupUnit(newTable, gen);
+	//newTable.PrintTableToConsole();
+
+	if (this->currentTemp > (this->initialTemp + this->finalTemp) / 2)
+	{
+		uniform_int_distribution<> perOperation(0, 1);
+		int op = perOperation(gen);
+		if (op == 0)
+			SwapTwoCol(newTable, gen);
+		else
+			SwapTwoRow(newTable, gen);
+	}
+	else
+	{
+		uniform_int_distribution<> perOperation(0, 2);
+		int op = perOperation(gen);
+		if (op == 0)
+			SwapTwoCol(newTable, gen);
+		else if (op == 1)
+			SwapTwoRow(newTable, gen);
+		else
+			SwapTwoGroupUnit(newTable, gen);
+	}
+
+	//SwapTwoGroupUnit(newTable, gen);
 	this->newTableList.push_back(newTable);
-
-	//auto SwapTwoDeviceUnit = [](CostTableManager& table, mt19937& gen) {
-	//	int rowSize = table.GetRowSize();
-	//	int colSize = table.GetColSize();
-	//	uniform_int_distribution<> disRow(0, rowSize - 1);
-	//	uniform_int_distribution<> disCol(0, colSize - 1);
-	//	int row1 = disRow(gen);
-	//	int col1 = disCol(gen);
-	//	int row2 = 0;
-	//	int col2 = 0;
-	//	do
-	//	{
-	//		row2 = disRow(gen);
-	//		col2 = disCol(gen);
-	//	} while (table.GetDeviceUnit(row1, col1).GetDeviceName() == table.GetDeviceUnit(row2, col2).GetDeviceName());
-
-	//	table.SwapDeviceUnit(row1, col1, row2, col2);
-	//	};
-
-	//// generate new solutions by swapping two device unit
-	//CostTableManager newTable = this->nowUseTable;
-	//SwapTwoDeviceUnit(newTable, gen);
-	//this->newTableList.push_back(newTable);
-
-
-	// generate new solutions by moving one device unit
-
+	/*newTable.PrintTableToConsole();
+	cout << endl;*/
 }
 
 bool doesADominateB(const std::unordered_map<CostEnum, double>& aCost, const std::unordered_map<CostEnum, double>& bCost)

@@ -36,6 +36,8 @@ public:
 	bool PlaceGroup(const Group& group, int& placedRow, int& placedCol);
 	bool SwapGroups(int row1, int col1, int row2, int col2);
 	bool MoveGroup(int srcRow, int srcCol, int destRow, int destCol);	// caution: the src position will be cleared
+	bool SwapColumns(int col1, int col2);
+	bool SwapRows(int row1, int row2);
 
 	bool CheckCanSwapGroups(int row1, int col1, int row2, int col2);
 
@@ -52,6 +54,8 @@ public:
 	std::vector<std::pair<std::string, double>> GetCostNameAndCostValueString();
 
 	bool EqualTableToSelf(TableManager& otherTable);
+
+	void PrintTableToConsole();
 
 private:
 	std::vector<std::vector<Group>> table;
