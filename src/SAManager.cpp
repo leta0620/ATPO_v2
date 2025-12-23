@@ -19,6 +19,7 @@ SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, do
 	
 {
 	// 計算成本並初始化 nondominatedSolution
+	this->initialTable.CheckAndFixDummyWidth();
 	this->initialTable.CalculateTableCost();
 	this->nowUseTable = this->initialTable;
 	this->nondominatedSolution.push_back(this->initialTable);

@@ -601,8 +601,15 @@ void TableManager::SetTableSize(int rowSize, int colSize)
 
 bool TableManager::CheckCanSwapGroups(int row1, int col1, int row2, int col2)
 {
+    if (row1 < 0 || row1 >= this->rowSize || col1 < 0 || col1 >= this->colSize ||
+        row2 < 0 || row2 >= this->rowSize || col2 < 0 || col2 >= this->colSize)
+		return false;
+
+
+
 	Group group1 = table[row1][col1];
 	Group group2 = table[row2][col2];
+
 	if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
 		this->ColumnRuleCheck(row2, col2, group1) && this->RowRuleCheck(row2, col2, group1))
 	{
@@ -683,4 +690,89 @@ void TableManager::PrintTableToConsole()
         }
         std::cout << std::endl;
     }
+}
+
+//std::vector<std::vector<std::string>> TableManager::GetRealTableInstFormatTable()
+//{
+//	vector<vector<string>> realTableInstNames;
+//    for (auto& row : table)
+//    {
+//        vector<string> rowInstNames;
+//        for (auto& group : row)
+//        {
+//            for (DeviceUnit deviceU : group.GetDeviceUnits())
+//            {
+//                auto realInstNames = deviceU.GetPatternUseNameList();
+//                for (const auto& instName : realInstNames)
+//                {
+//                    rowInstNames.push_back(instName);
+//                }
+//            }
+//        }
+//        realTableInstNames.push_back(rowInstNames);
+//	}
+//
+//	return realTableInstNames;
+//}
+
+
+bool TableManager::CheckAndFixDummyWidth()
+{
+    vector<vector<int>> dummyWidthTable;
+	dummyWidthTable.reserve(this->colSize);
+	this->PrintTableToConsole();
+    
+    for (int c = 0; c < this->colSize; c++)
+    {
+		vector<int> dummyWidthsInCol;
+        dummyWidthsInCol.resize(this->table[0][c].GetDeviceUnits().size());
+        
+
+        for (int r = 0; r < this->rowSize; r++)
+        {
+			Group& g = this->table[r][c];
+			vector<DeviceUnit> deviceUnits = g.GetDeviceUnits();
+            bool allWidthSave = true;
+			
+            for (int d = 0; d < deviceUnits.size(); d++)
+            {
+                if (deviceUnits[d].GetSymbol() != "d")
+                {
+                    dummyWidthsInCol[d] = deviceUnits[d].GetWidth();
+                }
+                else
+                {
+					allWidthSave = false;
+                }
+			}
+            
+            if (allWidthSave)
+            {
+				dummyWidthTable.push_back(dummyWidthsInCol);
+                break;
+            }
+		}
+	}
+
+	// fix dummy width
+    for (int c = 0; c < this->colSize; c++)
+    {
+        for (int r = 0; r < this->rowSize; r++)
+        {
+            Group& g = this->table[r][c];
+            vector<DeviceUnit> deviceUnits = g.GetDeviceUnits();
+            for (int d = 0; d < deviceUnits.size(); d++)
+            {
+                if (deviceUnits[d].GetSymbol() == "d")
+                {
+                    deviceUnits[d].SetWidth(dummyWidthTable[c][d]);
+                }
+            }
+            g.SetDeviceUnits(deviceUnits);
+        }
+	}
+
+
+
+    return true;
 }

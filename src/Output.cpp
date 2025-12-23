@@ -7,15 +7,15 @@
 using namespace std; 
 
 
-void Output::AddResultSingle(int round, TableManager& cTable)
-{
-	this->allNondominatedSolutions[round].push_back(cTable);
-}
-
-void Output::AddResultList(int round, std::vector<TableManager> cTableList)
-{
-	this->allNondominatedSolutions[round] = cTableList;
-}
+//void Output::AddResultSingle(int round, TableManager& cTable)
+//{
+//	this->allNondominatedSolutions[round].push_back(cTable);
+//}
+//
+//void Output::AddResultList(int round, std::vector<TableManager> cTableList)
+//{
+//	this->allNondominatedSolutions[round] = cTableList;
+//}
 
 void Output::WriteAllResultToFile(std::string fileName)
 {

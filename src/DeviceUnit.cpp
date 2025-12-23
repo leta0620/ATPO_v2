@@ -24,3 +24,21 @@ std::string DeviceUnit::GetStringRotation(bool leftS) const
 		return "ERROR";
 	}
 }
+
+std::vector<std::string> DeviceUnit::GetPatternUseNameList()
+{
+	std::vector<std::string> instNames;
+	
+	if (instName == "*") {
+		for (int i = 0; i < width; ++i) 
+		{
+			instNames.push_back(this->instName);
+		}
+		
+	}
+	else {
+		instNames.push_back(instName);
+	}
+
+	return instNames;
+}
