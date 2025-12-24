@@ -728,7 +728,7 @@ bool TableManager::CheckAndFixDummyWidth()
 {
     vector<vector<int>> dummyWidthTable;
 	dummyWidthTable.reserve(this->colSize);
-	this->PrintTableToConsole();
+	//this->PrintTableToConsole();
     
     for (int c = 0; c < this->colSize; c++)
     {
@@ -790,17 +790,35 @@ vector<string> TableManager::GetTableStringPatternInRealDummyLength()
     std::vector<std::string> tableStrings;
     for (vector<Group>& row : this->table)
     {
+        string rowString;
         for (Group& group : row)
         {
-            for (DeviceUnit deviceUnit : group.GetDeviceUnits())
+            for (size_t deviceIndex = 0; deviceIndex < group.GetDeviceUnits().size(); deviceIndex++)
             {
+				DeviceUnit deviceUnit = group.GetDeviceUnits()[deviceIndex];
+
                 vector<string> instNames = deviceUnit.GetPatternUseNameList();
-                for (string instName : instNames)
+                for (size_t i = 0; i < instNames.size(); i++)
                 {
-                    tableStrings.push_back(instName);
+                    rowString += instNames[i];
+
+                    if (i < instNames.size() - 1)
+                    {
+                        rowString += ", ";
+					}
                 }
+                
+                if (deviceIndex < group.GetDeviceUnits().size() - 1)
+                {
+                    rowString += ", ";
+				}
+            }
+            if (&group < &row.back())
+            {
+                rowString += ", ";
             }
         }
+		tableStrings.push_back(rowString);
     }
 	return tableStrings;
 }
@@ -808,19 +826,38 @@ vector<string> TableManager::GetTableStringPatternInRealDummyLength()
 vector<string> TableManager::GetTableRotationPatternInRealDummyLength(bool leftS)
 {
     std::vector<std::string> tableRotations;
+
     for (vector<Group>& row : this->table)
     {
+        string rowString;
+
         for (Group& group : row)
         {
-            for (DeviceUnit deviceUnit : group.GetDeviceUnits())
+            for (size_t deviceIndex = 0; deviceIndex < group.GetDeviceUnits().size(); deviceIndex++)
             {
+				DeviceUnit deviceUnit = group.GetDeviceUnits()[deviceIndex];
+
                 vector<string> rotations = deviceUnit.GetPatternUseRotationList();
-                for (string rotation : rotations)
+                for (size_t i = 0; i < rotations.size(); i++)
                 {
-                    tableRotations.push_back(rotation);
+					rowString += rotations[i];
+                    if (i < rotations.size() - 1)
+                    {
+                        rowString += ", ";
+                    }
+                }
+                
+                if (deviceIndex < group.GetDeviceUnits().size() - 1)
+                {
+                    rowString += ", ";
                 }
             }
+            if (&group < &row.back())
+            {
+                rowString += ", ";
+            }
         }
+		tableRotations.push_back(rowString);
     }
     return tableRotations;
 }
