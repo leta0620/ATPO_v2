@@ -7,15 +7,15 @@
 using namespace std; 
 
 
-void Output::AddResultSingle(int round, TableManager& cTable)
-{
-	this->allNondominatedSolutions[round].push_back(cTable);
-}
-
-void Output::AddResultList(int round, std::vector<TableManager> cTableList)
-{
-	this->allNondominatedSolutions[round] = cTableList;
-}
+//void Output::AddResultSingle(int round, TableManager& cTable)
+//{
+//	this->allNondominatedSolutions[round].push_back(cTable);
+//}
+//
+//void Output::AddResultList(int round, std::vector<TableManager> cTableList)
+//{
+//	this->allNondominatedSolutions[round] = cTableList;
+//}
 
 void Output::WriteAllResultToFile(std::string fileName)
 {
@@ -197,8 +197,11 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 
 			// output pattern file
 			string patternFileName = fileName + "_" + costItem + "_Solution_" + to_string(i + 1) + ".csv";
-			vector<string> pattern = sol.second[i].GetTableStringPattern();
-			vector<string> rotationPattern = sol.second[i].GetTableRotationPattern(leftS);
+			//vector<string> pattern = sol.second[i].GetTableStringPattern();
+			//vector<string> rotationPattern = sol.second[i].GetTableRotationPattern(leftS);
+			vector<string> pattern = sol.second[i].GetTableStringPatternInRealDummyLength();
+			vector<string> rotationPattern = sol.second[i].GetTableRotationPatternInRealDummyLength(leftS);
+
 
 			ofstream patternOutFile(patternFileName);
 

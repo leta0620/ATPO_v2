@@ -17,19 +17,16 @@ public:
 			leftS = false;
 	}
 
-	void AddResultSingle(int round, TableManager& cTable);
-	void AddResultList(int round, std::vector<TableManager> cTableList);
+	//void AddResultSingle(int round, TableManager& cTable);
+	//void AddResultList(int round, std::vector<TableManager> cTableList);
 
 	void WriteAllResultToFile(std::string fileName);
 	void PrintAllResult();
 
-	void SelectSignificantNondominatedSolutions();
 
-	//std::vector<TableManager> GetSignificantNondominatedSolutions() { return significantNondominatedSolutions; }
+	void SelectSignificantNondominatedSolutions();
 	void PrintSignificantNondominatedSolutions();
 	void WriteSignificantNondominatedSolutionsToFile(std::string fileName);
-
-	
 
 private:
 	std::map<int, std::vector<TableManager>> allNondominatedSolutions;

@@ -31,6 +31,14 @@ static std::unordered_map<std::string, int> CountNameInGroup(const Group& g) {
     return cnt;
 }
 
+bool CheckAllGroupMemberDummy(const Group& g) {
+    for (const auto& du : g.GetDeviceUnits()) {
+        const std::string& s = du.GetSymbol();
+        if (!s.empty() && s != "d") return false;
+    }
+    return true;
+}
+
 // =======================
 // Constructor & basic operations
 // =======================
@@ -86,7 +94,9 @@ std::vector<std::string> TableManager::GetTableStringPattern()
 			auto deviceUnits = group.GetDeviceUnits();
             for (size_t i = 0; i < deviceUnits.size(); i++)
             {
-				rowString += deviceUnits[i].GetSymbol();
+				//rowString += deviceUnits[i].GetSymbol();
+				rowString += deviceUnits[i].GetInstName();
+
                 if (i < deviceUnits.size() - 1)
                 {
 					rowString += ", ";
@@ -547,12 +557,34 @@ bool TableManager::SwapGroups(int row1, int col1, int row2, int col2)
 	Group group1 = table[row1][col1];
 	Group group2 = table[row2][col2];
 
-	if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
+	/*if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
 		this->ColumnRuleCheck(row2, col2, group1) && this->RowRuleCheck(row2, col2, group1))
 	{
 		this->table[row1][col1] = group2;
 		this->table[row2][col2] = group1;
 		return true;
+	}*/
+
+    auto SetGroupMemberWidth = [](Group& gDest, Group& gSource)
+        {
+            std::vector<DeviceUnit> sourceDeviceUnits = gSource.GetDeviceUnits();
+            std::vector<DeviceUnit> destDeviceUnits = gDest.GetDeviceUnits();
+            for (size_t i = 0; i < sourceDeviceUnits.size() && i < destDeviceUnits.size(); i++)
+            {
+                destDeviceUnits[i].SetWidth(sourceDeviceUnits[i].GetWidth());
+            }
+            gDest.SetDeviceUnits(destDeviceUnits);
+        };
+
+    if (this->CheckCanSwapGroups(row1, col1, row2, col2))
+    {
+        this->table[row1][col1] = group2;
+        this->table[row2][col2] = group1;
+        
+		SetGroupMemberWidth(this->table[row1][col1], group2);
+		SetGroupMemberWidth(this->table[row2][col2], group1);
+
+        return true;
 	}
 
 	return false;
@@ -592,15 +624,61 @@ void TableManager::SetTableSize(int rowSize, int colSize)
 
 bool TableManager::CheckCanSwapGroups(int row1, int col1, int row2, int col2)
 {
+    if (row1 < 0 || row1 >= this->rowSize || col1 < 0 || col1 >= this->colSize ||
+        row2 < 0 || row2 >= this->rowSize || col2 < 0 || col2 >= this->colSize)
+		return false;
+
+
+
 	Group group1 = table[row1][col1];
 	Group group2 = table[row2][col2];
-	if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
-		this->ColumnRuleCheck(row2, col2, group1) && this->RowRuleCheck(row2, col2, group1))
+
+    bool allMemberDummy1 = true, allMemberDummy2 = true;
+
+    allMemberDummy1 = CheckAllGroupMemberDummy(group1);
+    allMemberDummy2 = CheckAllGroupMemberDummy(group2);
+
+    if (allMemberDummy1 || allMemberDummy2)
+    {
+        return true;
+	}
+
+	if (this->ColumnRuleCheck(row1, col1, group2) && this->ColumnRuleCheck(row2, col2, group1))
 	{
 		return true;
 	}
 	return false;
 }
+
+bool TableManager::SwapColumns(int col1, int col2)
+{
+    if (col1 < 0 || col1 >= this->colSize || col2 < 0 || col2 >= this->colSize)
+		return false;
+
+    for (int r = 0; r < this->rowSize; r++)
+    {
+        Group group1 = table[r][col1];
+        Group group2 = table[r][col2];
+		table[r][col1] = group2;
+        table[r][col2] = group1;
+    }
+	return true;
+}
+
+bool TableManager::SwapRows(int row1, int row2)
+{
+    if (row1 < 0 || row1 >= this->rowSize || row2 < 0 || row2 >= this->rowSize)
+        return false;
+    for (int c = 0; c < this->colSize; c++)
+    {
+        Group group1 = table[row1][c];
+        Group group2 = table[row2][c];
+        table[row1][c] = group2;
+        table[row2][c] = group1;
+    }
+    return true;
+}
+
 
 std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValueString()
 {
@@ -629,4 +707,157 @@ std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValu
 		costNameAndValue.push_back(pair<string, double>(costName, costValue));
     }
     return costNameAndValue;
+}
+
+void TableManager::PrintTableToConsole()
+{
+    for (auto& row : table)
+    {
+        for (auto& group : row)
+        {
+            for (const auto& deviceUnit : group.GetDeviceUnits())
+            {
+                std::cout << deviceUnit.GetSymbol();
+            }
+        }
+        std::cout << std::endl;
+    }
+}
+
+bool TableManager::CheckAndFixDummyWidth()
+{
+    vector<vector<int>> dummyWidthTable;
+	dummyWidthTable.reserve(this->colSize);
+	//this->PrintTableToConsole();
+    
+    for (int c = 0; c < this->colSize; c++)
+    {
+		vector<int> dummyWidthsInCol;
+        dummyWidthsInCol.resize(this->table[0][c].GetDeviceUnits().size());
+        
+
+        for (int r = 0; r < this->rowSize; r++)
+        {
+			Group& g = this->table[r][c];
+			vector<DeviceUnit> deviceUnits = g.GetDeviceUnits();
+            bool allWidthSave = true;
+			
+            for (int d = 0; d < deviceUnits.size(); d++)
+            {
+                if (deviceUnits[d].GetSymbol() != "d")
+                {
+                    dummyWidthsInCol[d] = deviceUnits[d].GetWidth();
+                }
+                else
+                {
+					allWidthSave = false;
+                }
+			}
+            
+            if (allWidthSave)
+            {
+				dummyWidthTable.push_back(dummyWidthsInCol);
+                break;
+            }
+		}
+	}
+
+	// fix dummy width
+    for (int c = 0; c < this->colSize; c++)
+    {
+        for (int r = 0; r < this->rowSize; r++)
+        {
+            Group& g = this->table[r][c];
+            vector<DeviceUnit> deviceUnits = g.GetDeviceUnits();
+            for (int d = 0; d < deviceUnits.size(); d++)
+            {
+                if (deviceUnits[d].GetSymbol() == "d")
+                {
+                    deviceUnits[d].SetWidth(dummyWidthTable[c][d]);
+                }
+            }
+            g.SetDeviceUnits(deviceUnits);
+        }
+	}
+
+
+
+    return true;
+}
+
+vector<string> TableManager::GetTableStringPatternInRealDummyLength()
+{
+    std::vector<std::string> tableStrings;
+    for (vector<Group>& row : this->table)
+    {
+        string rowString;
+        for (Group& group : row)
+        {
+            for (size_t deviceIndex = 0; deviceIndex < group.GetDeviceUnits().size(); deviceIndex++)
+            {
+				DeviceUnit deviceUnit = group.GetDeviceUnits()[deviceIndex];
+
+                vector<string> instNames = deviceUnit.GetPatternUseNameList();
+                for (size_t i = 0; i < instNames.size(); i++)
+                {
+                    rowString += instNames[i];
+
+                    if (i < instNames.size() - 1)
+                    {
+                        rowString += ", ";
+					}
+                }
+                
+                if (deviceIndex < group.GetDeviceUnits().size() - 1)
+                {
+                    rowString += ", ";
+				}
+            }
+            if (&group < &row.back())
+            {
+                rowString += ", ";
+            }
+        }
+		tableStrings.push_back(rowString);
+    }
+	return tableStrings;
+}
+
+vector<string> TableManager::GetTableRotationPatternInRealDummyLength(bool leftS)
+{
+    std::vector<std::string> tableRotations;
+
+    for (vector<Group>& row : this->table)
+    {
+        string rowString;
+
+        for (Group& group : row)
+        {
+            for (size_t deviceIndex = 0; deviceIndex < group.GetDeviceUnits().size(); deviceIndex++)
+            {
+				DeviceUnit deviceUnit = group.GetDeviceUnits()[deviceIndex];
+
+                vector<string> rotations = deviceUnit.GetPatternUseRotationList();
+                for (size_t i = 0; i < rotations.size(); i++)
+                {
+					rowString += rotations[i];
+                    if (i < rotations.size() - 1)
+                    {
+                        rowString += ", ";
+                    }
+                }
+                
+                if (deviceIndex < group.GetDeviceUnits().size() - 1)
+                {
+                    rowString += ", ";
+                }
+            }
+            if (&group < &row.back())
+            {
+                rowString += ", ";
+            }
+        }
+		tableRotations.push_back(rowString);
+    }
+    return tableRotations;
 }

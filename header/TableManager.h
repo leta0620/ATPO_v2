@@ -36,6 +36,8 @@ public:
 	bool PlaceGroup(const Group& group, int& placedRow, int& placedCol);
 	bool SwapGroups(int row1, int col1, int row2, int col2);
 	bool MoveGroup(int srcRow, int srcCol, int destRow, int destCol);	// caution: the src position will be cleared
+	bool SwapColumns(int col1, int col2);
+	bool SwapRows(int row1, int row2);
 
 	bool CheckCanSwapGroups(int row1, int col1, int row2, int col2);
 
@@ -46,12 +48,21 @@ public:
 	std::vector<std::string> GetTableStringPattern();
 	std::vector<std::string> GetTableRotationPattern(bool leftS = true);
 
+	//****** need to modify pattern output to real dummy unit ******
+	std::vector<std::string> GetTableStringPatternInRealDummyLength();
+	std::vector<std::string> GetTableRotationPatternInRealDummyLength(bool leftS = true);
+
 	// cost
 	std::unordered_map<CostEnum, double> CalculateTableCost();
 	std::unordered_map<CostEnum, double> GetCostMap() { return costMap; }
 	std::vector<std::pair<std::string, double>> GetCostNameAndCostValueString();
 
 	bool EqualTableToSelf(TableManager& otherTable);
+
+	void PrintTableToConsole();
+
+	// dummy width check and fix
+	bool CheckAndFixDummyWidth();
 
 private:
 	std::vector<std::vector<Group>> table;
@@ -60,6 +71,7 @@ private:
 	int groupSize = 0;
 
 	int nfin = 4; // default 4 fin number per device unit
+	int minDummyWidthInUnit = 1; // default min dummy width
 
 	NetlistLookupTable netlist;
 
@@ -68,6 +80,8 @@ private:
 	bool ColumnRuleCheck(int rowPlace, int colPlace, Group& group);
 	// check row rule(neighborhood group can link)
 	bool RowRuleCheck(int rowPlace, int colPlace, Group& group);
+
+	
 
 	// cost part
 	std::unordered_map<CostEnum, double> costMap;

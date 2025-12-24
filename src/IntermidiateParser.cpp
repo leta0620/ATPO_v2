@@ -32,8 +32,8 @@ bool IntermidiateParser::Parse()
 				string deviceLine;
 				stringstream deviceSS(line);
 				string deviceToken;
-				tuple<string, string, string, int> deviceInstance;
-				deviceSS >> get<0>(deviceInstance) >> get<1>(deviceInstance) >> get<2>(deviceInstance) >> get<3>(deviceInstance);
+				tuple<string, string, string, int, int> deviceInstance;
+				deviceSS >> get<0>(deviceInstance) >> get<1>(deviceInstance) >> get<2>(deviceInstance) >> get<3>(deviceInstance) >> get<4>(deviceInstance);
 				this->deviceInstanceList.push_back(deviceInstance);
 			}
 		}
@@ -113,20 +113,35 @@ bool IntermidiateParser::Parse()
 	return true;
 }
 
+pair<string, string> SplitCellAndPin(const string& cellWithPin)
+{
+	size_t pos = cellWithPin.find('.');
+	if (pos == string::npos)
+	{
+		return make_pair(cellWithPin, "");
+	}
+	else
+	{
+		string cellName = cellWithPin.substr(0, pos);
+		string pinName = cellWithPin.substr(pos + 1);
+		return make_pair(cellName, pinName);
+	}
+}
+
 bool IntermidiateParser::GenerateNetlistLookupTable()
 {
-	unordered_map<string, NetlistUnit> tempNetlistMap;
+	unordered_map<string, NetlistUnit> tempNetlistMap;	// temporary map to build netlist units
 	// device 
 	for (const auto& deviceInstance : this->deviceInstanceList)
 	{
-		// 使用 C++17 結構綁定直接取出 tuple 的各個欄位
-		const auto& [cellName, synbolName, analogcellType, unitCount] = deviceInstance;
+		const auto& [instName, synbolName, analogcellType, unitCount, deviceWidth] = deviceInstance;
 
 		NetlistUnit unit;
 		unit.SetAnalogType(analogcellType);
-		unit.SetCellName(cellName);
+		unit.SetInstName(instName);
 		unit.SetSynbolName(synbolName);
 		unit.SetDeviceUnitCount(unitCount);
+		unit.SetDeviceWidth(deviceWidth);
 		tempNetlistMap[synbolName] = unit;
 	}
 
@@ -155,8 +170,12 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 		}
 		else
 		{
-			synbolName = cell.substr(0, pos);
-			pinName = cell.substr(pos + 1);
+			//synbolName = cell.substr(0, pos);
+			//pinName = cell.substr(pos + 1);
+
+			pair<string, string> cellAndPin = SplitCellAndPin(cell);
+			synbolName = cellAndPin.first;
+			pinName = cellAndPin.second;
 		}
 
 		auto it = tempNetlistMap.find(synbolName);
@@ -199,10 +218,17 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 			}
 			else
 			{
-				c1SynbolName = c1.substr(0, pos1);
+				/*c1SynbolName = c1.substr(0, pos1);
 				c1PinName = c1.substr(pos1 + 1);
 				c2SynbolName = c2.substr(0, pos2);
-				c2PinName = c2.substr(pos2 + 1);
+				c2PinName = c2.substr(pos2 + 1);*/
+				pair<string, string> cellAndPin1 = SplitCellAndPin(c1);
+				c1SynbolName = cellAndPin1.first;
+				c1PinName = cellAndPin1.second;
+
+				pair<string, string> cellAndPin2 = SplitCellAndPin(c2);
+				c2SynbolName = cellAndPin2.first;
+				c2PinName = cellAndPin2.second;
 			}
 
 			auto it = tempNetlistMap.find(c1SynbolName);
