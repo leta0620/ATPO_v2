@@ -66,6 +66,7 @@ public:
 	std::string GetStringRotation(bool leftS = true) const;
 
 	std::vector<std::string> GetPatternUseNameList();
+	std::vector<std::string> GetPatternUseRotationList();
 
 
 	// == operators

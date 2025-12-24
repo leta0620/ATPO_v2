@@ -48,7 +48,9 @@ public:
 	std::vector<std::string> GetTableStringPattern();
 	std::vector<std::string> GetTableRotationPattern(bool leftS = true);
 
-	//std::vector<std::vector<std::string>> GetRealTableInstFormatTable();
+	//****** need to modify pattern output to real dummy unit ******
+	std::vector<std::string> GetTableStringPatternInRealDummyLength();
+	std::vector<std::string> GetTableRotationPatternInRealDummyLength(bool leftS = true);
 
 	// cost
 	std::unordered_map<CostEnum, double> CalculateTableCost();

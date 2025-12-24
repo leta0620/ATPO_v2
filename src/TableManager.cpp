@@ -692,30 +692,6 @@ void TableManager::PrintTableToConsole()
     }
 }
 
-//std::vector<std::vector<std::string>> TableManager::GetRealTableInstFormatTable()
-//{
-//	vector<vector<string>> realTableInstNames;
-//    for (auto& row : table)
-//    {
-//        vector<string> rowInstNames;
-//        for (auto& group : row)
-//        {
-//            for (DeviceUnit deviceU : group.GetDeviceUnits())
-//            {
-//                auto realInstNames = deviceU.GetPatternUseNameList();
-//                for (const auto& instName : realInstNames)
-//                {
-//                    rowInstNames.push_back(instName);
-//                }
-//            }
-//        }
-//        realTableInstNames.push_back(rowInstNames);
-//	}
-//
-//	return realTableInstNames;
-//}
-
-
 bool TableManager::CheckAndFixDummyWidth()
 {
     vector<vector<int>> dummyWidthTable;
@@ -775,4 +751,44 @@ bool TableManager::CheckAndFixDummyWidth()
 
 
     return true;
+}
+
+vector<string> TableManager::GetTableStringPatternInRealDummyLength()
+{
+    std::vector<std::string> tableStrings;
+    for (vector<Group>& row : this->table)
+    {
+        for (Group& group : row)
+        {
+            for (DeviceUnit deviceUnit : group.GetDeviceUnits())
+            {
+                vector<string> instNames = deviceUnit.GetPatternUseNameList();
+                for (string instName : instNames)
+                {
+                    tableStrings.push_back(instName);
+                }
+            }
+        }
+    }
+	return tableStrings;
+}
+
+vector<string> TableManager::GetTableRotationPatternInRealDummyLength(bool leftS)
+{
+    std::vector<std::string> tableRotations;
+    for (vector<Group>& row : this->table)
+    {
+        for (Group& group : row)
+        {
+            for (DeviceUnit deviceUnit : group.GetDeviceUnits())
+            {
+                vector<string> rotations = deviceUnit.GetPatternUseRotationList();
+                for (string rotation : rotations)
+                {
+                    tableRotations.push_back(rotation);
+                }
+            }
+        }
+    }
+    return tableRotations;
 }

@@ -42,3 +42,18 @@ std::vector<std::string> DeviceUnit::GetPatternUseNameList()
 
 	return instNames;
 }
+
+std::vector<std::string> DeviceUnit::GetPatternUseRotationList()
+{
+	std::vector<std::string> rotations;
+	if (instName == "*") {
+		for (int i = 0; i < width; ++i)
+		{
+			rotations.push_back(this->GetStringRotation());
+		}
+	}
+	else {
+		rotations.push_back(this->GetStringRotation());
+	}
+	return rotations;
+}
