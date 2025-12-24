@@ -42,6 +42,9 @@ public:
 	}
 	void SetSymbol(const std::string& symbol) {
 		this->symbol = symbol;
+		if (this->symbol == "d") {
+			this->instName = "*";
+		}
 	}
 
 	void SetRotation(CellRotation dir) {
@@ -61,6 +64,10 @@ public:
 	}
 
 	std::string GetStringRotation(bool leftS = true) const;
+
+	std::vector<std::string> GetPatternUseNameList();
+	std::vector<std::string> GetPatternUseRotationList();
+
 
 	// == operators
 	bool operator==(const DeviceUnit& other) const {

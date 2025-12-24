@@ -83,11 +83,14 @@ int main(int argc, char* argv[]) {
 	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable());
 	vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
 
-	// 
+
+
+	map<int, vector<TableManager>> allNondominatedSolutions;
+	// SA
 	if (thread_num == 1)
 	{
 		// Single thread SA
-		map<int, vector<TableManager>> allNondominatedSolutions;
+		
 		for (int i = 0; i < initialTableList.size(); ++i)
 		{
 			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
@@ -101,14 +104,7 @@ int main(int argc, char* argv[]) {
 		}
 		cout << endl;
 
-		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName());
-
-		output.WriteAllResultToFile(output_file_path + "output.txt");
-		output.PrintAllResult();
-
-		output.SelectSignificantNondominatedSolutions();
-		output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "output_significant.txt");
-		output.PrintSignificantNondominatedSolutions();
+		
 	}
 	else
 	{
@@ -163,22 +159,20 @@ int main(int argc, char* argv[]) {
 		for (auto& th : threads) th.join();
 
 		// 組回你原本的 map<int, vector<TableManager>>
-		map<int, vector<TableManager>> allNondominatedSolutions;
 		for (int i = 0; i < jobCount; ++i) {
 			allNondominatedSolutions[i] = std::move(results[i]);
 		}
-
-		// 後處理跟單執行緒版本一樣
-		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D,
-			outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName());
-
-		output.WriteAllResultToFile(output_file_path + "output.txt");
-		output.PrintAllResult();
-
-		output.SelectSignificantNondominatedSolutions();
-		output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "output_significant.txt");
-		output.PrintSignificantNondominatedSolutions();
 	}
+
+	//後處理
+	Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName());
+
+	output.WriteAllResultToFile(output_file_path + "output.txt");
+	//output.PrintAllResult();
+
+	output.SelectSignificantNondominatedSolutions();
+	output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "output_significant.txt");
+	output.PrintSignificantNondominatedSolutions();
 
 	return 0;
 }
