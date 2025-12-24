@@ -31,6 +31,14 @@ static std::unordered_map<std::string, int> CountNameInGroup(const Group& g) {
     return cnt;
 }
 
+bool CheckAllGroupMemberDummy(const Group& g) {
+    for (const auto& du : g.GetDeviceUnits()) {
+        const std::string& s = du.GetSymbol();
+        if (!s.empty() && s != "d") return false;
+    }
+    return true;
+}
+
 // =======================
 // Constructor & basic operations
 // =======================
@@ -557,10 +565,25 @@ bool TableManager::SwapGroups(int row1, int col1, int row2, int col2)
 		return true;
 	}*/
 
+    auto SetGroupMemberWidth = [](Group& gDest, Group& gSource)
+        {
+            std::vector<DeviceUnit> sourceDeviceUnits = gSource.GetDeviceUnits();
+            std::vector<DeviceUnit> destDeviceUnits = gDest.GetDeviceUnits();
+            for (size_t i = 0; i < sourceDeviceUnits.size() && i < destDeviceUnits.size(); i++)
+            {
+                destDeviceUnits[i].SetWidth(sourceDeviceUnits[i].GetWidth());
+            }
+            gDest.SetDeviceUnits(destDeviceUnits);
+        };
+
     if (this->CheckCanSwapGroups(row1, col1, row2, col2))
     {
         this->table[row1][col1] = group2;
         this->table[row2][col2] = group1;
+        
+		SetGroupMemberWidth(this->table[row1][col1], group2);
+		SetGroupMemberWidth(this->table[row2][col2], group1);
+
         return true;
 	}
 
@@ -603,8 +626,18 @@ bool TableManager::CheckCanSwapGroups(int row1, int col1, int row2, int col2)
 {
 	Group group1 = table[row1][col1];
 	Group group2 = table[row2][col2];
-	if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
-		this->ColumnRuleCheck(row2, col2, group1) && this->RowRuleCheck(row2, col2, group1))
+
+    bool allMemberDummy1 = true, allMemberDummy2 = true;
+
+    allMemberDummy1 = CheckAllGroupMemberDummy(group1);
+    allMemberDummy2 = CheckAllGroupMemberDummy(group2);
+
+    if (allMemberDummy1 || allMemberDummy2)
+    {
+        return true;
+	}
+
+	if (this->ColumnRuleCheck(row1, col1, group2) && this->ColumnRuleCheck(row2, col2, group1))
 	{
 		return true;
 	}
