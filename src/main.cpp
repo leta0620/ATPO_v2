@@ -168,7 +168,7 @@ int main(int argc, char* argv[]) {
 	Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName());
 
 	output.WriteAllResultToFile(output_file_path + "output.txt");
-	output.PrintAllResult();
+	//output.PrintAllResult();
 
 	output.SelectSignificantNondominatedSolutions();
 	output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "output_significant.txt");
