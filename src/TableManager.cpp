@@ -578,11 +578,17 @@ bool TableManager::SwapGroups(int row1, int col1, int row2, int col2)
 
     if (this->CheckCanSwapGroups(row1, col1, row2, col2))
     {
+        if (CheckAllGroupMemberDummy(group1))
+        {
+            SetGroupMemberWidth(group1, group2);
+        }
+        else if (CheckAllGroupMemberDummy(group2))
+        {
+            SetGroupMemberWidth(group2, group1);
+		}
+
         this->table[row1][col1] = group2;
         this->table[row2][col2] = group1;
-        
-		SetGroupMemberWidth(this->table[row1][col1], group2);
-		SetGroupMemberWidth(this->table[row2][col2], group1);
 
         return true;
 	}
@@ -628,8 +634,6 @@ bool TableManager::CheckCanSwapGroups(int row1, int col1, int row2, int col2)
         row2 < 0 || row2 >= this->rowSize || col2 < 0 || col2 >= this->colSize)
 		return false;
 
-
-
 	Group group1 = table[row1][col1];
 	Group group2 = table[row2][col2];
 
@@ -637,6 +641,11 @@ bool TableManager::CheckCanSwapGroups(int row1, int col1, int row2, int col2)
 
     allMemberDummy1 = CheckAllGroupMemberDummy(group1);
     allMemberDummy2 = CheckAllGroupMemberDummy(group2);
+
+    if (allMemberDummy1 && allMemberDummy2)
+    {
+        return false;
+    }
 
     if (allMemberDummy1 || allMemberDummy2)
     {
@@ -788,16 +797,27 @@ bool TableManager::CheckAndFixDummyWidth()
 vector<string> TableManager::GetTableStringPatternInRealDummyLength()
 {
     std::vector<std::string> tableStrings;
-    for (vector<Group>& row : this->table)
+    vector<int> rowInstNum;
+	rowInstNum.resize(this->rowSize);
+	int maxRowInstNum = 0;
+
+    for (size_t rowIndex = 0; rowIndex < this->table.size(); rowIndex++)
     {
         string rowString;
-        for (Group& group : row)
+        for (size_t groupIndex = 0; groupIndex < table[rowIndex].size(); groupIndex++)
         {
-            for (size_t deviceIndex = 0; deviceIndex < group.GetDeviceUnits().size(); deviceIndex++)
+            for (size_t deviceIndex = 0; deviceIndex < table[rowIndex][groupIndex].GetDeviceUnits().size(); deviceIndex++)
             {
-				DeviceUnit deviceUnit = group.GetDeviceUnits()[deviceIndex];
+				DeviceUnit deviceUnit = table[rowIndex][groupIndex].GetDeviceUnits()[deviceIndex];
 
                 vector<string> instNames = deviceUnit.GetPatternUseNameList();
+				rowInstNum[rowIndex] += instNames.size();
+                if (rowInstNum[rowIndex] > maxRowInstNum)
+				{
+					maxRowInstNum = rowInstNum[rowIndex];
+				}
+
+
                 for (size_t i = 0; i < instNames.size(); i++)
                 {
                     rowString += instNames[i];
@@ -808,36 +828,59 @@ vector<string> TableManager::GetTableStringPatternInRealDummyLength()
 					}
                 }
                 
-                if (deviceIndex < group.GetDeviceUnits().size() - 1)
+                if (deviceIndex < table[rowIndex][groupIndex].GetDeviceUnits().size() - 1)
                 {
                     rowString += ", ";
 				}
             }
-            if (&group < &row.back())
+            if (groupIndex < table[rowIndex].size() - 1)
             {
                 rowString += ", ";
             }
         }
 		tableStrings.push_back(rowString);
     }
+
+    // fix word length
+	for (size_t rowIndex = 0; rowIndex < this->table.size(); rowIndex++)
+    {
+        int needAddDummyNum = maxRowInstNum - rowInstNum[rowIndex];
+        if (needAddDummyNum > 0)
+        {
+            string& rowString = tableStrings[rowIndex];
+            for (int i = 0; i < needAddDummyNum; i++)
+            {
+                rowString += ", *";
+            }
+        }
+	}
+
 	return tableStrings;
 }
 
 vector<string> TableManager::GetTableRotationPatternInRealDummyLength(bool leftS)
 {
     std::vector<std::string> tableRotations;
+	vector<int> rowInstNum;
+	rowInstNum.resize(this->rowSize);
+	int maxRowInstNum = 0;
 
-    for (vector<Group>& row : this->table)
+    for (size_t rowIndex = 0; rowIndex < this->table.size(); rowIndex++)
     {
         string rowString;
-
-        for (Group& group : row)
+        for (size_t groupIndex = 0; groupIndex < table[rowIndex].size(); groupIndex++)
         {
-            for (size_t deviceIndex = 0; deviceIndex < group.GetDeviceUnits().size(); deviceIndex++)
+            for (size_t deviceIndex = 0; deviceIndex < table[rowIndex][groupIndex].GetDeviceUnits().size(); deviceIndex++)
             {
-				DeviceUnit deviceUnit = group.GetDeviceUnits()[deviceIndex];
+				DeviceUnit deviceUnit = table[rowIndex][groupIndex].GetDeviceUnits()[deviceIndex];
 
                 vector<string> rotations = deviceUnit.GetPatternUseRotationList();
+				rowInstNum[rowIndex] += rotations.size();
+				if (rowInstNum[rowIndex] > maxRowInstNum)
+				{
+					maxRowInstNum = rowInstNum[rowIndex];
+				}
+
                 for (size_t i = 0; i < rotations.size(); i++)
                 {
 					rowString += rotations[i];
@@ -847,17 +890,32 @@ vector<string> TableManager::GetTableRotationPatternInRealDummyLength(bool leftS
                     }
                 }
                 
-                if (deviceIndex < group.GetDeviceUnits().size() - 1)
+                if (deviceIndex < table[rowIndex][groupIndex].GetDeviceUnits().size() - 1)
                 {
                     rowString += ", ";
                 }
             }
-            if (&group < &row.back())
+            if (groupIndex < table[rowIndex].size() - 1)
             {
                 rowString += ", ";
-            }
+			}
         }
 		tableRotations.push_back(rowString);
+    }
+
+	//fix word length
+    for (size_t rowIndex = 0; rowIndex < this->table.size(); rowIndex++)
+    {
+        int needAddDummyNum = maxRowInstNum - rowInstNum[rowIndex];
+        if (needAddDummyNum > 0)
+        {
+            string& rowString = tableRotations[rowIndex];
+            for (int i = 0; i < needAddDummyNum; i++)
+            {
+                rowString += ", R0";
+            }
+        }
+
     }
     return tableRotations;
 }
