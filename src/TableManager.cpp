@@ -183,21 +183,16 @@ void TableManager::CalculateCCCost() {
     using std::vector;
     using std::unordered_map;
 
-    // ----- tunable coefficients in p_u(x,y) = g10 * x + g01 * y -----
-    const double g10 = 1.0;  // weight for x
-    const double g01 = 1.0;  // weight for y
-
-    // per-device accumulators: sum of p_u, and count of unit-cells
-    unordered_map<string, double>    sum_p;
-    unordered_map<string, long long> cnt_p;
-
     const int R = rowSize;
-    if (R <= 0 || colSize <= 0) {
+    const int G = colSize; // group columns
+    if (R <= 0 || G <= 0) {
         costMap[CostEnum::ccCost] = 0.0;
         return;
     }
 
-    // y coordinate centering by rows
+    // -----------------------
+    // y centering by rows
+    // -----------------------
     const bool rows_even = (R % 2 == 0);
     const int  rk = R / 2;        // even: center between rk-1, rk
     const int  rm = (R - 1) / 2;  // odd : center at rm
@@ -213,13 +208,20 @@ void TableManager::CalculateCCCost() {
         }
         };
 
-    // ----- sweep each row -----
-    for (int r = 0; r < R; ++r) {
-        // 1) flatten this row into a unit-cell token sequence
-        vector<string> rowTok;
-        rowTok.reserve(colSize * 8); // rough guess
+    // per-type accumulators
+    unordered_map<string, double>    sum_x;
+    unordered_map<string, double>    sum_y;
+    unordered_map<string, long long> cnt;
 
-        for (int c = 0; c < colSize; ++c) {
+    // -----------------------
+    // sweep each row
+    // -----------------------
+    for (int r = 0; r < R; ++r) {
+        // 1) flatten this row into unit-cell token sequence
+        vector<string> rowTok;
+        rowTok.reserve(G * 8); // rough guess (groupSize often 8)
+
+        for (int c = 0; c < G; ++c) {
             const auto& units = table[r][c].GetDeviceUnits();
             for (const auto& du : units) {
                 rowTok.push_back(du.GetSymbol());
@@ -229,10 +231,11 @@ void TableManager::CalculateCCCost() {
         const int W = static_cast<int>(rowTok.size());
         if (W == 0) continue;
 
-        // x coordinate centering by columns within this row
+        // 2) x centering by W
         const bool even = (W % 2 == 0);
         const int  k = W / 2;        // even: center between k-1, k
         const int  m = (W - 1) / 2;  // odd : center at m
+
         const double y = y_of(r);
 
         for (int i = 0; i < W; ++i) {
@@ -242,7 +245,8 @@ void TableManager::CalculateCCCost() {
             double x;
             if (even) {
                 // ..., -3,-2,-1, +1,+2,+3,...
-                x = (i < k) ? (static_cast<double>(i) - static_cast<double>(k))
+                x = (i < k)
+                    ? (static_cast<double>(i) - static_cast<double>(k))
                     : (static_cast<double>(i) - static_cast<double>(k) + 1.0);
             }
             else {
@@ -250,33 +254,41 @@ void TableManager::CalculateCCCost() {
                 x = static_cast<double>(i - m);
             }
 
-            // p_u(x,y) = g10 * x + g01 * y
-            double p = g10 * x + g01 * y;
-
-            sum_p[name] += p;
-            cnt_p[name] += 1;
+            sum_x[name] += x;
+            sum_y[name] += y;
+            cnt[name] += 1;
         }
     }
 
+    // -----------------------
+    // per-type mu_x, mu_y
+    // CCx = avg(|mu_x|), CCy = avg(|mu_y|)
+    // CC  = CCx + CCy
+    // -----------------------
+    double sum_abs_mux = 0.0;
+    double sum_abs_muy = 0.0;
+    int    typeNum = 0;
 
-    double sum_mu = 0.0;
-    int    n_dev = 0;
-
-    for (const auto& kv : sum_p) {
+    for (const auto& kv : cnt) {
         const string& name = kv.first;
-        long long cnt = cnt_p[name];
-        if (cnt <= 0) continue;
-        double mu = kv.second / static_cast<double>(cnt); // average p for this device
-        sum_mu += std::fabs(mu);
-        ++n_dev;
+        long long n = kv.second;
+        if (n <= 0) continue;
+
+        double mu_x = sum_x[name] / static_cast<double>(n);
+        double mu_y = sum_y[name] / static_cast<double>(n);
+
+        sum_abs_mux += std::fabs(mu_x);
+        sum_abs_muy += std::fabs(mu_y);
+        ++typeNum;
     }
 
-    if (n_dev == 0) {
-        costMap[CostEnum::ccCost] = 0.0;
+    double CCx = 0.0, CCy = 0.0;
+    if (typeNum > 0) {
+        CCx = sum_abs_mux / static_cast<double>(typeNum);
+        CCy = sum_abs_muy / static_cast<double>(typeNum);
     }
-    else {
-        costMap[CostEnum::ccCost] = sum_mu / static_cast<double>(n_dev);
-    }
+
+    costMap[CostEnum::ccCost] = CCx + CCy;
 }
 
 
