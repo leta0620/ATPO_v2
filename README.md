@@ -12,6 +12,7 @@ A small C++ project organized with CMake so it can be built on Visual Studio (Wi
 │  ├─ IntermidiatePlacement.h
 │  ├─ NetListLookupTable.h
 │  ├─ NetlistUnit.h
+│  ├─ OuterInput.h
 │  ├─ Output.h
 │  ├─ SAManager.h
 │  ├─ TableManager.h
@@ -24,6 +25,7 @@ A small C++ project organized with CMake so it can be built on Visual Studio (Wi
    ├─ IntermidiatePlacement.cpp
    ├─ NetListLookupTable.cpp
    ├─ NetlistUnit.cpp
+   ├─ OuterInput.cpp
    ├─ Output.cpp
    ├─ SAManager.cpp
    ├─ TableManager.cpp
@@ -45,6 +47,16 @@ cmake --build build --config Debug
 
 接著用 VS 打開：build/AnalogTransistorPlacementOptimizer.sln
 在 Solution Explorer 對 ATPO_v2 右鍵 → 設為啟動專案 → ctrl+F5執行。
+
+## Build & Run on Windows (Visual Studio) | 在 Linux 編譯與執行
+```
+mkdir build
+cd build
+
+cmake ..
+make
+```
+編譯的可執行檔會在bin資料夾中
 
 ## Testinng
 在傳入的參數中，若僅傳入 "test"，會進入測試模式(test class)，請不要更動main funtion中的內容，將你的test function定義在test class中，並透過test class的建構式運行實作(test.cpp)。
