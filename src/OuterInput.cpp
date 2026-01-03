@@ -121,6 +121,13 @@ bool OuterInput::ParseCdlFile() {
 							while (!m.empty() && !isdigit(static_cast<unsigned char>(m.back())))
 								m.pop_back();
 						}
+						else if (m.size() > 2 && m.rfind("simM=", 0) == 0)
+						{
+							m = m.substr(5); // 從 index 5 開始到結尾
+							// 若有結尾的 ')' 或其他，嘗試移除非數字尾字元
+							while (!m.empty() && !isdigit(static_cast<unsigned char>(m.back())))
+								m.pop_back();
+						}
 
 						// 檢查是否有該 instName 的 cell-type 定義
 						auto it = this->instNameMapCellInformation.find(cellType);
@@ -197,7 +204,11 @@ bool OuterInput::ParseCdlFile() {
 			{
 				// set instNameMapCdlPosition
 				string pin1, pin2, pin3 ,pin4, m;
-				ss >> pin1 >> pin2 >> pin3 >> pin4 >> m;
+				ss >> pin1 >> pin2 >> pin3 >> pin4;
+				if (!ss.eof()) ss >> m;
+				else {
+					m = "m=1";
+				}
 
 				//m = m.substr(2, m.size() - 3);
 				if (m.size() > 2 && m.rfind("m=", 0) == 0)
