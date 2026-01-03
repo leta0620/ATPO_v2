@@ -48,7 +48,7 @@ cmake --build build --config Debug
 接著用 VS 打開：build/AnalogTransistorPlacementOptimizer.sln
 在 Solution Explorer 對 ATPO_v2 右鍵 → 設為啟動專案 → ctrl+F5執行。
 
-## Build & Run on Windows (Visual Studio) | 在 Linux 編譯與執行
+## Build & Run on Windows (g++) | 在 Linux 編譯與執行
 ```
 mkdir build
 cd build
