@@ -107,8 +107,24 @@ bool OuterInput::ParseCdlFile() {
 
 					if (line == ".ENDS" || line == ".ends") break;
 
-					if (ssT >> instName >> pin1 >> pin2 >> pin3 >> pin4 >> skip >> cellType >> m)
+					if (ssT >> instName >> pin1 >> pin2 >> pin3 >> pin4 >> skip)
 					{
+						if (skip != "/")
+						{
+							cellType = skip;
+							while (ssT >> m)
+							{
+								if (!m.empty() && ((m.substr(0, 2) == "m=") || (m.substr(0, 5) == "simM=")) )
+								{
+									break;
+								}
+							}
+						}
+						else
+						{
+							ssT >> cellType >> m;
+						}
+
 						// 移除實例名稱前的 'X'
 						if (!instName.empty() && instName[0] == 'X')
 							instName = instName.substr(1);
@@ -140,7 +156,7 @@ bool OuterInput::ParseCdlFile() {
 							tie(cT1, cT2, cT3, cT4, cTM, cascodeInterInst) = cellTypeInformation;
 
 							string dNet, gNet, sNet, bNet;
-							// 正確實作的 lambda：以 cTPin 決定要把哪個 net 指派給哪個變數
+							// 以 cTPin 決定要把哪個 net 指派給哪個變數
 							auto SetPinNets = [&dNet, &gNet, &sNet, &bNet](const string &cTPin, const string &pin)
 							{
 								if (cTPin == "D")
@@ -214,6 +230,13 @@ bool OuterInput::ParseCdlFile() {
 				if (m.size() > 2 && m.rfind("m=", 0) == 0)
 				{
 					m = m.substr(2); // 從 index 2 開始到結尾
+					// 若有結尾的 ')' 或其他，嘗試移除非數字尾字元
+					while (!m.empty() && !isdigit(static_cast<unsigned char>(m.back())))
+						m.pop_back();
+				}
+				else if (m.size() > 2 && m.rfind("simM=", 0) == 0)
+				{
+					m = m.substr(5); // 從 index 5 開始到結尾
 					// 若有結尾的 ')' 或其他，嘗試移除非數字尾字元
 					while (!m.empty() && !isdigit(static_cast<unsigned char>(m.back())))
 						m.pop_back();
