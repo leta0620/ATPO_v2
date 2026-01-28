@@ -31,4 +31,6 @@ private:
 
 	void InitialPathOrder();
 
+	void GroupAllocation();
+
 };
