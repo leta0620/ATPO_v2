@@ -5,9 +5,10 @@
 #include <set>
 #include <iostream>
 
+
 using namespace std;
 
-SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate, double initialTemp, double finalTemp, int iterationPerTemp, bool openCommandLineOutput)
+SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate, double initialTemp, double finalTemp, int iterationPerTemp, bool openCommandLineOutput, std::string saMode)
 	: initialTable(initialTable)
 	, netlistLookupTable(netlist)
 	, coolRate(coolRate)
@@ -16,8 +17,21 @@ SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, do
 	, currentTemp(initialTemp)
 	, iterationPerTemp(iterationPerTemp)
 	, openCommandLineOutput(openCommandLineOutput)
-	
 {
+	if (saMode == "RandomMode" || saMode == "0")
+	{
+		this->saMode = SAMode::RandomMode;
+	}
+	else if (saMode == "CCMode" || saMode == "1")
+	{
+		this->saMode = SAMode::CCMode;
+	}
+	else
+	{
+		cerr << "Unknown SA Mode, set to CC Mode by default." << endl;
+		this->saMode = SAMode::CCMode;
+	}
+
 	// 計算成本並初始化 nondominatedSolution
 	this->initialTable.CheckAndFixDummyWidth();
 	this->initialTable.CalculateTableCost();
@@ -128,35 +142,45 @@ void SAManager::Perturbation(std::mt19937& gen)
 		}
 	};
 
-	// generate new solutions by swapping two group unit
-	TableManager newTable = this->nowUseTable;
-	//newTable.PrintTableToConsole();
 
-	if (this->currentTemp > (this->initialTemp + this->finalTemp) / 2)
+	if (this->saMode == SAMode::RandomMode)
 	{
-		uniform_int_distribution<> perOperation(0, 1);
-		int op = perOperation(gen);
-		if (op == 0)
-			SwapTwoCol(newTable, gen);
+		// generate new solutions by swapping two group unit
+		TableManager newTable = this->nowUseTable;
+		//newTable.PrintTableToConsole();
+
+		if (this->currentTemp > (this->initialTemp + this->finalTemp) / 2)
+		{
+			uniform_int_distribution<> perOperation(0, 1);
+			int op = perOperation(gen);
+			if (op == 0)
+				SwapTwoCol(newTable, gen);
+			else
+				SwapTwoRow(newTable, gen);
+		}
 		else
-			SwapTwoRow(newTable, gen);
+		{
+			uniform_int_distribution<> perOperation(0, 2);
+			int op = perOperation(gen);
+			if (op == 0)
+				SwapTwoCol(newTable, gen);
+			else if (op == 1)
+				SwapTwoRow(newTable, gen);
+			else
+				SwapTwoGroupUnit(newTable, gen);
+		}
+
+		this->newTableList.push_back(newTable);
+
+	}
+	else if (this->saMode == SAMode::CCMode)
+	{
+		// TO DO: CC Mode Perturbation
 	}
 	else
 	{
-		uniform_int_distribution<> perOperation(0, 2);
-		int op = perOperation(gen);
-		if (op == 0)
-			SwapTwoCol(newTable, gen);
-		else if (op == 1)
-			SwapTwoRow(newTable, gen);
-		else
-			SwapTwoGroupUnit(newTable, gen);
+		cerr << "Unknown SA Mode." << endl;
 	}
-
-	//SwapTwoGroupUnit(newTable, gen);
-	this->newTableList.push_back(newTable);
-	/*newTable.PrintTableToConsole();
-	cout << endl;*/
 }
 
 bool doesADominateB(const std::unordered_map<CostEnum, double>& aCost, const std::unordered_map<CostEnum, double>& bCost)

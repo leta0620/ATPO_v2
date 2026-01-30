@@ -15,7 +15,7 @@ private:
 
 	NetlistLookupTable netlistLookupTable;
 
-	vector<Group> groupVec;
+	std::vector<Group> groupVec;
 
 	void InterleaveProcess();
 };

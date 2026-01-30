@@ -2,6 +2,14 @@
 #include "TableManager.h"
 #include "NetListLookupTable.h"
 #include <random>
+#include <string>
+
+enum SAMode
+{
+	// random mode, CC mode
+	RandomMode,
+	CCMode
+};
 
 class SAManager
 {
@@ -21,6 +29,8 @@ private:
 
 	NetlistLookupTable netlistLookupTable;
 
+	SAMode saMode = SAMode::CCMode;
+
 
 	// simulated annealing process
 	void SAProcess();
@@ -34,7 +44,7 @@ private:
 	// compare newTableList with nondominatedSolution and update nondominatedSolution
 	void UpdateNondominatedSolution();
 public:
-	SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate = 0.95, double initialTemp = 1000.0, double finalTemp = 1.0, int iterationPerTemp = 100, bool openCommandLineOutput = false);
+	SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate = 0.95, double initialTemp = 1000.0, double finalTemp = 1.0, int iterationPerTemp = 100, bool openCommandLineOutput = false, std::string saMode = "RandomMode");
 
 	std::vector<TableManager> GetNondominatedSolution() { return nondominatedSolution; }
 
