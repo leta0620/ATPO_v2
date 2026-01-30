@@ -133,15 +133,6 @@ int main(int argc, char* argv[]) {
 				int i = nextJob.fetch_add(1);
 				if (i >= jobCount) break;
 
-				//{
-				//	lock_guard<mutex> lock(coutMutex);
-				//	cout << "[Thread " << this_thread::get_id() << "] round: "
-				//		<< (i + 1) << "/" << jobCount << endl;
-				//}
-
-				// ★ 重要：每個 SA run 用自己的 TableManager copy，避免任何共享可變狀態
-				//TableManager initTable = initialTableList[i];
-
 				// 跑 SA（你的參數照舊）
 				SAManager saManager(initialTableList[i], netlistLUT, 0.9, 100.0, 1.0, 5, false);
 
