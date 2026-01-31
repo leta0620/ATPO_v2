@@ -8,10 +8,10 @@ Test::Test()
 {
 	// Add your test functions here, and call them in the constructor
 	//this->TestParsing()
-	//this->TestInitialPlacement(8, 8);
+	this->TestInitialPlacement(8, 10);
 	//this->TestInitialPlacement(6, 6);
 
-	this->TestOuterInputParsing();
+	//this->TestOuterInputParsing();
 
 }
 void Test::TestParsing()
@@ -37,7 +37,7 @@ void Test::TestParsing()
 
 void Test::TestInitialPlacement(int groupSize, int rowNum)
 {
-	IntermidiateParser parser("test2.txt");
+	IntermidiateParser parser("test.txt");
 	if (!parser.Parse()) {
 		std::cerr << "Error: Failed to parse intermediate code file." << std::endl;
 		return;
