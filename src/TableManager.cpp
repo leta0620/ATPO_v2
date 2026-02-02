@@ -436,23 +436,29 @@ bool TableManager::ColumnRuleCheck(int rowPlace, int colPlace, Group& group)
 	int nowGroupTypeHash = group.GetTypeHash();
 
 	// check above
-	if (rowPlace - 1 >= 0)
-	{
-		int aboveGroupTypeHash = table[rowPlace - 1][colPlace].GetTypeHash();
-		if (nowGroupTypeHash != aboveGroupTypeHash)
-		{
-			return false;
-		}
+    if (rowPlace - 1 >= 0)
+    {
+        if (!table[rowPlace - 1][colPlace].HasDummyUnit())
+        {
+            int aboveGroupTypeHash = table[rowPlace - 1][colPlace].GetTypeHash();
+            if (nowGroupTypeHash != aboveGroupTypeHash)
+            {
+                return false;
+            }
+        }
 	}
 
 	// check below
 	if (rowPlace + 1 < rowSize)
 	{
-		int belowGroupTypeHash = table[rowPlace + 1][colPlace].GetTypeHash();
-		if (nowGroupTypeHash != belowGroupTypeHash)
-		{
-			return false;
-		}
+        if (!table[rowPlace + 1][colPlace].HasDummyUnit())
+        {
+            int belowGroupTypeHash = table[rowPlace + 1][colPlace].GetTypeHash();
+            if (nowGroupTypeHash != belowGroupTypeHash)
+            {
+                return false;
+            }
+        }
 	}
 
 	return true;
