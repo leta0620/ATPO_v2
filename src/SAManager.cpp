@@ -146,6 +146,8 @@ void SAManager::Perturbation(std::mt19937& gen)
 
 	auto SwapCCTwoGroup = [](TableManager& table, mt19937& gen) {
 		// TO DO: CC Mode Swap Two Group
+		int delectionLimit = 1000, nowDelection = 0;
+
 		int rowS = table.GetRowSize();
 		int colS = table.GetColSize();
 
@@ -160,6 +162,12 @@ void SAManager::Perturbation(std::mt19937& gen)
 		{
 			row1 = disRowLeft(gen);
 			col1 = disColLeft(gen);
+			nowDelection++;
+			if (nowDelection > delectionLimit)
+			{
+				cerr << "Delection limit reached when select in SwapCCTwoGroup." << endl;
+				return;
+			}
 		} while (table.GetGroup(row1, col1).HasDummyUnit());
 
 		// select another one group from left side without dummy
@@ -169,6 +177,12 @@ void SAManager::Perturbation(std::mt19937& gen)
 		{
 			row2 = disRowLeft(gen);
 			col2 = disColLeft(gen);
+			nowDelection++;
+			if (nowDelection > delectionLimit)
+			{
+				cerr << "Delection limit reached when select in SwapCCTwoGroup." << endl;
+				return;
+			}
 		} while ((row1 == row2 && col1 == col2) || table.GetGroup(row2, col2).HasDummyUnit());
 
 		// swap the two group left side
