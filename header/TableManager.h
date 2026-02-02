@@ -64,6 +64,9 @@ public:
 	// dummy width check and fix
 	bool CheckAndFixDummyWidth();
 
+	// 回傳對應 CostEnum 的成本名稱（若找不到會回傳 fallback 字串）
+    std::string GetCostName(CostEnum costEnum);
+
 private:
 	std::vector<std::vector<Group>> table;
 	int rowSize = 0;

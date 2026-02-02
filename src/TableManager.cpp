@@ -704,16 +704,16 @@ std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValu
         switch (costEnum)
         {
         case CostEnum::ccCost:
-            costName = "CC Cost";
+            costName = "System variation";
             break;
         case CostEnum::rCost:
-            costName = "R Cost";
+            costName = "Routing Length";
             break;
         case CostEnum::cCost:
-            costName = "C Cost";
+            costName = "Coupling capacitance";
             break;
         case CostEnum::sperationCost:
-            costName = "Speration Cost";
+            costName = "Dispersion";
             break;
         default:
             costName = "Unknown Cost";
@@ -924,4 +924,28 @@ vector<string> TableManager::GetTableRotationPatternInRealDummyLength(bool leftS
 
     }
     return tableRotations;
+}
+
+string TableManager::GetCostName(CostEnum costEnum)
+{
+    if (costEnum == CostEnum::ccCost)
+    {
+        return "System variation";
+    }
+    else if (costEnum == CostEnum::rCost)
+    {
+        return "Routing Length";
+    }
+    else if (costEnum == CostEnum::cCost)
+    {
+        return "Coupling capacitance";
+    }
+    else if (costEnum == CostEnum::sperationCost)
+    {
+        return "Dispersion";
+    }
+    else
+    {
+        return "Unknown Cost";
+	}
 }
