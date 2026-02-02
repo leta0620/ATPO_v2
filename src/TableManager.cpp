@@ -373,9 +373,17 @@ void TableManager::CalculateCCost()
         return;
     }
 
+    auto is_dummy = [](const string& s) -> bool {
+        if (s.empty()) return true;
+        if (s == "d" || s == "D") return true;
+        return false;
+        };
 
+    // -----------------------------
+    // Step0: build flattened grid
+    // grid[r][i] = symbol of i-th device unit in row r
+    // -----------------------------
     vector<vector<string>> grid(R);
-
     for (int r = 0; r < R; ++r) {
         for (int c = 0; c < C; ++c) {
             const auto& units = table[r][c].GetDeviceUnits();
@@ -386,45 +394,105 @@ void TableManager::CalculateCCost()
     }
 
     const int W = static_cast<int>(grid[0].size());
-    if (W == 0) {
+    if (W <= 0) {
         costMap[CostEnum::cCost] = 0.0;
         return;
     }
 
+    // Ensure rectangular
+    for (int r = 1; r < R; ++r) {
+        if ((int)grid[r].size() != W) {
+            costMap[CostEnum::cCost] = 0.0;
+            return;
+        }
+    }
 
-    int H = 0;
+    // -----------------------------
+    // Example 1 weights (your choice)
+    // Make P2 and P3 close but ordered
+    // -----------------------------
+    const double wH = 1.0;
+    const double wV = 0.26;
+
+    // -----------------------------
+    // Step1: per-device local counts
+    // H_local / V_local (endpoints +1)
+    // -----------------------------
+    vector<vector<int>> H_local(R, vector<int>(W, 0));
+    vector<vector<int>> V_local(R, vector<int>(W, 0));
+
+    // Horizontal transitions
     for (int r = 0; r < R; ++r) {
         for (int i = 0; i < W - 1; ++i) {
             const string& a = grid[r][i];
             const string& b = grid[r][i + 1];
-            if (a.empty() || b.empty()) continue;
-            if (a == "d" || b == "d") continue;
+            if (is_dummy(a) || is_dummy(b)) continue;
             if (a != b) {
-                H += 1;
+                H_local[r][i] += 1;
+                H_local[r][i + 1] += 1;
             }
         }
     }
 
-
-    int V = 0;
+    // Vertical transitions (COLUMN direction)
     for (int i = 0; i < W; ++i) {
         for (int r = 0; r < R - 1; ++r) {
             const string& a = grid[r][i];
             const string& b = grid[r + 1][i];
-            if (a.empty() || b.empty()) continue;
-            if (a == "d" || b == "d") continue;
+            if (is_dummy(a) || is_dummy(b)) continue;
             if (a != b) {
-                V += 1;
+                V_local[r][i] += 1;
+                V_local[r + 1][i] += 1;
             }
         }
     }
 
+    // -----------------------------
+    // Step2: per-type accumulation
+    // row_cost(u)=H_local(u), col_cost(u)=V_local(u)
+    // -----------------------------
+    std::unordered_map<string, double> type_row_sum; // �U H_local(u)
+    std::unordered_map<string, double> type_col_sum; // �U V_local(u)
+    std::unordered_map<string, long long> type_cnt;  // N_type
 
-    int k = W / 4;
-    int beta = 1;
-    int alpha = 2 * k + 1;
+    for (int r = 0; r < R; ++r) {
+        for (int i = 0; i < W; ++i) {
+            const string& t = grid[r][i];
+            if (is_dummy(t)) continue;
 
-    double Ccost = alpha * H + beta * V;
+            type_row_sum[t] += (double)H_local[r][i];
+            type_col_sum[t] += (double)V_local[r][i];
+            type_cnt[t] += 1;
+        }
+    }
+
+    // -----------------------------
+    // Step3: per-type average, then average over types
+    // C_row = avg_over_types(avg_row(type))
+    // C_col = avg_over_types(avg_col(type))
+    // final: Ccost = wH*C_row + wV*C_col
+    // -----------------------------
+    double sum_type_avg_row = 0.0;
+    double sum_type_avg_col = 0.0;
+    int type_num = 0;
+
+    for (const auto& kv : type_cnt) {
+        const string& t = kv.first;
+        const long long cnt = kv.second;
+        if (cnt <= 0) continue;
+
+        const double avg_row_t = type_row_sum[t] / (double)cnt;
+        const double avg_col_t = type_col_sum[t] / (double)cnt;
+
+        sum_type_avg_row += avg_row_t;
+        sum_type_avg_col += avg_col_t;
+        type_num += 1;
+    }
+
+    const double C_row = (type_num > 0) ? (sum_type_avg_row / (double)type_num) : 0.0;
+    const double C_col = (type_num > 0) ? (sum_type_avg_col / (double)type_num) : 0.0;
+
+    const double Ccost = wH * C_row + wV * C_col;
     costMap[CostEnum::cCost] = Ccost;
 }
 
