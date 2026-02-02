@@ -119,8 +119,8 @@ void Output::PrintSignificantNondominatedSolutions()
 		}
 		else
 		{
-			auto costNameAndValue = sol.second[0].GetCostNameAndCostValueString();
-			cout << "Cost Item : " << costNameAndValue[static_cast<int>(sol.first)].first << "\n";
+			std::string costItem = sol.second[0].GetCostName(sol.first);
+			cout << "Cost Item : " << costItem << "\n";
 		}
 
 		for (size_t i = 0; i < sol.second.size(); ++i)
@@ -168,9 +168,9 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 		}
 		else
 		{
-			auto costNameAndValue = sol.second[0].GetCostNameAndCostValueString();
-			outFile << "Cost Item : " << costNameAndValue[static_cast<int>(sol.first)].first << "\n";
-			costItem = costNameAndValue[static_cast<int>(sol.first)].first;
+			// §ï¬°¡G
+			costItem = sol.second[0].GetCostName(sol.first);
+			outFile << "Cost Item : " << costItem << "\n";
 		}
 
 		for (size_t i = 0; i < sol.second.size(); ++i)

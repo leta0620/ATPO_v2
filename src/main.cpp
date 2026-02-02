@@ -33,9 +33,9 @@ int main(int argc, char* argv[]) {
 	//	return 1;
 	//}
 	
-	if (argc != 7) {
+	if (argc != 8) {
 		Test test; // Run tests
-		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D>" << endl;
+		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D> <sa_mode>" << endl;
 		return 1;
 	}
 
@@ -48,6 +48,7 @@ int main(int argc, char* argv[]) {
 	string output_file_path = argv[4];
 	int thread_num = stoi(argv[5]);
 	string left_is_S_or_D = argv[6];
+	string sa_mode_str = argv[7];
 
 	// Generate intermediate file from CDL and Pattern files
 	string intermediate_code_file_path = "intermediate_temp.txt";
@@ -94,7 +95,7 @@ int main(int argc, char* argv[]) {
 		for (int i = 0; i < initialTableList.size(); ++i)
 		{
 			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
-			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, 5, true);
+			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, 5, true, sa_mode_str);
 			allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
 			
 			cout << "\r";
@@ -132,15 +133,6 @@ int main(int argc, char* argv[]) {
 			while (true) {
 				int i = nextJob.fetch_add(1);
 				if (i >= jobCount) break;
-
-				//{
-				//	lock_guard<mutex> lock(coutMutex);
-				//	cout << "[Thread " << this_thread::get_id() << "] round: "
-				//		<< (i + 1) << "/" << jobCount << endl;
-				//}
-
-				// ★ 重要：每個 SA run 用自己的 TableManager copy，避免任何共享可變狀態
-				//TableManager initTable = initialTableList[i];
 
 				// 跑 SA（你的參數照舊）
 				SAManager saManager(initialTableList[i], netlistLUT, 0.9, 100.0, 1.0, 5, false);
