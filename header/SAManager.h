@@ -3,6 +3,8 @@
 #include "NetListLookupTable.h"
 #include <random>
 #include <string>
+#include <vector>`
+#include <unordered_map>
 
 enum SAMode
 {
@@ -31,6 +33,8 @@ private:
 
 	SAMode saMode = SAMode::CCMode;
 
+	std::unordered_map<int, std::vector<std::pair<int, int>>> groupTypePositionMap; // key: group type hash, value: list of position(row, col) that has this group type
+
 
 	// simulated annealing process
 	void SAProcess();
@@ -43,6 +47,8 @@ private:
 
 	// compare newTableList with nondominatedSolution and update nondominatedSolution
 	void UpdateNondominatedSolution();
+
+	void SetupGroupTypePositionMap();
 public:
 	SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate = 0.95, double initialTemp = 1000.0, double finalTemp = 1.0, int iterationPerTemp = 100, bool openCommandLineOutput = false, std::string saMode = "RandomMode");
 

@@ -28,8 +28,8 @@ SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, do
 	}
 	else
 	{
-		cerr << "Unknown SA Mode, set to CC Mode by default." << endl;
-		this->saMode = SAMode::CCMode;
+		cerr << "Unknown SA Mode, set to RandomMode by default." << endl;
+		this->saMode = SAMode::RandomMode;
 	}
 
 	// 計算成本並初始化 nondominatedSolution
@@ -37,6 +37,7 @@ SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, do
 	this->initialTable.CalculateTableCost();
 	this->nowUseTable = this->initialTable;
 	this->nondominatedSolution.push_back(this->initialTable);
+	
 	// 開始 SA 流程
 	this->SAProcess();
 }
@@ -48,6 +49,7 @@ void SAManager::SAProcess()
 	std::mt19937 gen(rd());
 
 	int nowIteration = 0;
+	this->SetupGroupTypePositionMap();
 	while (this->currentTemp > this->finalTemp)
 	{
 		newTableList.clear();
@@ -142,6 +144,53 @@ void SAManager::Perturbation(std::mt19937& gen)
 		}
 	};
 
+	auto SwapCCTwoGroup = [](TableManager& table, mt19937& gen) {
+		// TO DO: CC Mode Swap Two Group
+		int rowS = table.GetRowSize();
+		int colS = table.GetColSize();
+
+		int leftS = colS / 2;
+		
+		// select one group from left side without dummy
+		uniform_int_distribution<> disRowLeft(0, rowS - 1);
+		uniform_int_distribution<> disColLeft(0, leftS - 1);
+		int row1 = 0;
+		int col1 = 0;
+		do
+		{
+			row1 = disRowLeft(gen);
+			col1 = disColLeft(gen);
+		} while (table.GetGroup(row1, col1).HasDummyUnit());
+
+		// select another one group from left side without dummy
+		int row2 = 0;
+		int col2 = 0;
+		do
+		{
+			row2 = disRowLeft(gen);
+			col2 = disColLeft(gen);
+		} while ((row1 == row2 && col1 == col2) || table.GetGroup(row2, col2).HasDummyUnit());
+
+		// swap the two group left side
+		if (!table.SwapGroups(row1, col1, row2, col2))
+		{
+			cerr << "Swap two group unit fail." << endl;
+		}
+
+		int rightRow1 = rowS - 1 - row1;
+		int rightCol1 = colS - 1 - col1;
+		int rightRow2 = rowS - 1 - row2;
+		int rightCol2 = colS - 1 - col2;
+
+		// cout << "Swap CC Group: (" << row1 << ", " << col1 << ") with (" << row2 << ", " << col2 << ") and (" << rightRow1 << ", " << rightCol1 << ") with (" << rightRow2 << ", " << rightCol2 << ")" << endl;
+
+		// swap the two group right side
+		if (!table.SwapGroups(rightRow1, rightCol1, rightRow2, rightCol2))
+		{
+			cerr << "Swap two group unit fail." << endl;
+		}
+	};
+
 
 	if (this->saMode == SAMode::RandomMode)
 	{
@@ -176,6 +225,10 @@ void SAManager::Perturbation(std::mt19937& gen)
 	else if (this->saMode == SAMode::CCMode)
 	{
 		// TO DO: CC Mode Perturbation
+		TableManager newTable = this->nowUseTable;
+
+		SwapCCTwoGroup(newTable, gen);
+		this->newTableList.push_back(newTable);
 	}
 	else
 	{
@@ -325,7 +378,7 @@ void SAManager::UpdateNondominatedSolution()
 	{
 		bool newIsDominated = false;
 		std::unordered_map<CostEnum, double> newCost = newTable.GetCostMap();
-		for (size_t i = 0; i < this->nondominatedSolution.size(); i++)
+		for (int i = 0; i < this->nondominatedSolution.size(); i++)
 		{
 			if (doesADominateB(newCost, this->nondominatedSolution[i].GetCostMap()))
 			{
@@ -357,7 +410,7 @@ void SAManager::UpdateNondominatedSolution()
 
 	// remove dominated solutions from nondominatedSolution
 	vector<TableManager> updatedNondominatedSolution;
-	for (size_t i = 0; i < this->nondominatedSolution.size(); i++)
+	for (int i = 0; i < this->nondominatedSolution.size(); i++)
 	{
 		if (toBeRemovedIndex.find(i) == toBeRemovedIndex.end()) // not to be removed
 		{
@@ -370,6 +423,22 @@ void SAManager::UpdateNondominatedSolution()
 		updatedNondominatedSolution.push_back(this->newTableList[index]);
 	}
 	this->nondominatedSolution = updatedNondominatedSolution;
+}
+
+void SAManager::SetupGroupTypePositionMap()
+{
+	this->groupTypePositionMap.clear();
+	int rowSize = this->initialTable.GetRowSize();
+	int colSize = this->initialTable.GetColSize();
+	for (int r = 0; r < rowSize; r++)
+	{
+		for (int c = 0; c < colSize; c++)
+		{
+			Group group = this->initialTable.GetGroup(r, c);
+			int typeHash = group.GetTypeHash();
+			this->groupTypePositionMap[typeHash].push_back({ r, c });
+		}
+	}
 }
 
 
