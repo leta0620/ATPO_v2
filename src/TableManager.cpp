@@ -1,4 +1,4 @@
-// cost part implementation
+ï»¿// cost part implementation
 #include <cmath>
 #include <unordered_map>
 #include <unordered_set>
@@ -87,25 +87,25 @@ std::vector<std::string> TableManager::GetTableStringPattern()
 
     for (size_t rowIndex = 0; rowIndex < table.size(); rowIndex++)
     {
-		auto& row = table[rowIndex];
+        auto& row = table[rowIndex];
         std::string rowString;
         for (auto& group : row)
         {
-			auto deviceUnits = group.GetDeviceUnits();
+            auto deviceUnits = group.GetDeviceUnits();
             for (size_t i = 0; i < deviceUnits.size(); i++)
             {
-				//rowString += deviceUnits[i].GetSymbol();
-				rowString += deviceUnits[i].GetInstName();
+                //rowString += deviceUnits[i].GetSymbol();
+                rowString += deviceUnits[i].GetInstName();
 
                 if (i < deviceUnits.size() - 1)
                 {
-					rowString += ", ";
+                    rowString += ", ";
                 }
             }
             if (&group < &row.back())
             {
                 rowString += ", ";
-			}
+            }
         }
         tableStrings.push_back(rowString);
     }
@@ -123,7 +123,7 @@ std::vector<std::string> TableManager::GetTableRotationFormat(bool leftS)
         {
             for (auto& deviceUnit : group.GetDeviceUnits())
             {
-				rowRotation += deviceUnit.GetStringRotation(leftS);
+                rowRotation += deviceUnit.GetStringRotation(leftS);
             }
         }
         tableRotations.push_back(rowRotation);
@@ -140,7 +140,7 @@ std::vector<std::string> TableManager::GetTableRotationPattern(bool leftS)
         std::string rowRotation;
         for (auto& group : row)
         {
-			auto deviceUnits = group.GetDeviceUnits();
+            auto deviceUnits = group.GetDeviceUnits();
             for (size_t i = 0; i < deviceUnits.size(); i++)
             {
                 rowRotation += deviceUnits[i].GetStringRotation(leftS);
@@ -152,7 +152,7 @@ std::vector<std::string> TableManager::GetTableRotationPattern(bool leftS)
             if (&group < &row.back())
             {
                 rowRotation += ", ";
-			}
+            }
         }
         tableRotations.push_back(rowRotation);
     }
@@ -177,15 +177,133 @@ std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
 // Cost part implementation
 // =======================
 
-// ---- CC (Center Closure): compute £g for each device name and average their |£g| ----
+// ---- CC (Center Closure): compute ï¿½g for each device name and average their |ï¿½g| ----
 void TableManager::CalculateCCCost() {
-    // For each row: flatten the row into unit-cell tokens (same logic as GetTableStringFormat)
-    std::unordered_map<std::string, long long> sum_x;   // £U x for each symbol
-    std::unordered_map<std::string, long long> cnt_x;   // count for each symbol
+    using std::string;
+    using std::vector;
+    using std::unordered_map;
+
+    const int R = rowSize;
+    const int G = colSize; // group columns
+    if (R <= 0 || G <= 0) {
+        costMap[CostEnum::ccCost] = 0.0;
+        return;
+    }
+
+    // -----------------------
+    // y centering by rows
+    // -----------------------
+    const bool rows_even = (R % 2 == 0);
+    const int  rk = R / 2;        // even: center between rk-1, rk
+    const int  rm = (R - 1) / 2;  // odd : center at rm
+
+    auto y_of = [&](int r)->double {
+        if (rows_even) {
+            // ...,-1.5,-0.5,+0.5,+1.5,...
+            return (static_cast<double>(r) + 0.5) - static_cast<double>(rk);
+        }
+        else {
+            // ...,-2,-1,0,+1,+2,...
+            return static_cast<double>(r - rm);
+        }
+        };
+
+    // per-type accumulators
+    unordered_map<string, double>    sum_x;
+    unordered_map<string, double>    sum_y;
+    unordered_map<string, long long> cnt;
+
+    // -----------------------
+    // sweep each row
+    // -----------------------
+    for (int r = 0; r < R; ++r) {
+        // 1) flatten this row into unit-cell token sequence
+        vector<string> rowTok;
+        rowTok.reserve(G * 8); // rough guess (groupSize often 8)
+
+        for (int c = 0; c < G; ++c) {
+            const auto& units = table[r][c].GetDeviceUnits();
+            for (const auto& du : units) {
+                rowTok.push_back(du.GetSymbol());
+            }
+        }
+
+        const int W = static_cast<int>(rowTok.size());
+        if (W == 0) continue;
+
+        // 2) x centering by W
+        const bool even = (W % 2 == 0);
+        const int  k = W / 2;        // even: center between k-1, k
+        const int  m = (W - 1) / 2;  // odd : center at m
+
+        const double y = y_of(r);
+
+        for (int i = 0; i < W; ++i) {
+            const string& name = rowTok[i];
+            if (name.empty() || name == "d") continue; // ignore dummy
+
+            double x;
+            if (even) {
+                // ..., -3,-2,-1, +1,+2,+3,...
+                x = (i < k)
+                    ? (static_cast<double>(i) - static_cast<double>(k))
+                    : (static_cast<double>(i) - static_cast<double>(k) + 1.0);
+            }
+            else {
+                // ..., -2,-1,0,+1,+2,...
+                x = static_cast<double>(i - m);
+            }
+
+            sum_x[name] += x;
+            sum_y[name] += y;
+            cnt[name] += 1;
+        }
+    }
+
+    // -----------------------
+    // per-type mu_x, mu_y
+    // CCx = avg(|mu_x|), CCy = avg(|mu_y|)
+    // CC  = CCx + CCy
+    // -----------------------
+    double sum_abs_mux = 0.0;
+    double sum_abs_muy = 0.0;
+    int    typeNum = 0;
+
+    for (const auto& kv : cnt) {
+        const string& name = kv.first;
+        long long n = kv.second;
+        if (n <= 0) continue;
+
+        double mu_x = sum_x[name] / static_cast<double>(n);
+        double mu_y = sum_y[name] / static_cast<double>(n);
+
+        sum_abs_mux += std::fabs(mu_x);
+        sum_abs_muy += std::fabs(mu_y);
+        ++typeNum;
+    }
+
+    double CCx = 0.0, CCy = 0.0;
+    if (typeNum > 0) {
+        CCx = sum_abs_mux / static_cast<double>(typeNum);
+        CCy = sum_abs_muy / static_cast<double>(typeNum);
+    }
+
+    costMap[CostEnum::ccCost] = CCx + CCy;
+}
+
+
+
+void TableManager::CalculateRCost() {
+    using std::string;
+    using std::vector;
+    using std::unordered_map;
+
+    unordered_map<string, double>    sum_wdist;
+    unordered_map<string, long long> sum_cnt;
 
     for (int r = 0; r < rowSize; ++r) {
-        // Flatten row into tokens
-        std::vector<std::string> rowTok;
+        vector<string> rowTok;
+        rowTok.reserve(colSize * 8);
         for (int c = 0; c < colSize; ++c) {
             const auto& units = table[r][c].GetDeviceUnits();
             for (const auto& du : units) {
@@ -201,78 +319,40 @@ void TableManager::CalculateCCCost() {
         const int  m = (W - 1) / 2;
 
         for (int i = 0; i < W; ++i) {
-            const std::string& name = rowTok[i];
+            const string& name = rowTok[i];
             if (name.empty() || name == "d") continue;
 
-            long long x = even
-                ? ((i < k) ? (i - k) : (i - k + 1))
-                : (i - m);
 
-            sum_x[name] += x;
-            cnt_x[name] += 1;
+            double x;
+            if (even) x = (i < k) ? (i - k) : (i - k + 1);
+            else      x = i - m;
+
+            double dist = std::fabs(x);
+            sum_wdist[name] += dist;
+            sum_cnt[name] += 1;
         }
     }
 
-    // Compute £g for each name and average their absolute values |£g|
-    double sum_abs_mu = 0.0;
-    int n = 0;
-    for (const auto& kv : sum_x) {
-        const std::string& name = kv.first;
-        long long c = cnt_x[name];
-        if (c <= 0) continue;
 
-        double mu = static_cast<double>(kv.second) / static_cast<double>(c);
-        sum_abs_mu += std::fabs(mu);   //ABS!!!
-        ++n;
-    }
-
-    costMap[CostEnum::ccCost] = (n == 0) ? 0.0 : (sum_abs_mu / static_cast<double>(n));
-}
-
-
-// ---- R (Row Spread): column distance ¡Ñ unit count ¡÷ per-name mean ¡÷ population stddev ----
-void TableManager::CalculateRCost() {
-    std::unordered_map<std::string, double> sum_wdist;  // £U(dist ¡Ñ count)
-    std::unordered_map<std::string, long long> sum_cnt; // total count
-
-    const bool even = (colSize % 2 == 0);
-    const int  k = colSize / 2;
-    const int  m = (colSize - 1) / 2;
-
-    auto col_dist = [&](int j)->double {
-        return even ? std::fabs((static_cast<double>(j) + 0.5) - static_cast<double>(k))
-            : std::fabs(static_cast<double>(j - m));
-        };
-
-    for (int r = 0; r < rowSize; ++r) {
-        for (int j = 0; j < colSize; ++j) {
-            const auto counts = CountNameInGroup(table[r][j]);
-            const double d = col_dist(j);
-            for (const auto& kv : counts) {
-                sum_wdist[kv.first] += d * static_cast<double>(kv.second);
-                sum_cnt[kv.first] += kv.second;
-            }
-        }
-    }
-
-    // Compute average distance per name
     std::vector<double> per_name_avg;
     per_name_avg.reserve(sum_wdist.size());
     for (const auto& kv : sum_wdist) {
-        const std::string& name = kv.first;
-        long long c = sum_cnt[name];
-        if (c <= 0) continue;
-        per_name_avg.push_back(kv.second / static_cast<double>(c));
+        const string& name = kv.first;
+        long long cnt = sum_cnt[name];
+        if (cnt <= 0) continue;
+        per_name_avg.push_back(kv.second / static_cast<double>(cnt));
     }
 
-    // Compute population standard deviation
     double r_cost = 0.0;
     if (!per_name_avg.empty()) {
         double s = 0.0, s2 = 0.0;
-        for (double v : per_name_avg) { s += v; s2 += v * v; }
+        for (double v : per_name_avg) {
+            s += v;
+            s2 += v * v;
+        }
         double n = static_cast<double>(per_name_avg.size());
         double mean = s / n;
-        double var = (s2 / n) - mean * mean;
+        double var = (s2 / n) - (mean * mean);
         if (var < 0.0) var = 0.0;
         r_cost = std::sqrt(var);
     }
@@ -281,74 +361,144 @@ void TableManager::CalculateRCost() {
 }
 
 // ---- C (Column Closure): both sides from outside to inside; add penalty when new name appears ----
-void TableManager::CalculateCCost() {
-    const int nfin_local = std::max(2, this->nfin); // avoid dividing by zero
+void TableManager::CalculateCCost()
+{
+    using std::string;
+    using std::vector;
 
-    auto process_side = [&](int r, int start, int end, int step,
-        std::unordered_map<std::string, double>& sum_w,
-        std::unordered_map<std::string, long long>& sum_cnt) {
+    const int R = rowSize;
+    const int C = colSize;
+    if (R <= 0 || C <= 0) {
+        costMap[CostEnum::cCost] = 0.0;
+        return;
+    }
 
-            std::unordered_set<std::string> seen;
-            std::string prev;
-            int numerator = 1;
-
-            for (int j = start; j != end + step; j += step) {
-
-                // Get main symbol of this group
-                std::string gname = ExtractGroupName(table[r][j]);
-                if (gname.empty()) continue;
-
-                // Penalty: new symbol that has not appeared on this side
-                if (!prev.empty() && gname != prev && !seen.count(gname)) {
-                    numerator += 1;
-                }
-                prev = gname;
-                seen.insert(gname);
-
-                // Add weighted count for all units in this group
-                auto counts = CountNameInGroup(table[r][j]);
-                for (const auto& kv : counts) {
-                    const std::string& name = kv.first;
-                    int cnt = kv.second;
-
-                    sum_w[name] += (static_cast<double>(numerator) / static_cast<double>(nfin_local - 1))
-                        * static_cast<double>(cnt);
-
-                    sum_cnt[name] += cnt;
-                }
-            }
+    auto is_dummy = [](const string& s) -> bool {
+        if (s.empty()) return true;
+        if (s == "d" || s == "D") return true;
+        return false;
         };
 
-    std::unordered_map<std::string, double> sum_w;
-    std::unordered_map<std::string, long long> sum_cnt;
-
-    for (int r = 0; r < rowSize; ++r) {
-        if (colSize == 0) continue;
-
-        if (colSize % 2 == 0) {
-            int k = colSize / 2;
-            if (k - 1 >= 0) process_side(r, 0, k - 1, +1, sum_w, sum_cnt);      // left: outer ¡÷ inner
-            if (colSize - 1 >= k) process_side(r, colSize - 1, k, -1, sum_w, sum_cnt);  // right: outer ¡÷ inner
-        }
-        else {
-            int m = (colSize - 1) / 2;
-            process_side(r, 0, m, +1, sum_w, sum_cnt);                                 // left (includes center)
-            if (colSize - 1 >= m + 1) process_side(r, colSize - 1, m + 1, -1, sum_w, sum_cnt);
+    // -----------------------------
+    // Step0: build flattened grid
+    // grid[r][i] = symbol of i-th device unit in row r
+    // -----------------------------
+    vector<vector<string>> grid(R);
+    for (int r = 0; r < R; ++r) {
+        for (int c = 0; c < C; ++c) {
+            const auto& units = table[r][c].GetDeviceUnits();
+            for (const auto& du : units) {
+                grid[r].push_back(du.GetSymbol());
+            }
         }
     }
 
-    double c_total = 0.0;
-    for (const auto& kv : sum_w) {
-        const std::string& name = kv.first;
-        long long tot = sum_cnt[name];
-        if (tot <= 0) continue;
-        c_total += kv.second / static_cast<double>(tot);
+    const int W = static_cast<int>(grid[0].size());
+    if (W <= 0) {
+        costMap[CostEnum::cCost] = 0.0;
+        return;
     }
 
-    costMap[CostEnum::cCost] = c_total;
+    // Ensure rectangular
+    for (int r = 1; r < R; ++r) {
+        if ((int)grid[r].size() != W) {
+            costMap[CostEnum::cCost] = 0.0;
+            return;
+        }
+    }
+
+    // -----------------------------
+    // Example 1 weights (your choice)
+    // Make P2 and P3 close but ordered
+    // -----------------------------
+    const double wH = 1.0;
+    const double wV = 0.26;
+
+    // -----------------------------
+    // Step1: per-device local counts
+    // H_local / V_local (endpoints +1)
+    // -----------------------------
+    vector<vector<int>> H_local(R, vector<int>(W, 0));
+    vector<vector<int>> V_local(R, vector<int>(W, 0));
+
+    // Horizontal transitions
+    for (int r = 0; r < R; ++r) {
+        for (int i = 0; i < W - 1; ++i) {
+            const string& a = grid[r][i];
+            const string& b = grid[r][i + 1];
+            if (is_dummy(a) || is_dummy(b)) continue;
+            if (a != b) {
+                H_local[r][i] += 1;
+                H_local[r][i + 1] += 1;
+            }
+        }
+    }
+
+    // Vertical transitions (COLUMN direction)
+    for (int i = 0; i < W; ++i) {
+        for (int r = 0; r < R - 1; ++r) {
+            const string& a = grid[r][i];
+            const string& b = grid[r + 1][i];
+            if (is_dummy(a) || is_dummy(b)) continue;
+            if (a != b) {
+                V_local[r][i] += 1;
+                V_local[r + 1][i] += 1;
+            }
+        }
+    }
+
+    // -----------------------------
+    // Step2: per-type accumulation
+    // row_cost(u)=H_local(u), col_cost(u)=V_local(u)
+    // -----------------------------
+    std::unordered_map<string, double> type_row_sum; // ï¿½U H_local(u)
+    std::unordered_map<string, double> type_col_sum; // ï¿½U V_local(u)
+    std::unordered_map<string, long long> type_cnt;  // N_type
+
+    for (int r = 0; r < R; ++r) {
+        for (int i = 0; i < W; ++i) {
+            const string& t = grid[r][i];
+            if (is_dummy(t)) continue;
+
+            type_row_sum[t] += (double)H_local[r][i];
+            type_col_sum[t] += (double)V_local[r][i];
+            type_cnt[t] += 1;
+        }
+    }
+
+    // -----------------------------
+    // Step3: per-type average, then average over types
+    // C_row = avg_over_types(avg_row(type))
+    // C_col = avg_over_types(avg_col(type))
+    // final: Ccost = wH*C_row + wV*C_col
+    // -----------------------------
+    double sum_type_avg_row = 0.0;
+    double sum_type_avg_col = 0.0;
+    int type_num = 0;
+
+    for (const auto& kv : type_cnt) {
+        const string& t = kv.first;
+        const long long cnt = kv.second;
+        if (cnt <= 0) continue;
+
+        const double avg_row_t = type_row_sum[t] / (double)cnt;
+        const double avg_col_t = type_col_sum[t] / (double)cnt;
+
+        sum_type_avg_row += avg_row_t;
+        sum_type_avg_col += avg_col_t;
+        type_num += 1;
+    }
+
+    const double C_row = (type_num > 0) ? (sum_type_avg_row / (double)type_num) : 0.0;
+    const double C_col = (type_num > 0) ? (sum_type_avg_col / (double)type_num) : 0.0;
+
+    const double Ccost = wH * C_row + wV * C_col;
+    costMap[CostEnum::cCost] = Ccost;
 }
 
-// ---- Separation: unit-cell based metric using rho(distance), then compute pairwise £m_ij ----
+
+
+// ---- Separation: unit-cell based metric using rho(distance), then compute pairwise ï¿½m_ij ----
 void TableManager::CalculateSpetationCost() {
 
     struct Pt { int r, x; }; // r = row index, x = unit index within the row
@@ -398,7 +548,7 @@ void TableManager::CalculateSpetationCost() {
         if (X[kv.first] <= 0.0) X[kv.first] = static_cast<double>(n);
     }
 
-    // Compute £U £m_ij across all pairs
+    // Compute ï¿½U ï¿½m_ij across all pairs
     std::vector<std::string> names;
     names.reserve(cells.size());
     for (const auto& kv : cells) names.push_back(kv.first);
@@ -433,7 +583,7 @@ void TableManager::CalculateSpetationCost() {
 // check colume rule(same type sequential)
 bool TableManager::ColumnRuleCheck(int rowPlace, int colPlace, Group& group)
 {
-	int nowGroupTypeHash = group.GetTypeHash();
+    int nowGroupTypeHash = group.GetTypeHash();
 
 	// check above
     if (rowPlace - 1 >= 0)
@@ -461,19 +611,19 @@ bool TableManager::ColumnRuleCheck(int rowPlace, int colPlace, Group& group)
         }
 	}
 
-	return true;
+    return true;
 }
 // check row rule(neighborhood group can link)
 bool TableManager::RowRuleCheck(int rowPlace, int colPlace, Group& group)
 {
-	vector<DeviceUnit> groupDeviceUnits = group.GetDeviceUnits();
-	
-	// check left
-	DeviceUnit firstDeviceUnit = groupDeviceUnits[0];
-	if (colPlace - 1 >= 0)
-	{
-		Group leftGroup = table[rowPlace][colPlace - 1];
-		pair<string, CellRotation> leftGroupLastWhoAndRotation = leftGroup.GetLastDeviceUnitWhoAndRotation();
+    vector<DeviceUnit> groupDeviceUnits = group.GetDeviceUnits();
+
+    // check left
+    DeviceUnit firstDeviceUnit = groupDeviceUnits[0];
+    if (colPlace - 1 >= 0)
+    {
+        Group leftGroup = table[rowPlace][colPlace - 1];
+        pair<string, CellRotation> leftGroupLastWhoAndRotation = leftGroup.GetLastDeviceUnitWhoAndRotation();
 
         if (leftGroupLastWhoAndRotation.second == CellRotation::R0)
         {
@@ -492,20 +642,20 @@ bool TableManager::RowRuleCheck(int rowPlace, int colPlace, Group& group)
             {
                 return false;
             }
-		}
+        }
         else
         {
-			return false;
+            return false;
         }
-	}
+    }
 
-	// check right
-	DeviceUnit lastDeviceUnit = groupDeviceUnits.back();
-	if (colPlace + 1 < colSize)
-	{
-		Group rightGroup = table[rowPlace][colPlace + 1];
-		pair<string, CellRotation> rightGroupFirstWhoAndRotation = rightGroup.GetFirstDeviceUnitWhoAndRotation();
-		//if (rightGroupFirstWhoAndOuterPin.first != lastDeviceUnit.GetSymbol()) return false;
+    // check right
+    DeviceUnit lastDeviceUnit = groupDeviceUnits.back();
+    if (colPlace + 1 < colSize)
+    {
+        Group rightGroup = table[rowPlace][colPlace + 1];
+        pair<string, CellRotation> rightGroupFirstWhoAndRotation = rightGroup.GetFirstDeviceUnitWhoAndRotation();
+        //if (rightGroupFirstWhoAndOuterPin.first != lastDeviceUnit.GetSymbol()) return false;
 
         if (rightGroupFirstWhoAndRotation.second == CellRotation::R0)
         {
@@ -516,7 +666,7 @@ bool TableManager::RowRuleCheck(int rowPlace, int colPlace, Group& group)
                 return false;
             }
         }
-		else  if (rightGroupFirstWhoAndRotation.second == CellRotation::MY)
+        else  if (rightGroupFirstWhoAndRotation.second == CellRotation::MY)
         {
             auto tmp = this->netlist.GetPinSLinkWho(rightGroupFirstWhoAndRotation.first).first;
 
@@ -524,14 +674,14 @@ bool TableManager::RowRuleCheck(int rowPlace, int colPlace, Group& group)
             {
                 return false;
             }
-		}
+        }
         else
         {
-			return false;
+            return false;
         }
-	}
+    }
 
-	return true;
+    return true;
 }
 
 // =======================
@@ -540,36 +690,36 @@ bool TableManager::RowRuleCheck(int rowPlace, int colPlace, Group& group)
 
 bool TableManager::PlaceGroup(const Group& group, int& placedRow, int& placedCol)
 {
-	if (placedRow < 0 || placedRow >= this->rowSize || placedCol < 0 || placedCol >= this->colSize)
-		return false;
-	else
-	{
-		this->table[placedRow][placedCol] = group;
-		return true;
-	}
+    if (placedRow < 0 || placedRow >= this->rowSize || placedCol < 0 || placedCol >= this->colSize)
+        return false;
+    else
+    {
+        this->table[placedRow][placedCol] = group;
+        return true;
+    }
 
-	//Group placedGroup = group;
-	//if (this->ColumnRuleCheck(placedRow, placedCol, placedGroup) && this->RowRuleCheck(placedRow, placedCol, placedGroup))
-	//{
-	//	this->table[placedRow][placedCol] = placedGroup;
-	//	return true;
-	//}
+    //Group placedGroup = group;
+    //if (this->ColumnRuleCheck(placedRow, placedCol, placedGroup) && this->RowRuleCheck(placedRow, placedCol, placedGroup))
+    //{
+    //	this->table[placedRow][placedCol] = placedGroup;
+    //	return true;
+    //}
 
-	return false;
+    return false;
 }
 
 bool TableManager::SwapGroups(int row1, int col1, int row2, int col2)
 {
-	Group group1 = table[row1][col1];
-	Group group2 = table[row2][col2];
+    Group group1 = table[row1][col1];
+    Group group2 = table[row2][col2];
 
-	/*if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
-		this->ColumnRuleCheck(row2, col2, group1) && this->RowRuleCheck(row2, col2, group1))
-	{
-		this->table[row1][col1] = group2;
-		this->table[row2][col2] = group1;
-		return true;
-	}*/
+    /*if (this->ColumnRuleCheck(row1, col1, group2) && this->RowRuleCheck(row1, col1, group2) &&
+        this->ColumnRuleCheck(row2, col2, group1) && this->RowRuleCheck(row2, col2, group1))
+    {
+        this->table[row1][col1] = group2;
+        this->table[row2][col2] = group1;
+        return true;
+    }*/
 
     auto SetGroupMemberWidth = [](Group& gDest, Group& gSource)
         {
@@ -591,29 +741,29 @@ bool TableManager::SwapGroups(int row1, int col1, int row2, int col2)
         else if (CheckAllGroupMemberDummy(group2))
         {
             SetGroupMemberWidth(group2, group1);
-		}
+        }
 
         this->table[row1][col1] = group2;
         this->table[row2][col2] = group1;
 
         return true;
-	}
+    }
 
-	return false;
+    return false;
 }
 
 bool TableManager::MoveGroup(int srcRow, int srcCol, int destRow, int destCol)
 {
-	Group srcGroup = table[srcRow][srcCol];
-	if (this->ColumnRuleCheck(destRow, destCol, srcGroup) && this->RowRuleCheck(destRow, destCol, srcGroup))
-	{
-		this->table[destRow][destCol] = srcGroup;
-		// clear source position
-		this->table[srcRow][srcCol] = Group();
-		return true;
-	}
+    Group srcGroup = table[srcRow][srcCol];
+    if (this->ColumnRuleCheck(destRow, destCol, srcGroup) && this->RowRuleCheck(destRow, destCol, srcGroup))
+    {
+        this->table[destRow][destCol] = srcGroup;
+        // clear source position
+        this->table[srcRow][srcCol] = Group();
+        return true;
+    }
 
-	return false;
+    return false;
 }
 
 // =======================
@@ -629,19 +779,19 @@ bool TableManager::EqualTableToSelf(TableManager& otherTable)
 
 void TableManager::SetTableSize(int rowSize, int colSize)
 {
-	this->rowSize = rowSize;
-	this->colSize = colSize;
-	InitializeTable();
+    this->rowSize = rowSize;
+    this->colSize = colSize;
+    InitializeTable();
 }
 
 bool TableManager::CheckCanSwapGroups(int row1, int col1, int row2, int col2)
 {
     if (row1 < 0 || row1 >= this->rowSize || col1 < 0 || col1 >= this->colSize ||
         row2 < 0 || row2 >= this->rowSize || col2 < 0 || col2 >= this->colSize)
-		return false;
+        return false;
 
-	Group group1 = table[row1][col1];
-	Group group2 = table[row2][col2];
+    Group group1 = table[row1][col1];
+    Group group2 = table[row2][col2];
 
     bool allMemberDummy1 = true, allMemberDummy2 = true;
 
@@ -656,28 +806,28 @@ bool TableManager::CheckCanSwapGroups(int row1, int col1, int row2, int col2)
     if (allMemberDummy1 || allMemberDummy2)
     {
         return true;
-	}
+    }
 
-	if (this->ColumnRuleCheck(row1, col1, group2) && this->ColumnRuleCheck(row2, col2, group1))
-	{
-		return true;
-	}
-	return false;
+    if (this->ColumnRuleCheck(row1, col1, group2) && this->ColumnRuleCheck(row2, col2, group1))
+    {
+        return true;
+    }
+    return false;
 }
 
 bool TableManager::SwapColumns(int col1, int col2)
 {
     if (col1 < 0 || col1 >= this->colSize || col2 < 0 || col2 >= this->colSize)
-		return false;
+        return false;
 
     for (int r = 0; r < this->rowSize; r++)
     {
         Group group1 = table[r][col1];
         Group group2 = table[r][col2];
-		table[r][col1] = group2;
+        table[r][col1] = group2;
         table[r][col2] = group1;
     }
-	return true;
+    return true;
 }
 
 bool TableManager::SwapRows(int row1, int row2)
@@ -719,7 +869,7 @@ std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValu
             costName = "Unknown Cost";
             break;
         }
-		costNameAndValue.push_back(pair<string, double>(costName, costValue));
+        costNameAndValue.push_back(pair<string, double>(costName, costValue));
     }
     return costNameAndValue;
 }
@@ -742,21 +892,21 @@ void TableManager::PrintTableToConsole()
 bool TableManager::CheckAndFixDummyWidth()
 {
     vector<vector<int>> dummyWidthTable;
-	dummyWidthTable.reserve(this->colSize);
-	//this->PrintTableToConsole();
-    
+    dummyWidthTable.reserve(this->colSize);
+    //this->PrintTableToConsole();
+
     for (int c = 0; c < this->colSize; c++)
     {
-		vector<int> dummyWidthsInCol;
+        vector<int> dummyWidthsInCol;
         dummyWidthsInCol.resize(this->table[0][c].GetDeviceUnits().size());
-        
+
 
         for (int r = 0; r < this->rowSize; r++)
         {
-			Group& g = this->table[r][c];
-			vector<DeviceUnit> deviceUnits = g.GetDeviceUnits();
+            Group& g = this->table[r][c];
+            vector<DeviceUnit> deviceUnits = g.GetDeviceUnits();
             bool allWidthSave = true;
-			
+
             for (int d = 0; d < deviceUnits.size(); d++)
             {
                 if (deviceUnits[d].GetSymbol() != "d")
@@ -765,19 +915,19 @@ bool TableManager::CheckAndFixDummyWidth()
                 }
                 else
                 {
-					allWidthSave = false;
+                    allWidthSave = false;
                 }
-			}
-            
+            }
+
             if (allWidthSave)
             {
-				dummyWidthTable.push_back(dummyWidthsInCol);
+                dummyWidthTable.push_back(dummyWidthsInCol);
                 break;
             }
-		}
-	}
+        }
+    }
 
-	// fix dummy width
+    // fix dummy width
     for (int c = 0; c < this->colSize; c++)
     {
         for (int r = 0; r < this->rowSize; r++)
@@ -793,7 +943,7 @@ bool TableManager::CheckAndFixDummyWidth()
             }
             g.SetDeviceUnits(deviceUnits);
         }
-	}
+    }
 
 
 
@@ -804,8 +954,8 @@ vector<string> TableManager::GetTableStringPatternInRealDummyLength()
 {
     std::vector<std::string> tableStrings;
     vector<int> rowInstNum;
-	rowInstNum.resize(this->rowSize);
-	int maxRowInstNum = 0;
+    rowInstNum.resize(this->rowSize);
+    int maxRowInstNum = 0;
 
     for (size_t rowIndex = 0; rowIndex < this->table.size(); rowIndex++)
     {
@@ -814,14 +964,14 @@ vector<string> TableManager::GetTableStringPatternInRealDummyLength()
         {
             for (size_t deviceIndex = 0; deviceIndex < table[rowIndex][groupIndex].GetDeviceUnits().size(); deviceIndex++)
             {
-				DeviceUnit deviceUnit = table[rowIndex][groupIndex].GetDeviceUnits()[deviceIndex];
+                DeviceUnit deviceUnit = table[rowIndex][groupIndex].GetDeviceUnits()[deviceIndex];
 
                 vector<string> instNames = deviceUnit.GetPatternUseNameList();
-				rowInstNum[rowIndex] += instNames.size();
+                rowInstNum[rowIndex] += instNames.size();
                 if (rowInstNum[rowIndex] > maxRowInstNum)
-				{
-					maxRowInstNum = rowInstNum[rowIndex];
-				}
+                {
+                    maxRowInstNum = rowInstNum[rowIndex];
+                }
 
 
                 for (size_t i = 0; i < instNames.size(); i++)
@@ -831,24 +981,24 @@ vector<string> TableManager::GetTableStringPatternInRealDummyLength()
                     if (i < instNames.size() - 1)
                     {
                         rowString += ", ";
-					}
+                    }
                 }
-                
+
                 if (deviceIndex < table[rowIndex][groupIndex].GetDeviceUnits().size() - 1)
                 {
                     rowString += ", ";
-				}
+                }
             }
             if (groupIndex < table[rowIndex].size() - 1)
             {
                 rowString += ", ";
             }
         }
-		tableStrings.push_back(rowString);
+        tableStrings.push_back(rowString);
     }
 
     // fix word length
-	for (size_t rowIndex = 0; rowIndex < this->table.size(); rowIndex++)
+    for (size_t rowIndex = 0; rowIndex < this->table.size(); rowIndex++)
     {
         int needAddDummyNum = maxRowInstNum - rowInstNum[rowIndex];
         if (needAddDummyNum > 0)
@@ -859,17 +1009,17 @@ vector<string> TableManager::GetTableStringPatternInRealDummyLength()
                 rowString += ", *";
             }
         }
-	}
+    }
 
-	return tableStrings;
+    return tableStrings;
 }
 
 vector<string> TableManager::GetTableRotationPatternInRealDummyLength(bool leftS)
 {
     std::vector<std::string> tableRotations;
-	vector<int> rowInstNum;
-	rowInstNum.resize(this->rowSize);
-	int maxRowInstNum = 0;
+    vector<int> rowInstNum;
+    rowInstNum.resize(this->rowSize);
+    int maxRowInstNum = 0;
 
     for (size_t rowIndex = 0; rowIndex < this->table.size(); rowIndex++)
     {
@@ -878,24 +1028,24 @@ vector<string> TableManager::GetTableRotationPatternInRealDummyLength(bool leftS
         {
             for (size_t deviceIndex = 0; deviceIndex < table[rowIndex][groupIndex].GetDeviceUnits().size(); deviceIndex++)
             {
-				DeviceUnit deviceUnit = table[rowIndex][groupIndex].GetDeviceUnits()[deviceIndex];
+                DeviceUnit deviceUnit = table[rowIndex][groupIndex].GetDeviceUnits()[deviceIndex];
 
                 vector<string> rotations = deviceUnit.GetPatternUseRotationList();
-				rowInstNum[rowIndex] += rotations.size();
-				if (rowInstNum[rowIndex] > maxRowInstNum)
-				{
-					maxRowInstNum = rowInstNum[rowIndex];
-				}
+                rowInstNum[rowIndex] += rotations.size();
+                if (rowInstNum[rowIndex] > maxRowInstNum)
+                {
+                    maxRowInstNum = rowInstNum[rowIndex];
+                }
 
                 for (size_t i = 0; i < rotations.size(); i++)
                 {
-					rowString += rotations[i];
+                    rowString += rotations[i];
                     if (i < rotations.size() - 1)
                     {
                         rowString += ", ";
                     }
                 }
-                
+
                 if (deviceIndex < table[rowIndex][groupIndex].GetDeviceUnits().size() - 1)
                 {
                     rowString += ", ";
@@ -904,12 +1054,12 @@ vector<string> TableManager::GetTableRotationPatternInRealDummyLength(bool leftS
             if (groupIndex < table[rowIndex].size() - 1)
             {
                 rowString += ", ";
-			}
+            }
         }
-		tableRotations.push_back(rowString);
+        tableRotations.push_back(rowString);
     }
 
-	//fix word length
+    //fix word length
     for (size_t rowIndex = 0; rowIndex < this->table.size(); rowIndex++)
     {
         int needAddDummyNum = maxRowInstNum - rowInstNum[rowIndex];
