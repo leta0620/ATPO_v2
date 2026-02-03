@@ -28,10 +28,15 @@ public:
 	void PrintSignificantNondominatedSolutions();
 	void WriteSignificantNondominatedSolutionsToFile(std::string fileName);
 
+	void WriteGlobalNondominatedSolutionsToFile(std::string fileName);
+
 private:
 	std::map<int, std::vector<TableManager>> allNondominatedSolutions;
 
 	std::map<CostEnum, std::vector<TableManager>> significantNondominatedSolutions;
+
+	std::map<int, std::vector<TableManager>> globalNondominatedSolutions;
+	void GenGlobalNondominatedSolutions();
 
 	void SelectTopNByCostEnum(CostEnum costEnum, int N);
 

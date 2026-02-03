@@ -34,6 +34,7 @@ void Output::WriteAllResultToFile(std::string fileName)
 		for (size_t i = 0; i < tableList.size(); ++i)
 		{
 			outFile << "Table " << i + 1 << ":\n";
+			outFile << "group size: " << tableList[i].GetGroupSize() << "\n";
 
 			// 遍歷cost並輸出，要有項目名稱和數值
 			auto costNameAndValue = tableList[i].GetCostNameAndCostValueString();
@@ -70,6 +71,7 @@ void Output::PrintAllResult()
 		for (size_t i = 0; i < tableList.size(); ++i)
 		{
 			cout << "Table " << i + 1 << ":\n";
+			cout << "group size: " << tableList[i].GetGroupSize() << "\n";
 			auto costNameAndValue = tableList[i].GetCostNameAndCostValueString();
 			for (auto cost : costNameAndValue)
 			{
@@ -126,6 +128,7 @@ void Output::PrintSignificantNondominatedSolutions()
 		for (size_t i = 0; i < sol.second.size(); ++i)
 		{
 			cout << "Significant Nondominated Solution " << i + 1 << ":\n";
+			cout << "group size: " << sol.second[i].GetGroupSize() << "\n";
 			auto costNameAndValue = sol.second[i].GetCostNameAndCostValueString();
 			for (auto cost : costNameAndValue)
 			{
@@ -168,7 +171,6 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 		}
 		else
 		{
-			// 改為：
 			costItem = sol.second[0].GetCostName(sol.first);
 			outFile << "Cost Item : " << costItem << "\n";
 		}
@@ -176,6 +178,7 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 		for (size_t i = 0; i < sol.second.size(); ++i)
 		{
 			outFile << "Significant Nondominated Solution " << i + 1 << ":\n";
+			outFile << "group size: " << sol.second[i].GetGroupSize() << "\n";
 			auto costNameAndValue = sol.second[i].GetCostNameAndCostValueString();
 			for (auto cost : costNameAndValue)
 			{
@@ -236,6 +239,100 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 	outFile.close();
 }
 
+void Output::WriteGlobalNondominatedSolutionsToFile(std::string fileName)
+{
+	GenGlobalNondominatedSolutions();
+	ofstream outFile(fileName);
+	if (!outFile.is_open())
+	{
+		cerr << "Error opening file: " << fileName << endl;
+		return;
+	}
+	for (auto& [round, tableList] : globalNondominatedSolutions)
+	{
+		outFile << "Round " << round << " Global Nondominated Results:\n";
+		for (size_t i = 0; i < tableList.size(); ++i)
+		{
+			outFile << "Table " << i + 1 << ":\n";
+			outFile << "group size: " << tableList[i].GetGroupSize() << "\n";
+			// 遍歷cost並輸出，要有項目名稱和數值
+			auto costNameAndValue = tableList[i].GetCostNameAndCostValueString();
+			for (auto cost : costNameAndValue)
+			{
+				outFile << cost.first << ":" << cost.second << "\t";
+			}
+			outFile << "\n";
+			auto tableStrings = tableList[i].GetTableStringFormat();
+			auto rotationStrings = tableList[i].GetTableRotationFormat(leftS);
+			for (const auto& rowString : tableStrings)
+			{
+				outFile << rowString << "\n";
+			}
+			outFile << "Rotations:\n";
+			for (const auto& rotationString : rotationStrings)
+			{
+				outFile << rotationString << "\n";
+			}
+			outFile << "\n";
+		}
+		outFile << "----------------------------------------\n";
+	}
+}
+
+void Output::GenGlobalNondominatedSolutions()
+{
+	// TO DO: implement global nondominated solution generation logic
+	auto doesADominateB = [](const std::unordered_map<CostEnum, double>& aCost, const std::unordered_map<CostEnum, double>& bCost) -> bool {
+		bool aBetterInAtLeastOne = false;
+		for (size_t i = 0; i < aCost.size(); ++i)
+		{
+			auto it = aCost.find(static_cast<CostEnum>(i));
+			if (it != aCost.end())
+			{
+				int aValue = it->second;
+				int bValue = bCost.at(static_cast<CostEnum>(i));
+				if (aValue > bValue)
+				{
+					return false; // a is worse in this objective
+				}
+				else if (aValue < bValue)
+				{
+					aBetterInAtLeastOne = true; // a is better in this objective
+				}
+			}
+		}
+		return aBetterInAtLeastOne;
+	};
+
+	globalNondominatedSolutions.clear();
+
+	for (auto& [round, tableList] : allNondominatedSolutions)
+	{
+		for (auto& table : tableList)
+		{
+			bool isDominated = false;
+			for (auto& [gRound, gTableList] : globalNondominatedSolutions)
+			{
+				for (auto& gTable : gTableList)
+				{
+					if (doesADominateB(gTable.GetCostMap(), table.GetCostMap()))
+					{
+						isDominated = true;
+						break;
+					}
+				}
+				if (isDominated)
+				{
+					break;
+				}
+			}
+			if (!isDominated)
+			{
+				globalNondominatedSolutions[round].push_back(table);
+			}
+		}
+	}
+}
 
 void Output::SelectTopNByCostEnum(CostEnum costEnum, int N)
 {
