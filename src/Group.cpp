@@ -79,3 +79,16 @@ std::pair<std::string, CellRotation> Group::GetLastDeviceUnitWhoAndRotation()
 		return { "", CellRotation::ERROR };
 	}
 }
+
+void Group::FlipGroupRotation()
+{
+	std::vector<DeviceUnit> newDeviceUnits;
+	while (!deviceUnits.empty())
+	{
+		DeviceUnit unit = deviceUnits.back();
+		deviceUnits.pop_back();
+		unit.FlipRotation();
+		newDeviceUnits.push_back(unit);
+	}
+	this->deviceUnits = newDeviceUnits;
+}

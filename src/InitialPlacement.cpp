@@ -301,6 +301,7 @@ void InitialPlacement::CalculateInitialTableList()
 						else {
 							nowGroup = dummyGroup;   // dummy group（用預設建構）
 						}
+						nowGroup.FlipGroupRotation();
 						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
 					}
 					else
@@ -325,6 +326,7 @@ void InitialPlacement::CalculateInitialTableList()
 						else {
 							nowGroup = dummyGroup;   // dummy group（用預設建構）
 						}
+						nowGroup.FlipGroupRotation();
 						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
 
 						placeRow = (this->rowSize / 2) - j;
@@ -347,6 +349,7 @@ void InitialPlacement::CalculateInitialTableList()
 						else {
 							nowGroup = dummyGroup;   // dummy group（用預設建構）
 						}
+						nowGroup.FlipGroupRotation();
 						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
 					}
 				}
@@ -372,6 +375,7 @@ void InitialPlacement::CalculateInitialTableList()
 					else {
 						nowGroup = dummyGroup;   // dummy group（用預設建構）
 					}
+					nowGroup.FlipGroupRotation();
 					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
 
 					placeRow = (this->rowSize / 2) - 1 - j;
@@ -394,6 +398,7 @@ void InitialPlacement::CalculateInitialTableList()
 					else {
 						nowGroup = dummyGroup;   // dummy group（用預設建構）
 					}
+					nowGroup.FlipGroupRotation();
 					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
 				}
 			}

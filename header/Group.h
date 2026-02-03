@@ -33,6 +33,8 @@ public:
 		return typeHash;
 	}
 
+	void FlipGroupRotation();
+
 	std::pair<std::string, CellRotation> GetFirstDeviceUnitWhoAndRotation();
 	std::pair<std::string, CellRotation> GetLastDeviceUnitWhoAndRotation();
 
