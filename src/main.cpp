@@ -167,5 +167,7 @@ int main(int argc, char* argv[]) {
 	output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "output_significant.txt");
 	output.PrintSignificantNondominatedSolutions();
 
+	output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "output_global_nondominated.txt");
+
 	return 0;
 }
