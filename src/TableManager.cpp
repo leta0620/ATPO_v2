@@ -573,7 +573,11 @@ void TableManager::CalculateSpetationCost() {
         }
     }
 
-    costMap[CostEnum::sperationCost] = total_sigma;
+    constexpr double kEps = 1e-12;           // Avoid delete 0
+    double sigma = total_sigma;
+
+    if (sigma < kEps) sigma = kEps;          // clamp
+    costMap[CostEnum::sperationCost] = 1.0 / sigma;
 }
 
 // =======================
