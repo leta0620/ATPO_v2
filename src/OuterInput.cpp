@@ -92,7 +92,7 @@ bool OuterInput::ParseCdlFile() {
 
 		string tmp;
 		ss >> tmp;
-		if (tmp == ".SUBCKT" || tmp == ".subskt")
+		if (tmp == ".SUBCKT" || tmp == ".subckt")
 		{
 			ss >> tmp;
 			string subcktName = tmp;
