@@ -26,6 +26,15 @@ SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, do
 	{
 		this->saMode = SAMode::CCMode;
 	}
+	else if (saMode == "InterleavingMode" || saMode == "2")
+	{
+		this->saMode = SAMode::InterleavingMode;
+		if (!initialTable.BuildInterleavingTable())
+		{
+			cerr << "Build interleaving table fail, set to RandomMode by default." << endl;
+			this->saMode = SAMode::RandomMode;
+		}
+	}
 	else
 	{
 		cerr << "Unknown SA Mode, set to RandomMode by default." << endl;
@@ -205,7 +214,6 @@ void SAManager::Perturbation(std::mt19937& gen)
 		}
 	};
 
-
 	if (this->saMode == SAMode::RandomMode)
 	{
 		// generate new solutions by swapping two group unit
@@ -242,6 +250,15 @@ void SAManager::Perturbation(std::mt19937& gen)
 		TableManager newTable = this->nowUseTable;
 
 		SwapCCTwoGroup(newTable, gen);
+		this->newTableList.push_back(newTable);
+	}
+	else if (this->saMode == SAMode::InterleavingMode)
+	{
+		// TO DO: Interleaving Mode Perturbation
+		TableManager newTable = this->nowUseTable;
+
+		// only use swap two column
+		SwapTwoCol(newTable, gen);
 		this->newTableList.push_back(newTable);
 	}
 	else

@@ -1103,3 +1103,59 @@ string TableManager::GetCostName(CostEnum costEnum)
         return "Unknown Cost";
 	}
 }
+
+
+bool TableManager::BuildInterleavingTable()
+{
+    std::unordered_map<std::string, int> groupTypeCount;
+
+    for (auto& r : this->table)
+    {
+        for (auto& g : r)
+        {
+            if (g.CheckAllDummyUnit())
+            {
+                continue;
+            }
+
+            std::string sNS = g.GetSymbolNameSequence();
+            // 產生反轉字串
+            std::string rev = sNS;
+            std::reverse(rev.begin(), rev.end());
+
+            // 先尋找正向 key
+            auto it = groupTypeCount.find(sNS);
+            if (it != groupTypeCount.end())
+            {
+                it->second += 1;
+            }
+            else
+            {
+                // 再尋找反向 key，若存在則視為同一類型（增加該反向 key 的計數）
+                auto it_rev = groupTypeCount.find(rev);
+                if (it_rev != groupTypeCount.end())
+                {
+                    it_rev->second += 1;
+                }
+                else
+                {
+                    // 都不存在，新增正向 key
+                    groupTypeCount.emplace(sNS, 1);
+                }
+            }
+        }
+    }
+
+    // 原有的 interleaving 建構邏輯被註解掉，保留列印 table 的行為方便除錯/檢查。
+    std::cout << "Interleaving Table:" << std::endl;
+    for (const auto& row : this->table)
+    {
+        for (const auto& group : row)
+        {
+            std::cout << group.GetTypeHash() << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    return true;
+}

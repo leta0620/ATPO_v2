@@ -33,6 +33,10 @@ public:
 		return typeHash;
 	}
 
+	int GetSymbolNameSequenceHash() const;
+
+	std::string GetSymbolNameSequence();
+
 	void FlipGroupRotation();
 
 	std::pair<std::string, CellRotation> GetFirstDeviceUnitWhoAndRotation();
@@ -41,6 +45,11 @@ public:
 	bool HasDummyUnit() const 
 	{
 		return dummyNum > 0;
+	}
+
+	bool CheckAllDummyUnit() const 
+	{
+		return dummyNum == deviceUnits.size();
 	}
 
 private:

@@ -67,6 +67,9 @@ public:
 	// 回傳對應 CostEnum 的成本名稱（若找不到會回傳 fallback 字串）
     std::string GetCostName(CostEnum costEnum);
 
+	// modify table to make it interleaving, return true if success, false if fail (if fail, the table will not be modified)
+	bool BuildInterleavingTable();
+
 private:
 	std::vector<std::vector<Group>> table;
 	int rowSize = 0;
