@@ -29,7 +29,7 @@ SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, do
 	else if (saMode == "InterleavingMode" || saMode == "2")
 	{
 		this->saMode = SAMode::InterleavingMode;
-		if (!initialTable.BuildInterleavingTable())
+		if (!this->initialTable.BuildInterleavingTable())
 		{
 			cerr << "Build interleaving table fail, set to RandomMode by default." << endl;
 			this->saMode = SAMode::RandomMode;
@@ -259,6 +259,11 @@ void SAManager::Perturbation(std::mt19937& gen)
 
 		// only use swap two column
 		SwapTwoCol(newTable, gen);
+
+		// print the new table for debug
+		cout << "New Table after Swap Two Column in Interleaving Mode:" << endl;
+		newTable.PrintTableToConsole();
+
 		this->newTableList.push_back(newTable);
 	}
 	else

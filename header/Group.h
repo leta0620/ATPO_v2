@@ -52,6 +52,8 @@ public:
 		return dummyNum == deviceUnits.size();
 	}
 
+	void BuildAllDummyGroup(int groupSize);
+
 private:
 	//std::string name;
 	std::vector<DeviceUnit> deviceUnits;

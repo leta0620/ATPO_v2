@@ -112,3 +112,21 @@ std::string Group::GetSymbolNameSequence()
 	}
 	return concatenatedNames;
 }
+
+void Group::BuildAllDummyGroup(int groupSize)
+{
+	this->deviceUnits.clear();
+	DeviceUnit dummyUnit;
+	dummyUnit.SetSymbol("d");
+	dummyUnit.SetInstName("d");
+	dummyUnit.SetAnalogCellType("DUMMY");
+	dummyUnit.SetWidth(1);
+	dummyUnit.SetRotation(CellRotation::R0);
+
+	for (int i = 0; i < groupSize; i++)
+	{
+		this->deviceUnits.push_back(dummyUnit);
+	}
+	this->dummyNum = groupSize;
+	this->CalculateTypeHash();
+}
