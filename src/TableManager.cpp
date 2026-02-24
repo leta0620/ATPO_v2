@@ -1108,6 +1108,7 @@ string TableManager::GetCostName(CostEnum costEnum)
 bool TableManager::BuildInterleavingTable()
 {
     std::unordered_map<std::string, int> groupTypeCount;
+    unordered_map<string, Group> groupTypeExample;
 
     for (auto& r : this->table)
     {
@@ -1131,7 +1132,7 @@ bool TableManager::BuildInterleavingTable()
             }
             else
             {
-                // 再尋找反向 key，若存在則視為同一類型（增加該反向 key 的計數）
+                // find reverse key
                 auto it_rev = groupTypeCount.find(rev);
                 if (it_rev != groupTypeCount.end())
                 {
@@ -1139,20 +1140,88 @@ bool TableManager::BuildInterleavingTable()
                 }
                 else
                 {
-                    // 都不存在，新增正向 key
+                    // add new key
                     groupTypeCount.emplace(sNS, 1);
+                    groupTypeExample.emplace(sNS, g);
                 }
             }
         }
     }
 
+	// build interleaving table
+	vector<vector<Group>> interleavingTable;
+    for (auto& item : groupTypeCount)
+    {
+        std::string sNS = item.first;
+        int count = item.second;
+
+        while (count > 0)
+        {
+            if (count > rowSize)
+            {
+				vector<Group> rowGroups(rowSize);
+                for (int i = 0; i < rowSize; i++)
+                {
+					rowGroups[i] = groupTypeExample[sNS];
+                }
+                interleavingTable.push_back(rowGroups);
+                count -= rowSize;
+            }
+            else
+            {
+				int upDummy = (rowSize - count) / 2;
+				int downDummy = rowSize - count - upDummy;
+
+				int groupSize = groupTypeExample[sNS].GetDeviceUnits().size();
+                
+                Group dummyGroup;
+				dummyGroup.BuildAllDummyGroup(groupSize);
+
+                vector<Group> rowGroups;
+                for (int i = 0; i < upDummy; i++)
+                {
+                    rowGroups.push_back(dummyGroup);
+                }
+                for (int i = 0; i < count; i++)
+                {
+                    rowGroups.push_back(groupTypeExample[sNS]);
+				}
+                for (int i = 0; i < downDummy; i++)
+                {
+                    rowGroups.push_back(dummyGroup);
+                }
+                interleavingTable.push_back(rowGroups);
+				count = 0;
+            }
+		}
+	}
+
+	this->table.clear();
+	this->table.resize(rowSize);
+	int colNum = interleavingTable.size();
+    for (int r = 0; r < rowSize; r++)
+    {
+		table[r].resize(colNum);
+	}
+	
+    for (int c = 0; c < colNum; c++)
+    {
+        for (int r = 0; r < rowSize; r++)
+        {
+            table[r][c] = interleavingTable[c][r];
+        }
+	}
+
+
+    //this->table = interleavingTable;
+
     // 原有的 interleaving 建構邏輯被註解掉，保留列印 table 的行為方便除錯/檢查。
     std::cout << "Interleaving Table:" << std::endl;
-    for (const auto& row : this->table)
+    for (auto& row : this->table)
     {
-        for (const auto& group : row)
+        for (auto& group : row)
         {
-            std::cout << group.GetTypeHash() << " ";
+            std::cout << group.GetSymbolNameSequence() << " ";
         }
         std::cout << std::endl;
     }
