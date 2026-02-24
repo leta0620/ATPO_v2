@@ -92,3 +92,23 @@ void Group::FlipGroupRotation()
 	}
 	this->deviceUnits = newDeviceUnits;
 }
+
+int Group::GetSymbolNameSequenceHash() const
+{
+	std::string concatenatedNames;
+	for (const auto& unit : this->deviceUnits)
+	{
+		concatenatedNames += unit.GetSymbol();
+	}
+	return int(std::hash<std::string>{}(concatenatedNames));
+}
+
+std::string Group::GetSymbolNameSequence()
+{
+	std::string concatenatedNames;
+	for (const auto& unit : this->deviceUnits)
+	{
+		concatenatedNames += unit.GetSymbol();
+	}
+	return concatenatedNames;
+}

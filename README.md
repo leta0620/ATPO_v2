@@ -9,7 +9,6 @@ A small C++ project organized with CMake so it can be built on Visual Studio (Wi
 │  ├─ DeviceUnit.h
 │  ├─ Group.h
 │  ├─ InitialPlacement.h
-│  ├─ Interleaving.h
 │  ├─ IntermidiatePlacement.h
 │  ├─ NetListLookupTable.h
 │  ├─ NetlistUnit.h
@@ -23,7 +22,6 @@ A small C++ project organized with CMake so it can be built on Visual Studio (Wi
    ├─ DeviceUnit.cpp
    ├─ Group.cpp
    ├─ InitialPlacement.cpp
-   ├─ Interleaving.cpp
    ├─ IntermidiatePlacement.cpp
    ├─ NetListLookupTable.cpp
    ├─ NetlistUnit.cpp
@@ -34,13 +32,13 @@ A small C++ project organized with CMake so it can be built on Visual Studio (Wi
    └─ Test.cpp
 ```
 
-## Prerequisites | 先決條件
+## Prerequisites
 ```
 1. 安裝Visual Studio 2022。
 2. 安裝CMAKE(CMake ≥ 3.20)。
 ```
 
-## Build & Run on Windows (Visual Studio) | 在 Windows / VS 編譯與執行
+## Build & Run on Windows (Visual Studio)
 先在資料夾中新增build資料夾，並用 CMake 產生 .sln，使用CMAKE，並輸入：
 ```
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
@@ -50,7 +48,7 @@ cmake --build build --config Debug
 接著用 VS 打開：build/AnalogTransistorPlacementOptimizer.sln
 在 Solution Explorer 對 ATPO_v2 右鍵 → 設為啟動專案 → ctrl+F5執行。
 
-## Build & Run on Windows (g++) | 在 Linux 編譯與執行
+## Build & Run on Windows/linux (g++)
 ```
 mkdir build
 cd build
@@ -77,7 +75,7 @@ e.g. class SAManager{};
 *合併遠端(github)主幹請使用github網頁提交merge request，若發生衝突無法提交合併申請，請先在本地端將main分支pull下來到最新版，並且將目前main分支的內容合併到自己的分支中，解決完衝突後，重新將自己的分支推上去，再從網頁提交合併。
 
 ## command example
-sa_mode: 0 = random mode / 1 = CC mode
+sa_mode: 0 = random mode / 1 = CC mode / 2 = Interleaving mode
 ```
 <groupSize> <rowSize> <CDL_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D> <mode> <sa_round_per_temp>
 
