@@ -10,7 +10,8 @@ enum class CostEnum
 	ccCost,
 	rCost,
 	cCost,
-	sperationCost
+	sperationCost,
+	dummyCost
 };
 
 class TableManager
@@ -96,4 +97,5 @@ private:
 	void CalculateRCost();
 	void CalculateCCost();
 	void CalculateSpetationCost();
+	void CalculateDummyCost();
 };

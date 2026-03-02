@@ -260,10 +260,6 @@ void SAManager::Perturbation(std::mt19937& gen)
 		// only use swap two column
 		SwapTwoCol(newTable, gen);
 
-		// print the new table for debug
-		cout << "New Table after Swap Two Column in Interleaving Mode:" << endl;
-		newTable.PrintTableToConsole();
-
 		this->newTableList.push_back(newTable);
 	}
 	else

@@ -1215,16 +1215,21 @@ bool TableManager::BuildInterleavingTable()
 
     //this->table = interleavingTable;
 
-    // 原有的 interleaving 建構邏輯被註解掉，保留列印 table 的行為方便除錯/檢查。
-    std::cout << "Interleaving Table:" << std::endl;
-    for (auto& row : this->table)
-    {
-        for (auto& group : row)
-        {
-            std::cout << group.GetSymbolNameSequence() << " ";
-        }
-        std::cout << std::endl;
-    }
+    //// 原有的 interleaving 建構邏輯被註解掉，保留列印 table 的行為方便除錯/檢查。
+    //std::cout << "Interleaving Table:" << std::endl;
+    //for (auto& row : this->table)
+    //{
+    //    for (auto& group : row)
+    //    {
+    //        std::cout << group.GetSymbolNameSequence() << " ";
+    //    }
+    //    std::cout << std::endl;
+    //}
 
     return true;
+}
+
+void TableManager::CalculateDummyCost()
+{
+
 }
