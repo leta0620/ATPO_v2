@@ -170,6 +170,7 @@ std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
     this->CalculateRCost();
     this->CalculateCCost();
     this->CalculateSpetationCost();
+	this->CalculateDummyCost();
     return this->costMap;
 }
 
@@ -855,24 +856,30 @@ std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValu
     for (const auto& [costEnum, costValue] : this->costMap)
     {
         std::string costName;
-        switch (costEnum)
-        {
-        case CostEnum::ccCost:
-            costName = "System variation";
-            break;
-        case CostEnum::rCost:
-            costName = "Routing Length";
-            break;
-        case CostEnum::cCost:
-            costName = "Coupling capacitance";
-            break;
-        case CostEnum::sperationCost:
-            costName = "Dispersion";
-            break;
-        default:
-            costName = "Unknown Cost";
-            break;
-        }
+
+		costName = GetCostName(costEnum);
+
+   //     switch (costEnum)
+   //     {
+   //     case CostEnum::ccCost:
+   //         costName = "System variation";
+   //         break;
+   //     case CostEnum::rCost:
+   //         costName = "Routing Length";
+   //         break;
+   //     case CostEnum::cCost:
+   //         costName = "Coupling capacitance";
+   //         break;
+   //     case CostEnum::sperationCost:
+   //         costName = "Dispersion";
+   //         break;
+   //     case CostEnum::dummyCost:
+   //         costName = "Dummy Penalty";
+			//break;
+   //     default:
+   //         costName = "Unknown Cost";
+   //         break;
+   //     }
         costNameAndValue.push_back(pair<string, double>(costName, costValue));
     }
     return costNameAndValue;
@@ -1098,6 +1105,10 @@ string TableManager::GetCostName(CostEnum costEnum)
     {
         return "Dispersion";
     }
+    else if (costEnum == CostEnum::dummyCost)
+    {
+        return "Dummy Penalty";
+	}
     else
     {
         return "Unknown Cost";
@@ -1150,6 +1161,7 @@ bool TableManager::BuildInterleavingTable()
 
 	// build interleaving table
 	vector<vector<Group>> interleavingTable;
+	vector<vector<Group>> dummyGroupTable;
     for (auto& item : groupTypeCount)
     {
         std::string sNS = item.first;
@@ -1190,11 +1202,27 @@ bool TableManager::BuildInterleavingTable()
                 {
                     rowGroups.push_back(dummyGroup);
                 }
-                interleavingTable.push_back(rowGroups);
+                dummyGroupTable.push_back(rowGroups);
 				count = 0;
             }
 		}
 	}
+
+	// merge interleaving table and dummy group table
+	int dummyRowSize = dummyGroupTable.size();
+	int dummyMiddleIndex = dummyRowSize / 2;
+
+	int dummyIndex = 0;
+    for (; dummyIndex < dummyMiddleIndex; dummyIndex++)
+    {
+		interleavingTable.insert(interleavingTable.begin(), dummyGroupTable[dummyIndex]);
+    }
+
+    for (; dummyIndex < dummyRowSize; dummyIndex++)
+    {
+        interleavingTable.push_back(dummyGroupTable[dummyIndex]);
+    }
+
 
 	this->table.clear();
 	this->table.resize(rowSize);
@@ -1212,24 +1240,42 @@ bool TableManager::BuildInterleavingTable()
         }
 	}
 
-
-    //this->table = interleavingTable;
-
-    //// 原有的 interleaving 建構邏輯被註解掉，保留列印 table 的行為方便除錯/檢查。
-    //std::cout << "Interleaving Table:" << std::endl;
-    //for (auto& row : this->table)
-    //{
-    //    for (auto& group : row)
-    //    {
-    //        std::cout << group.GetSymbolNameSequence() << " ";
-    //    }
-    //    std::cout << std::endl;
-    //}
+    std::cout << "Interleaving Table:" << std::endl;
+    for (auto& row : this->table)
+    {
+        for (auto& group : row)
+        {
+            std::cout << group.GetSymbolNameSequence() << " ";
+        }
+        std::cout << std::endl;
+    }
 
     return true;
 }
 
 void TableManager::CalculateDummyCost()
 {
+	int nowGroupSize = table[0][0].GetDeviceUnits().size();
 
+	double rowMid = nowGroupSize * static_cast<double>(rowSize - 1) / 2.0;
+	double colMid = nowGroupSize * static_cast<double>(colSize - 1) / 2.0;
+
+    double totalCost = 0.0;
+    for (int r = 0; r < rowSize; ++r) {
+        for (int c = 0; c < colSize; ++c) {
+			vector<DeviceUnit> deviceUnits = table[r][c].GetDeviceUnits();
+            for (int i = 0; i < deviceUnits.size(); ++i) {
+                const DeviceUnit& du = deviceUnits[i];
+                if (du.GetSymbol() == "d") {
+                    double x = i + c * nowGroupSize;
+                    double y = r;
+					// Calculate distance from the center of the table
+                    double dist = sqrt((x - colMid) * (x - colMid) + (y - rowMid) * (y - rowMid));
+                    totalCost += 1 / dist;
+                }
+			}
+            
+        }
+    }
+	costMap[CostEnum::dummyCost] = totalCost;
 }

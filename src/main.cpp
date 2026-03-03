@@ -26,12 +26,6 @@ int main(int argc, char* argv[]) {
 		Test test;
 		return 0;
 	}
-
-	//if (argc != 8) {
-	//	Test test; // Run tests
-	//	cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <Pattern_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D>" << endl;
-	//	return 1;
-	//}
 	
 	if (argc != 9) {
 		Test test; // Run tests
