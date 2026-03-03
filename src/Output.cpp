@@ -102,7 +102,7 @@ void Output::SelectSignificantNondominatedSolutions()
 	// TO DO: implement selection logic
 
 	// select top 5 significant solutions by each cost enum
-	for (int costEnumInt = 0; costEnumInt < 4; ++costEnumInt)
+	for (int costEnumInt = 0; costEnumInt < 5; ++costEnumInt)
 	{
 		CostEnum costEnum = static_cast<CostEnum>(costEnumInt);
 		SelectTopNByCostEnum(costEnum, 5);
@@ -127,7 +127,7 @@ void Output::PrintSignificantNondominatedSolutions()
 
 		for (size_t i = 0; i < sol.second.size(); ++i)
 		{
-			cout << "Significant Nondominated Solution " << i + 1 << ":\n";
+			cout << "Significant Nondominated Solution first " << 10 + i*20 << "% :\n";
 			cout << "group size: " << sol.second[i].GetGroupSize() << "\n";
 			auto costNameAndValue = sol.second[i].GetCostNameAndCostValueString();
 			for (auto cost : costNameAndValue)
@@ -177,7 +177,7 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 
 		for (size_t i = 0; i < sol.second.size(); ++i)
 		{
-			outFile << "Significant Nondominated Solution " << i + 1 << ":\n";
+			outFile << "Significant Nondominated Solution first " << 10 + i * 20 << "% :\n";
 			outFile << "group size: " << sol.second[i].GetGroupSize() << "\n";
 			auto costNameAndValue = sol.second[i].GetCostNameAndCostValueString();
 			for (auto cost : costNameAndValue)

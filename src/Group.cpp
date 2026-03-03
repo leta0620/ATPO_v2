@@ -21,6 +21,11 @@ void Group::AddDeviceUnit(const DeviceUnit& deviceUnit)
 
 void Group::SetDeviceUnits(const std::vector<DeviceUnit>& units)
 {
+	if (this->dummyNum > 0)
+	{
+		this->dummyNum = 0;
+	}
+
 	this->deviceUnits = units;
 	this->CalculateTypeHash();
 
@@ -128,5 +133,6 @@ void Group::BuildAllDummyGroup(int groupSize)
 		this->deviceUnits.push_back(dummyUnit);
 	}
 	this->dummyNum = groupSize;
+	this->groupNum = groupSize;
 	this->CalculateTypeHash();
 }
