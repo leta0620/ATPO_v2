@@ -1,0 +1,19 @@
+*Custom Compiler Version X-2025.06-2
+*Sat Mar  7 14:24:52 2026
+
+*.SCALE METER
+*.LDD
+
+********************************************************************************
+* Library          : Test
+* Cell             : CM_fun_test
+* View             : schematic
+* View Search List : auCdl schematic
+* View Stop List   : auCdl
+********************************************************************************
+.SUBCKT CM_fun_test
+MD DD G2 BD VSS nch_lvt_mac l=16n nfin=4 m=64
+MC G1 G2 AC VSS nch_lvt_mac l=16n nfin=4 m=64
+MB BD G1 VSS VSS nch_lvt_mac l=16n nfin=4 m=64
+MA AC G1 VSS VSS nch_lvt_mac l=16n nfin=4 m=64
+.ENDS

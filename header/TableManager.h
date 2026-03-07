@@ -11,7 +11,9 @@ enum class CostEnum
 	rCost,
 	cCost,
 	sperationCost,
-	dummyCost
+	dummyCost,
+	routingcomplexityCost,
+	mildCost
 };
 
 class TableManager
@@ -21,6 +23,7 @@ public:
 	TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist);
 
 	void SetNetlistLookupTable(NetlistLookupTable& netlist) { this->netlist = netlist; }
+	void SetCdlFilePath(const std::string& path) { cdlFilePath = path; } //2026/03/08 updated
 
 	// **this function will re-initialize the table, make sure the old data is not needed**
 	void SetTableSize(int rowSize, int colSize);
@@ -81,7 +84,7 @@ private:
 	int minDummyWidthInUnit = 1; // default min dummy width
 
 	NetlistLookupTable netlist;
-
+	std::string cdlFilePath; //2026/03/08 updated
 	void InitializeTable();
 	// check colume rule(same type sequential)
 	bool ColumnRuleCheck(int rowPlace, int colPlace, Group& group);
@@ -98,4 +101,6 @@ private:
 	void CalculateCCost();
 	void CalculateSpetationCost();
 	void CalculateDummyCost();
+	double CalculateRoutingComplexity();
+	void CalculateMILDCost();
 };

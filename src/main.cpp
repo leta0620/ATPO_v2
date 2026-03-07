@@ -78,7 +78,8 @@ int main(int argc, char* argv[]) {
 
 	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable());
 	vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
-
+	for (auto& t : initialTableList)
+		t.SetCdlFilePath(cdl_input_file_path);//Add tablemanager known  parser 
 
 
 	map<int, vector<TableManager>> allNondominatedSolutions;
