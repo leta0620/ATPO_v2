@@ -6,7 +6,9 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-
+#include <fstream>
+#include <sstream>
+#include <iomanip>
 #include "TableManager.h"
 
 using namespace std;
@@ -171,6 +173,8 @@ std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
     this->CalculateCCost();
     this->CalculateSpetationCost();
 	this->CalculateDummyCost();
+    this->costMap[CostEnum::routingcomplexityCost] = this->CalculateRoutingComplexity(); // ← 新增
+    this->CalculateMILDCost();
     return this->costMap;
 }
 
@@ -366,135 +370,185 @@ void TableManager::CalculateCCost()
 {
     using std::string;
     using std::vector;
+    using std::unordered_map;
+    using std::unordered_set;
 
     const int R = rowSize;
     const int C = colSize;
-    if (R <= 0 || C <= 0) {
-        costMap[CostEnum::cCost] = 0.0;
-        return;
-    }
+    if (R <= 0 || C <= 0) { costMap[CostEnum::cCost] = 0.0; return; }
 
     auto is_dummy = [](const string& s) -> bool {
-        if (s.empty()) return true;
-        if (s == "d" || s == "D") return true;
-        return false;
+        return s.empty() || s == "d";
         };
 
-    // -----------------------------
-    // Step0: build flattened grid
-    // grid[r][i] = symbol of i-th device unit in row r
-    // -----------------------------
+    // ============================================================
+    // [Part 1] Lateral
+    // ============================================================
     vector<vector<string>> grid(R);
-    for (int r = 0; r < R; ++r) {
-        for (int c = 0; c < C; ++c) {
-            const auto& units = table[r][c].GetDeviceUnits();
-            for (const auto& du : units) {
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            for (const auto& du : table[r][c].GetDeviceUnits())
                 grid[r].push_back(du.GetSymbol());
-            }
-        }
-    }
 
-    const int W = static_cast<int>(grid[0].size());
-    if (W <= 0) {
-        costMap[CostEnum::cCost] = 0.0;
-        return;
-    }
+    const int W = (int)grid[0].size();
+    if (W <= 0) { costMap[CostEnum::cCost] = 0.0; return; }
+    for (int r = 1; r < R; ++r)
+        if ((int)grid[r].size() != W) { costMap[CostEnum::cCost] = 0.0; return; }
 
-    // Ensure rectangular
-    for (int r = 1; r < R; ++r) {
-        if ((int)grid[r].size() != W) {
-            costMap[CostEnum::cCost] = 0.0;
-            return;
-        }
-    }
-
-    // -----------------------------
-    // Example 1 weights (your choice)
-    // Make P2 and P3 close but ordered
-    // -----------------------------
-    const double wH = 1.0;
-    const double wV = 0.26;
-
-    // -----------------------------
-    // Step1: per-device local counts
-    // H_local / V_local (endpoints +1)
-    // -----------------------------
+    const double wH = 1.0, wV = 0.26;
     vector<vector<int>> H_local(R, vector<int>(W, 0));
     vector<vector<int>> V_local(R, vector<int>(W, 0));
 
-    // Horizontal transitions
-    for (int r = 0; r < R; ++r) {
-        for (int i = 0; i < W - 1; ++i) {
-            const string& a = grid[r][i];
-            const string& b = grid[r][i + 1];
+    for (int r = 0; r < R; ++r)
+        for (int i = 0; i < W - 1; ++i)
+        {
+            const string& a = grid[r][i]; const string& b = grid[r][i + 1];
             if (is_dummy(a) || is_dummy(b)) continue;
-            if (a != b) {
-                H_local[r][i] += 1;
-                H_local[r][i + 1] += 1;
-            }
+            if (a != b) { H_local[r][i]++; H_local[r][i + 1]++; }
         }
-    }
-
-    // Vertical transitions (COLUMN direction)
-    for (int i = 0; i < W; ++i) {
-        for (int r = 0; r < R - 1; ++r) {
-            const string& a = grid[r][i];
-            const string& b = grid[r + 1][i];
+    for (int i = 0; i < W; ++i)
+        for (int r = 0; r < R - 1; ++r)
+        {
+            const string& a = grid[r][i]; const string& b = grid[r + 1][i];
             if (is_dummy(a) || is_dummy(b)) continue;
-            if (a != b) {
-                V_local[r][i] += 1;
-                V_local[r + 1][i] += 1;
-            }
+            if (a != b) { V_local[r][i]++; V_local[r + 1][i]++; }
         }
-    }
 
-    // -----------------------------
-    // Step2: per-type accumulation
-    // row_cost(u)=H_local(u), col_cost(u)=V_local(u)
-    // -----------------------------
-    std::unordered_map<string, double> type_row_sum; // �U H_local(u)
-    std::unordered_map<string, double> type_col_sum; // �U V_local(u)
-    std::unordered_map<string, long long> type_cnt;  // N_type
-
-    for (int r = 0; r < R; ++r) {
-        for (int i = 0; i < W; ++i) {
+    unordered_map<string, double> type_row_sum, type_col_sum;
+    unordered_map<string, long long> type_cnt;
+    for (int r = 0; r < R; ++r)
+        for (int i = 0; i < W; ++i)
+        {
             const string& t = grid[r][i];
             if (is_dummy(t)) continue;
+            type_row_sum[t] += H_local[r][i];
+            type_col_sum[t] += V_local[r][i];
+            type_cnt[t]++;
+        }
 
-            type_row_sum[t] += (double)H_local[r][i];
-            type_col_sum[t] += (double)V_local[r][i];
-            type_cnt[t] += 1;
+    double sum_avg_row = 0.0, sum_avg_col = 0.0;
+    int type_num = 0;
+    for (const auto& kv : type_cnt)
+    {
+        const string& t = kv.first; long long cnt = kv.second;
+        if (cnt <= 0) continue;
+        sum_avg_row += type_row_sum[t] / cnt;
+        sum_avg_col += type_col_sum[t] / cnt;
+        type_num++;
+    }
+    const double C_row = type_num > 0 ? sum_avg_row / type_num : 0.0;
+    const double C_col = type_num > 0 ? sum_avg_col / type_num : 0.0;
+    const double lateral = wH * C_row + wV * C_col;
+
+    // ============================================================
+    // [Part 2] Fringe
+    // ============================================================
+    const double weightCoeff = 1.5;
+    const double wLateral = 1.0;
+    const double wFringe = 1.0 / static_cast<double>(R * C);
+
+    auto groupSig = [&](int r, int c) -> string {
+        unordered_set<string> s;
+        for (const auto& du : table[r][c].GetDeviceUnits())
+            if (!is_dummy(du.GetSymbol())) s.insert(du.GetSymbol());
+        vector<string> v(s.begin(), s.end());
+        std::sort(v.begin(), v.end());
+        string sig;
+        for (const auto& x : v) sig += x;
+        return sig;
+        };
+
+    vector<vector<string>> sig(R, vector<string>(C));
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            sig[r][c] = groupSig(r, c);
+
+    auto allAboveSame = [&](int r, int c) -> bool {
+        if (r == 0) return false;
+        for (int rr = 0; rr < r; ++rr)
+            if (sig[rr][c] != sig[r][c]) return false;
+        return true;
+        };
+
+    auto allBelowSame = [&](int r, int c) -> bool {
+        if (r == R - 1) return false;
+        for (int rr = r + 1; rr < R; ++rr)
+            if (sig[rr][c] != sig[r][c]) return false;
+        return true;
+        };
+
+    unordered_map<string, double> typeCongestSum;
+    unordered_map<string, int>    typeCongestCnt;
+
+    for (int r = 0; r < R; ++r)
+    {
+        for (int c = 0; c < C; ++c)
+        {
+            vector<string> unitSyms;
+            for (const auto& du : table[r][c].GetDeviceUnits())
+                if (!is_dummy(du.GetSymbol()))
+                    unitSyms.push_back(du.GetSymbol());
+
+            int n = (int)unitSyms.size();
+            if (n == 0) continue;
+
+            bool aboveBoundary = (r == 0);
+            bool belowBoundary = (r == R - 1);
+            bool aboveSame = aboveBoundary ? false : allAboveSame(r, c);
+            bool belowSame = belowBoundary ? false : allBelowSame(r, c);
+
+            int numer = 3;
+            bool aboveOK = aboveBoundary || aboveSame;
+            bool belowOK = belowBoundary || belowSame;
+            if (!aboveOK && !belowOK) numer += 2;
+
+            double weight = 1.0;
+            bool aboveDiff = !aboveBoundary && !aboveSame;
+            bool belowDiff = !belowBoundary && !belowSame;
+
+            if (aboveDiff && belowDiff)
+            {
+                string aboveSigVal = (r > 0) ? sig[r - 1][c] : "";
+                string belowSigVal = (r < R - 1) ? sig[r + 1][c] : "";
+                if (aboveSigVal == belowSigVal)
+                    weight = weightCoeff * weightCoeff;
+                else
+                    weight = weightCoeff * weightCoeff * weightCoeff;
+            }
+            else if (aboveDiff || belowDiff)
+            {
+                weight = weightCoeff;
+            }
+
+            double congest = (static_cast<double>(numer) / n) * weight;
+
+            unordered_set<string> seenTypes;
+            for (const auto& sym : unitSyms)
+            {
+                if (seenTypes.count(sym)) continue;
+                seenTypes.insert(sym);
+                typeCongestSum[sym] += congest;
+                typeCongestCnt[sym]++;
+            }
         }
     }
 
-    // -----------------------------
-    // Step3: per-type average, then average over types
-    // C_row = avg_over_types(avg_row(type))
-    // C_col = avg_over_types(avg_col(type))
-    // final: Ccost = wH*C_row + wV*C_col
-    // -----------------------------
-    double sum_type_avg_row = 0.0;
-    double sum_type_avg_col = 0.0;
-    int type_num = 0;
+    // Step 6: average congestion per device type
+    unordered_map<string, double> typeAvgCongest;
+    vector<string> allTypes;
+    for (const auto& kv : typeCongestSum) allTypes.push_back(kv.first);
+    std::sort(allTypes.begin(), allTypes.end());
 
-    for (const auto& kv : type_cnt) {
-        const string& t = kv.first;
-        const long long cnt = kv.second;
-        if (cnt <= 0) continue;
+    for (const auto& sym : allTypes)
+        typeAvgCongest[sym] = typeCongestSum[sym] / typeCongestCnt[sym];
 
-        const double avg_row_t = type_row_sum[t] / (double)cnt;
-        const double avg_col_t = type_col_sum[t] / (double)cnt;
+    // Step 7: fringe = mean of avgCongest over all device types
+    double sumAvg = 0.0;
+    for (const auto& sym : allTypes)
+        sumAvg += typeAvgCongest[sym];
+    double fringe = (allTypes.size() > 0) ? sumAvg / (double)allTypes.size() : 0.0;
 
-        sum_type_avg_row += avg_row_t;
-        sum_type_avg_col += avg_col_t;
-        type_num += 1;
-    }
-
-    const double C_row = (type_num > 0) ? (sum_type_avg_row / (double)type_num) : 0.0;
-    const double C_col = (type_num > 0) ? (sum_type_avg_col / (double)type_num) : 0.0;
-
-    const double Ccost = wH * C_row + wV * C_col;
-    costMap[CostEnum::cCost] = Ccost;
+    costMap[CostEnum::cCost] = wLateral * lateral + wFringe * fringe;
 }
 
 
@@ -579,6 +633,220 @@ void TableManager::CalculateSpetationCost() {
 
     if (sigma < kEps) sigma = kEps;          // clamp
     costMap[CostEnum::sperationCost] = 1.0 / sigma;
+}
+
+double TableManager::CalculateRoutingComplexity()
+{
+    using std::string;
+    using std::vector;
+    using std::unordered_map;
+
+    struct GroupInfo {
+        int row;
+        int gc;
+        int xStart;
+        std::unordered_map<std::string, std::vector<int>> symXs;
+    };
+
+    vector<GroupInfo> allGroups;
+    int col_x = 0;
+
+    for (int r = 0; r < rowSize; ++r)
+    {
+        col_x = 0;
+        for (int c = 0; c < colSize; ++c)
+        {
+            GroupInfo gi;
+            gi.row = r;
+            gi.gc = c;
+            gi.xStart = col_x;
+
+            const auto& units = table[r][c].GetDeviceUnits();
+            for (const auto& du : units)
+            {
+                const string& sym = du.GetSymbol();
+                if (!sym.empty() && sym != "d")
+                    gi.symXs[sym].push_back(col_x);
+                ++col_x;
+            }
+            allGroups.push_back(gi);
+        }
+    }
+
+    if (allGroups.empty()) return 0.0;
+
+    // Build instName -> symbolName, then parse CDL
+    unordered_map<string, string> instToSymbol;
+    for (const auto& sym : netlist.GetAllSymbolNames())
+    {
+        NetlistUnit nu = netlist.GetNetlistUnit(sym);
+        instToSymbol[nu.GetInstName()] = sym;
+    }
+
+    unordered_map<string, std::unordered_set<string>> netSymbols;
+
+    std::ifstream cdlFile(cdlFilePath);
+    if (!cdlFile.is_open())
+    {
+        std::cerr << "[Routing] Cannot open CDL file: " << cdlFilePath << "\n";
+        return 0.0;
+    }
+
+    string line;
+    while (std::getline(cdlFile, line))
+    {
+        if (line.empty() || line[0] == '*' || line[0] == '.') continue;
+        std::istringstream iss(line);
+        string instName, netD, netG, netS, netB;
+        if (!(iss >> instName >> netD >> netG >> netS >> netB)) continue;
+
+        auto it = instToSymbol.find(instName);
+        if (it == instToSymbol.end()) continue;
+        const string& sym = it->second;
+
+        netSymbols[netD].insert(sym);
+        netSymbols[netG].insert(sym);
+        netSymbols[netS].insert(sym);
+    }
+    cdlFile.close();
+
+    // For each net, calculate routing length
+    double totalRC = 0.0;
+
+    for (const auto& kv : netSymbols)
+    {
+        const auto& symsInNet = kv.second;
+
+        double horizTotal = 0.0;
+        std::unordered_map<int, std::vector<int>> gcToRows;
+        std::unordered_map<int, int> gcCenterX;
+
+        for (const auto& gi : allGroups)
+        {
+            int minX = INT_MAX, maxX = INT_MIN;
+            bool found = false;
+
+            for (const auto& kvSym : gi.symXs)
+            {
+                if (!symsInNet.count(kvSym.first)) continue;
+                for (int x : kvSym.second) {
+                    minX = std::min(minX, x);
+                    maxX = std::max(maxX, x);
+                    found = true;
+                }
+            }
+
+            if (found)
+            {
+                horizTotal += (maxX - minX);
+                gcToRows[gi.gc].push_back(gi.row);
+                int totalUnits = 0;
+                for (const auto& kvSym : gi.symXs) totalUnits += (int)kvSym.second.size();
+                gcCenterX[gi.gc] = gi.xStart + totalUnits / 2;
+            }
+        }
+
+        double vertTotal = 0.0;
+        std::vector<int> activeCols;
+        for (auto& gcKv : gcToRows)
+        {
+            auto& rows = gcKv.second;
+            std::sort(rows.begin(), rows.end());
+            vertTotal += (rows.back() - rows.front());
+            activeCols.push_back(gcKv.first);
+        }
+        std::sort(activeCols.begin(), activeCols.end());
+
+        double hMidTotal = 0.0;
+        if (activeCols.size() >= 2)
+        {
+            int leftX = gcCenterX[activeCols.front()];
+            int rightX = gcCenterX[activeCols.back()];
+            hMidTotal = rightX - leftX;
+        }
+
+        totalRC += horizTotal + vertTotal + hMidTotal;
+    }
+
+    return totalRC;
+}
+
+void TableManager::CalculateMILDCost()
+{
+    using std::string;
+    using std::unordered_map;
+    using std::vector;
+
+    const double Lg = 1.0;
+
+    // ----------------------------------------------------------
+    // Compute w: total unit cells per row
+    // ----------------------------------------------------------
+    int w = 0;
+    if (rowSize > 0)
+        for (int c = 0; c < colSize; ++c)
+            w += (int)table[0][c].GetDeviceUnits().size();
+
+    if (w == 0)
+    {
+        costMap[CostEnum::mildCost] = 0.0;
+        return;
+    }
+
+    // ----------------------------------------------------------
+    // Step 1: For each device, collect 1/LOD of each unit cell
+    // ----------------------------------------------------------
+    unordered_map<string, double> sumInvLOD;
+    unordered_map<string, int>    unitCount;
+
+    for (int r = 0; r < rowSize; ++r)
+    {
+        int x = 0;                          // 0-based: x = 0 .. w-1
+        for (int c = 0; c < colSize; ++c)
+        {
+            const auto& units = table[r][c].GetDeviceUnits();
+            for (const auto& du : units)
+            {
+                const string& sym = du.GetSymbol();
+                if (!sym.empty() && sym != "d")
+                {
+                    double invLOD = 1.0 / (x + 0.5 * Lg)
+                        + 1.0 / (w - 1 - x + 0.5 * Lg);
+                    sumInvLOD[sym] += invLOD;
+                    unitCount[sym]++;
+                }
+                ++x;
+            }
+        }
+    }
+
+    if (sumInvLOD.size() < 2)
+    {
+        costMap[CostEnum::mildCost] = 0.0;
+        return;
+    }
+
+    // ----------------------------------------------------------
+    // Step 2: mean 1/LOD per device
+    // ----------------------------------------------------------
+    unordered_map<string, double> meanInvLOD;
+    for (const auto& kv : sumInvLOD)
+        meanInvLOD[kv.first] = kv.second / unitCount[kv.first];
+
+    // ----------------------------------------------------------
+    // Step 3: MILD = Σ_{k<l} |mean(1/LOD)_k - mean(1/LOD)_l|
+    // ----------------------------------------------------------
+    double mild = 0.0;
+    vector<string> symbols;
+    for (const auto& kv : meanInvLOD)
+        symbols.push_back(kv.first);
+    std::sort(symbols.begin(), symbols.end());
+
+    for (int i = 0; i < (int)symbols.size() - 1; ++i)
+        for (int j = i + 1; j < (int)symbols.size(); ++j)
+            mild += std::abs(meanInvLOD[symbols[i]] - meanInvLOD[symbols[j]]);
+
+    costMap[CostEnum::mildCost] = mild;
 }
 
 // =======================
@@ -1109,6 +1377,15 @@ string TableManager::GetCostName(CostEnum costEnum)
     {
         return "Dummy Penalty";
 	}
+    else if (costEnum == CostEnum::routingcomplexityCost)
+    {
+        return "Routing Complexity";
+    }
+
+    else if (costEnum == CostEnum::mildCost)
+    {
+        return "MILD";
+    }
     else
     {
         return "Unknown Cost";
