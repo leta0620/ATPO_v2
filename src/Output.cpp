@@ -7,7 +7,6 @@
 #include <limits>
 using namespace std; 
 
-
 //void Output::AddResultSingle(int round, TableManager& cTable)
 //{
 //	this->allNondominatedSolutions[round].push_back(cTable);
@@ -102,7 +101,7 @@ void Output::SelectSignificantNondominatedSolutions()
 	// TO DO: implement selection logic
 
 	// select top 5 significant solutions by each cost enum
-	for (int costEnumInt = 0; costEnumInt < 5; ++costEnumInt)
+	for (int costEnumInt = 0; costEnumInt < 7; ++costEnumInt)
 	{
 		CostEnum costEnum = static_cast<CostEnum>(costEnumInt);
 		SelectTopNByCostEnum(costEnum, 5);
