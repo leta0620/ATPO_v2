@@ -34,5 +34,6 @@ private:
 	//void InitialPathOrder();
 
 	void GroupAllocation();
+	void regularGroupAllocation();
 
 };
