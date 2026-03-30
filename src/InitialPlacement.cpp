@@ -5,7 +5,7 @@
 InitialPlacement::InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist) : groupSize(groupSize), rowSize(rowSize), colSize(0), netListLookupTable(netlist)
 {
 	//InitialTableList.resize(rowSize, TableManager(groupSize, rowSize, colSize, netListLookupTable));
-	this->regularGroupAllocation(); //floorplan
+	this->GroupAllocation(); //floorplan
 	this->CalculateInitialTableList(); //placement
 }
 

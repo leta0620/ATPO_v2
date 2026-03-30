@@ -8,6 +8,8 @@
 #include <mutex>
 #include <atomic>
 #include <random>
+#include <fstream>
+#include <filesystem>
 
 #include "IntermidiateParser.h"
 #include "TableManager.h"
@@ -16,8 +18,15 @@
 #include "Test.h"
 #include "Output.h"
 
-
 using namespace std;
+
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(path) _mkdir(path)
+#else
+#include <sys/stat.h>
+#define MKDIR(path) mkdir(path, 0777)
+#endif
 
 int main(int argc, char* argv[]) {
 	// input commandLine arguments : groupSize, rowSize, itermidiate_code_file_path, output_file_path, thread_num
@@ -152,17 +161,43 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	// delete intermediate file
+	if (remove(intermediate_code_file_path.c_str()) != 0) {
+		cerr << "Error: Failed to delete intermediate file." << endl;
+	}
+	else {
+		//cout << "Intermediate file deleted successfully.\n" << endl;
+	}
+
 	//後處理
+	// delete exist data in output folder
+	try {
+		for (const auto& entry : std::filesystem::directory_iterator(output_file_path)) {
+			std::filesystem::remove_all(entry.path());
+		}
+		//cout << "Existing data in output folder deleted successfully.\n" << endl;
+	}
+	catch (const std::exception& e) {
+		cerr << "Error removing existing data in output folder: " << e.what() << endl;
+	}
+
 	Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName());
 
-	output.WriteAllResultToFile(output_file_path + "output.txt");
+	output.WriteAllResultToFile(output_file_path + "all_results.txt");
 	//output.PrintAllResult();
 
-	output.SelectSignificantNondominatedSolutions();
-	output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "output_significant.txt");
-	output.PrintSignificantNondominatedSolutions();
+	//output.SelectSignificantNondominatedSolutions();
+	//output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "_significant.txt");
+	//output.PrintSignificantNondominatedSolutions();
 
-	output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "output_global_nondominated.txt");
+	//output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "_global_nondominated.txt");
 
+	output.SelectCoBetterSolution();
+	output.PrintCoBetterSolution(100);
+	output.WriteCSVCoBetterSolutionToFile(100, output_file_path);
+
+	output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(100, output_file_path);
+
+	cout << "All processing completed successfully.\n" << endl;
 	return 0;
 }
