@@ -5,7 +5,18 @@
 #include <fstream>
 #include <set>
 #include <limits>
+#include <iostream>
+#include <algorithm>
+#include <unordered_map>
 using namespace std; 
+
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(path) _mkdir(path)
+#else
+#include <sys/stat.h>
+#define MKDIR(path) mkdir(path, 0777)
+#endif
 
 //void Output::AddResultSingle(int round, TableManager& cTable)
 //{
@@ -408,3 +419,370 @@ void Output::SelectTopNByCostEnum(CostEnum costEnum, int N)
 	return;
 }
 
+
+void Output::PrintGlobalNondominatedSolutions()
+{
+	for (auto& [round, tableList] : globalNondominatedSolutions)
+	{
+		cout << "Round " << round << " Global Nondominated Results:\n";
+		for (size_t i = 0; i < tableList.size(); ++i)
+		{
+			cout << "Table " << i + 1 << ":\n";
+			cout << "group size: " << tableList[i].GetGroupSize() << "\n";
+			auto costNameAndValue = tableList[i].GetCostNameAndCostValueString();
+			for (auto cost : costNameAndValue)
+			{
+				cout << cost.first << ":" << cost.second << "\t";
+			}
+			cout << "\n";
+			auto tableStrings = tableList[i].GetTableStringFormat();
+			auto rotationStrings = tableList[i].GetTableRotationFormat(leftS);
+			for (const auto& rowString : tableStrings)
+			{
+				cout << rowString << "\n";
+			}
+			cout << "Rotations:\n";
+			for (const auto& rotationString : rotationStrings)
+			{
+				cout << rotationString << "\n";
+			}
+			cout << "\n";
+		}
+		cout << "----------------------------------------\n";
+	}
+}
+
+
+tuple<int, int, double> CalCoverageRate(TableManager& table, int rowWindowSize, int colWindowSize, tuple<int, int, double> bestCoverageWin)
+{
+	int rowSize = table.GetRowSize();
+	int colSize = table.GetColSize();
+	int sameGroupCount = 0;
+	int allGroupCount = 0;
+
+	for (int i = 0; i + rowWindowSize - 1 < rowSize; i+=rowWindowSize)
+	{
+		for (int j = 0; j + colWindowSize - 1 < colSize; j+=colWindowSize)
+		{
+			allGroupCount++;
+			Group currentGroup = table.GetGroup(i, j);
+			
+			//cout << rowSize << " " << colSize << " " << rowWindowSize << " " << colWindowSize << "\n";
+
+			bool sameGroup = true;
+			// 修正邊界：只檢查當前的 Window 範圍
+			for (int x = i; x < i + rowWindowSize; ++x)
+			{
+				for (int y = j; y < j + colWindowSize; ++y)
+				{
+					if (table.GetGroup(x, y).GetSymbolNameSequence() != currentGroup.GetSymbolNameSequence())
+					{
+						sameGroup = false;
+						break;
+					}
+				}
+				if (!sameGroup)
+				{
+					break;
+				}
+			}
+
+			if (sameGroup)
+			{
+				sameGroupCount++;
+			}
+		}
+	}
+
+	//if (sameGroupCount == allGroupCount)
+	//{
+	//	return make_tuple(rowWindowSize, colWindowSize, 1.0);
+	//}
+
+	double coverageRate = (double)sameGroupCount / allGroupCount;
+	int bestRowWindowSize = rowWindowSize, bestColWindowSize = colWindowSize;
+
+
+	if (rowWindowSize > 1)
+	{
+		tuple<int, int, double> newCoverageRate = CalCoverageRate(table, rowWindowSize / 2, colWindowSize, bestCoverageWin);
+		if (get<2>(newCoverageRate) > coverageRate || ((get<2>(newCoverageRate) == coverageRate) && (get<0>(newCoverageRate) * get<1>(newCoverageRate) > bestRowWindowSize * bestColWindowSize)))
+		{
+			coverageRate = get<2>(newCoverageRate);
+			bestRowWindowSize = get<0>(newCoverageRate);
+			bestColWindowSize = get<1>(newCoverageRate);
+		}
+	}
+
+	if (colWindowSize > 1)
+	{
+		tuple<int, int, double> newCoverageRate = CalCoverageRate(table, rowWindowSize, colWindowSize / 2, bestCoverageWin);
+		if (get<2>(newCoverageRate) > coverageRate || ((get<2>(newCoverageRate) == coverageRate) && (get<0>(newCoverageRate) * get<1>(newCoverageRate) > bestRowWindowSize * bestColWindowSize)))
+		{
+			coverageRate = get<2>(newCoverageRate);
+			bestRowWindowSize = get<0>(newCoverageRate);
+			bestColWindowSize = get<1>(newCoverageRate);
+		}
+	}
+
+	return make_tuple(bestRowWindowSize, bestColWindowSize, coverageRate);
+}
+
+void Output::SelectCoBetterSolution()
+{
+	vector<pair<TableManager, pair<int, int>>> tableScoreList;
+
+	for (auto& [round, tableList] : allNondominatedSolutions)
+	{
+		for (auto& table : tableList)
+		{
+			tuple<int, int, double> bestCoverageRate = CalCoverageRate(table, table.GetRowSize(), table.GetColSize(), make_tuple(0, 0, 0.0));
+			tableScoreList.push_back(make_pair(table, make_pair(get<0>(bestCoverageRate), get<1>(bestCoverageRate))));
+		}
+	}
+
+	sort(tableScoreList.begin(), tableScoreList.end(), [](pair<TableManager, pair<int, int>>& a, pair<TableManager, pair<int, int>>& b) {
+		if (a.first.GetColSize() * a.first.GetGroupSize() > b.first.GetColSize() * b.first.GetGroupSize())
+		{
+			return false;
+		}
+		else if (a.first.GetColSize() * a.first.GetGroupSize() < b.first.GetColSize() * b.first.GetGroupSize())
+		{
+			return true;
+		}
+		double aWinSize = (double)a.second.first * a.second.second * a.first.GetGroupSize();
+		double bWinSize = (double)b.second.first * b.second.second * b.first.GetGroupSize();
+
+		if (aWinSize == bWinSize)
+		{
+			unordered_map<CostEnum, double> costA = a.first.GetCostMap();
+			unordered_map<CostEnum, double> costB = b.first.GetCostMap();
+
+			return (costA[CostEnum::cCost] < costB[CostEnum::cCost]) || 
+				(costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::rCost] < costB[CostEnum::rCost]) ||
+				(costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::rCost] == costB[CostEnum::rCost] && costA[CostEnum::sperationCost] < costB[CostEnum::sperationCost]) ||
+				(costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::rCost] == costB[CostEnum::rCost] && costA[CostEnum::sperationCost] == costB[CostEnum::sperationCost] && costA[CostEnum::mildCost] < costB[CostEnum::mildCost]);
+		}
+
+
+		return aWinSize > bWinSize; // sort in descending order of coverage
+		});	
+
+	this->coTableScoreList = tableScoreList;
+}
+
+void Output::PrintCoBetterSolution(int topN)
+{
+	for (size_t i = 0; i < coTableScoreList.size() && i < topN; ++i)
+	{
+		cout << "Best Solution " << i + 1 << ":\n";
+		cout << "group size: " << coTableScoreList[i].first.GetGroupSize() << ", e.g. [" << coTableScoreList[i].first.GetGroup(0, 0).GetSymbolNameSequence() << "]" << endl;
+		//auto costNameAndValue = coTableScoreList[i].first.GetCostNameAndCostValueString();
+		//for (auto cost : costNameAndValue)
+		//{
+		//	cout << cost.first << ":" << cost.second << "\t";
+		//}
+		//cout << "\n";
+		cout << "Best window size: " << coTableScoreList[i].second.first << " x " << coTableScoreList[i].second.second << "\n";
+
+		auto tableStrings = coTableScoreList[i].first.GetTableStringFormat();
+		auto rotationStrings = coTableScoreList[i].first.GetTableRotationFormat(leftS);
+		
+		int rowSpace = coTableScoreList[i].second.second * coTableScoreList[i].first.GetGroupSize();
+		int colSpace = coTableScoreList[i].second.first;
+		for (const auto& rowString : tableStrings)
+		{
+			for (size_t j = 0; j < rowString.size(); ++j)
+			{
+				cout << rowString[j];
+				if ((j + 1) % rowSpace == 0)
+				{
+					cout << " "; // add space after each window
+				}
+			}
+			if ((&rowString - &tableStrings[0] + 1) % colSpace == 0)
+			{
+				cout << "\n"; // add extra space after each column of windows
+			}
+			cout << "\n";
+		}
+		//cout << "Rotations:\n";
+		//for (const auto& rotationString : rotationStrings)
+		//{
+		//	cout << rotationString << "\n";
+		//}
+		cout << "\n";
+	}
+}
+
+
+
+void Output::WriteCSVCoBetterSolutionToFile(int topN, std::string fileName)
+{
+	int index = 1;
+	fileName += "All_Best_Solutions";
+	MKDIR(fileName.c_str());
+	for (auto& tableScore : coTableScoreList)
+	{
+		if (index > topN)
+		{
+			break;
+		}
+
+		// output pattern file
+		string patternFileName = fileName + "/Best_Solution_" + to_string(index) + ".csv";
+		ofstream outFile(patternFileName);
+		if (!outFile.is_open())
+		{
+			cerr << "Error opening file: " << patternFileName << endl;
+			return;
+		}
+
+		vector<string> pattern = tableScore.first.GetTableStringPatternInRealDummyLength();
+		vector<string> rotationPattern = tableScore.first.GetTableRotationPatternInRealDummyLength(leftS);
+
+		ofstream patternOutFile(patternFileName);
+
+		if (!patternOutFile.is_open())
+		{
+			cerr << "Error opening pattern file: " << patternFileName << endl;
+			continue;
+		}
+
+		for (const auto& patternLine : pattern)
+		{
+			patternOutFile << patternLine << "\n";
+		}
+		patternOutFile << "\n";
+		for (const auto& rotationLine : rotationPattern)
+		{
+			patternOutFile << rotationLine << "\n";
+		}
+		patternOutFile << "\n";
+
+		for (auto& [instName, labelName] : instNameMapLabelName)
+		{
+			patternOutFile << instName << ", " << labelName << "\n";
+		}
+		patternOutFile << "\n";
+
+		patternOutFile.close();
+		
+		
+		index++;
+	}
+}
+
+// the solution of eachfile needs to classify by group size and put in different files, the file name will be fileName + "_GroupSize_" + groupSize + ".txt"
+// the file type is equal toWrite WriteSignificantNondominatedSolutionsToFile
+void Output::WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(int topN, std::string fileName)
+{
+	int overallIndex = 1;
+	map<int, vector<pair<int, pair<TableManager, pair<int, int>>>>> groupSizeToTableScoreListMap;
+	for (auto& tableScore : coTableScoreList)
+	{
+		if (overallIndex > topN)
+		{
+			break;
+		}
+
+		int groupSize = tableScore.first.GetGroupSize();
+		groupSizeToTableScoreListMap[groupSize].push_back({overallIndex, tableScore});
+		overallIndex++;
+	}
+
+	fileName += "best_solution";
+	for (auto& [groupSize, tableScoreList] : groupSizeToTableScoreListMap)
+	{
+		string groupFileName = fileName + "_GroupSize_" + to_string(groupSize);
+		MKDIR(groupFileName.c_str());
+		for (auto& item : tableScoreList)
+		{
+			int rankIndex = item.first;
+			auto& tableScore = item.second;
+
+			string patternFileName = groupFileName + "/Best_Solution_" + to_string(rankIndex) + ".csv";
+			ofstream outFile(patternFileName);
+			if (!outFile.is_open())
+			{
+				cerr << "Error opening file: " << patternFileName << endl;
+				return;
+			}
+			vector<string> pattern = tableScore.first.GetTableStringPatternInRealDummyLength();
+			vector<string> rotationPattern = tableScore.first.GetTableRotationPatternInRealDummyLength(leftS);
+			ofstream patternOutFile(patternFileName);
+			if (!patternOutFile.is_open())
+			{
+				cerr << "Error opening pattern file: " << patternFileName << endl;
+				continue;
+			}
+			for (const auto& patternLine : pattern)
+			{
+				patternOutFile << patternLine << "\n";
+			}
+			patternOutFile << "\n";
+			for (const auto& rotationLine : rotationPattern)
+			{
+				patternOutFile << rotationLine << "\n";
+			}
+			patternOutFile << "\n";
+			for (auto& [instName, labelName] : instNameMapLabelName)
+			{
+				patternOutFile << instName << ", " << labelName << "\n";
+			}
+			patternOutFile << "\n";
+			patternOutFile.close();
+		}
+	}
+}
+
+void Output::WriteCoBetterSolutionToFile(int topN, std::string fileName)
+{
+	fileName += "All_Best_Solutions";
+	MKDIR(fileName.c_str());
+	int index = 1;
+	for (auto& tableScore : coTableScoreList)
+	{
+		if (index > topN)
+		{
+			break;
+		}
+		string solutionFileName = fileName + "/Best_Solution_" + to_string(index) + ".txt";
+		ofstream outFile(solutionFileName);
+		if (!outFile.is_open())
+		{
+			cerr << "Error opening file: " << solutionFileName << endl;
+			return;
+		}
+		outFile << "group size: " << tableScore.first.GetGroupSize() << ", e.g. [" << tableScore.first.GetGroup(0, 0).GetSymbolNameSequence() << "]" << endl;
+		outFile << "Best window size: " << tableScore.second.first << " x " << tableScore.second.second << "\n";
+		auto tableStrings = tableScore.first.GetTableStringFormat();
+		auto rotationStrings = tableScore.first.GetTableRotationFormat(leftS);
+		
+		int rowSpace = tableScore.second.second * tableScore.first.GetGroupSize();
+		int colSpace = tableScore.second.first;
+		for (const auto& rowString : tableStrings)
+		{
+			for (size_t j = 0; j < rowString.size(); ++j)
+			{
+				outFile << rowString[j];
+				if ((j + 1) % rowSpace == 0)
+				{
+					outFile << " "; // add space after each window
+				}
+			}
+			if ((&rowString - &tableStrings[0] + 1) % colSpace == 0)
+			{
+				outFile << "\n"; // add extra space after each column of windows
+			}
+			outFile << "\n";
+		}
+		
+		outFile << "\n";
+		
+		outFile.close();
+		
+		
+		index++;
+	}
+}

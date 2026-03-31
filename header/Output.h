@@ -29,6 +29,18 @@ public:
 	void WriteSignificantNondominatedSolutionsToFile(std::string fileName);
 
 	void WriteGlobalNondominatedSolutionsToFile(std::string fileName);
+	void PrintGlobalNondominatedSolutions();
+
+	void WriteCSVCoBetterSolutionToFile(int topN, std::string fileName);
+	void PrintCoBetterSolution(int topN);
+	void WriteCoBetterSolutionToFile(int topN, std::string fileName);
+
+	void WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(int topN, std::string fileName);
+
+	// select corporation better solution, return a list of pair of table and its coverage (coverage is represented as a pair of integers, the larger the better)
+	void SelectCoBetterSolution();
+
+	std::vector<std::pair<TableManager, std::pair<int, int>>> GetCoBetterSolutions() { return coTableScoreList; }
 
 private:
 	std::map<int, std::vector<TableManager>> allNondominatedSolutions;
@@ -43,6 +55,8 @@ private:
 	int group;
 	int rowSize;
 	bool leftS = true;
+
+	std::vector<std::pair<TableManager, std::pair<int, int>>> coTableScoreList;
 
 	std::unordered_map<std::string, std::string> labelNameMapInstName; // label name -> inst name
 	std::unordered_map<std::string, std::string> instNameMapLabelName; // inst name -> label name

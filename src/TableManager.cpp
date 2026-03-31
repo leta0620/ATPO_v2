@@ -1119,6 +1119,7 @@ bool TableManager::SwapRows(int row1, int row2)
 
 
 std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValueString()
+
 {
     std::vector< std::pair<std::string, double>> costNameAndValue;
     for (const auto& [costEnum, costValue] : this->costMap)
@@ -1517,7 +1518,7 @@ bool TableManager::BuildInterleavingTable()
         }
 	}
 
-    std::cout << "Interleaving Table:" << std::endl;
+    /*std::cout << "Interleaving Table:" << std::endl;
     for (auto& row : this->table)
     {
         for (auto& group : row)
@@ -1525,7 +1526,7 @@ bool TableManager::BuildInterleavingTable()
             std::cout << group.GetSymbolNameSequence() << " ";
         }
         std::cout << std::endl;
-    }
+    }*/
 
     return true;
 }
