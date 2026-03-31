@@ -193,10 +193,11 @@ int main(int argc, char* argv[]) {
 	//output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "_global_nondominated.txt");
 
 	output.SelectCoBetterSolution();
-	output.PrintCoBetterSolution(100);
-	output.WriteCSVCoBetterSolutionToFile(100, output_file_path);
+	output.PrintCoBetterSolution(20);
+	output.WriteCSVCoBetterSolutionToFile(20, output_file_path);
+	output.WriteCoBetterSolutionToFile(20, output_file_path);
 
-	output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(100, output_file_path);
+	output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(20, output_file_path);
 
 	cout << "All processing completed successfully.\n" << endl;
 	return 0;

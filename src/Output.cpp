@@ -460,20 +460,22 @@ tuple<int, int, double> CalCoverageRate(TableManager& table, int rowWindowSize, 
 	int sameGroupCount = 0;
 	int allGroupCount = 0;
 
-	for (int i = 0; i < rowWindowSize; i+=rowWindowSize)
+	for (int i = 0; i + rowWindowSize - 1 < rowSize; i+=rowWindowSize)
 	{
-		for (int j = 0; j < colWindowSize; j+=colWindowSize)
+		for (int j = 0; j + colWindowSize - 1 < colSize; j+=colWindowSize)
 		{
 			allGroupCount++;
 			Group currentGroup = table.GetGroup(i, j);
 			
+			//cout << rowSize << " " << colSize << " " << rowWindowSize << " " << colWindowSize << "\n";
+
 			bool sameGroup = true;
+			// 修正邊界：只檢查當前的 Window 範圍
 			for (int x = i; x < i + rowWindowSize; ++x)
 			{
 				for (int y = j; y < j + colWindowSize; ++y)
 				{
-					//if (table.GetGroup(x, y).GetTypeHash() != currentGroup.GetTypeHash())
-					if (table.GetGroup(x, y).GetSymbolNameSequenceHash() != currentGroup.GetSymbolNameSequenceHash())
+					if (table.GetGroup(x, y).GetSymbolNameSequence() != currentGroup.GetSymbolNameSequence())
 					{
 						sameGroup = false;
 						break;
@@ -587,6 +589,7 @@ void Output::PrintCoBetterSolution(int topN)
 		auto rotationStrings = coTableScoreList[i].first.GetTableRotationFormat(leftS);
 		
 		int rowSpace = coTableScoreList[i].second.second * coTableScoreList[i].first.GetGroupSize();
+		int colSpace = coTableScoreList[i].second.first;
 		for (const auto& rowString : tableStrings)
 		{
 			for (size_t j = 0; j < rowString.size(); ++j)
@@ -597,13 +600,17 @@ void Output::PrintCoBetterSolution(int topN)
 					cout << " "; // add space after each window
 				}
 			}
+			if ((&rowString - &tableStrings[0] + 1) % colSpace == 0)
+			{
+				cout << "\n"; // add extra space after each column of windows
+			}
 			cout << "\n";
 		}
-		cout << "Rotations:\n";
-		for (const auto& rotationString : rotationStrings)
-		{
-			cout << rotationString << "\n";
-		}
+		//cout << "Rotations:\n";
+		//for (const auto& rotationString : rotationStrings)
+		//{
+		//	cout << rotationString << "\n";
+		//}
 		cout << "\n";
 	}
 }
@@ -617,6 +624,11 @@ void Output::WriteCSVCoBetterSolutionToFile(int topN, std::string fileName)
 	MKDIR(fileName.c_str());
 	for (auto& tableScore : coTableScoreList)
 	{
+		if (index > topN)
+		{
+			break;
+		}
+
 		// output pattern file
 		string patternFileName = fileName + "/Best_Solution_" + to_string(index) + ".csv";
 		ofstream outFile(patternFileName);
@@ -669,6 +681,11 @@ void Output::WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(int topN, std::s
 	map<int, vector<pair<int, pair<TableManager, pair<int, int>>>>> groupSizeToTableScoreListMap;
 	for (auto& tableScore : coTableScoreList)
 	{
+		if (overallIndex > topN)
+		{
+			break;
+		}
+
 		int groupSize = tableScore.first.GetGroupSize();
 		groupSizeToTableScoreListMap[groupSize].push_back({overallIndex, tableScore});
 		overallIndex++;
@@ -716,5 +733,56 @@ void Output::WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(int topN, std::s
 			patternOutFile << "\n";
 			patternOutFile.close();
 		}
+	}
+}
+
+void Output::WriteCoBetterSolutionToFile(int topN, std::string fileName)
+{
+	fileName += "All_Best_Solutions";
+	MKDIR(fileName.c_str());
+	int index = 1;
+	for (auto& tableScore : coTableScoreList)
+	{
+		if (index > topN)
+		{
+			break;
+		}
+		string solutionFileName = fileName + "/Best_Solution_" + to_string(index) + ".txt";
+		ofstream outFile(solutionFileName);
+		if (!outFile.is_open())
+		{
+			cerr << "Error opening file: " << solutionFileName << endl;
+			return;
+		}
+		outFile << "group size: " << tableScore.first.GetGroupSize() << ", e.g. [" << tableScore.first.GetGroup(0, 0).GetSymbolNameSequence() << "]" << endl;
+		outFile << "Best window size: " << tableScore.second.first << " x " << tableScore.second.second << "\n";
+		auto tableStrings = tableScore.first.GetTableStringFormat();
+		auto rotationStrings = tableScore.first.GetTableRotationFormat(leftS);
+		
+		int rowSpace = tableScore.second.second * tableScore.first.GetGroupSize();
+		int colSpace = tableScore.second.first;
+		for (const auto& rowString : tableStrings)
+		{
+			for (size_t j = 0; j < rowString.size(); ++j)
+			{
+				outFile << rowString[j];
+				if ((j + 1) % rowSpace == 0)
+				{
+					outFile << " "; // add space after each window
+				}
+			}
+			if ((&rowString - &tableStrings[0] + 1) % colSpace == 0)
+			{
+				outFile << "\n"; // add extra space after each column of windows
+			}
+			outFile << "\n";
+		}
+		
+		outFile << "\n";
+		
+		outFile.close();
+		
+		
+		index++;
 	}
 }

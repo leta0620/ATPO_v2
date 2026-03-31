@@ -33,6 +33,7 @@ public:
 
 	void WriteCSVCoBetterSolutionToFile(int topN, std::string fileName);
 	void PrintCoBetterSolution(int topN);
+	void WriteCoBetterSolutionToFile(int topN, std::string fileName);
 
 	void WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(int topN, std::string fileName);
 
