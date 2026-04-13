@@ -1,0 +1,25 @@
+*Custom Compiler Version X-2025.06-2
+*Tue Feb 24 14:53:42 2026
+
+*.SCALE METER
+*.LDD
+
+********************************************************************************
+* Library          : Test
+* Cell             : CM1
+* View             : schematic
+* View Search List : auCdl schematic
+* View Stop List   : auCdl
+********************************************************************************
+.SUBCKT CM1
+MD1 net45 net20 VSS VSS nch_lvt_mac l=16n nfin=4 m=32
+MD2 net25 net12 net45 VSS nch_lvt_mac l=16n nfin=4 m=32
+MC1 net21 net20 VSS VSS nch_lvt_mac l=16n nfin=4 m=32
+MB1 net17 net20 VSS VSS nch_lvt_mac l=16n nfin=4 m=32
+MC2 net13 net12 net21 VSS nch_lvt_mac l=16n nfin=4 m=32
+MB2 net9 net12 net17 VSS nch_lvt_mac l=16n nfin=4 m=32
+MA1 net6 net20 VSS VSS nch_lvt_mac l=16n nfin=4 m=32
+MA2 net20 net12 net6 VSS nch_lvt_mac l=16n nfin=4 m=32
+.ENDS
+
+

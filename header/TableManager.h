@@ -12,8 +12,11 @@ enum class CostEnum
 	cCost,
 	sperationCost,
 	dummyCost,
-	routingcomplexityCost,
-	mildCost
+	routing_lengthCost,
+	mildCost,// RMST routing complexity
+	congestionCost, // trunk-based congestion metric (from cCost Part1)
+	hierCongestionCost, // hierarchical routing congestion metric
+	hierCCost // cCost with hierarchical congestion replacing trunk-based
 };
 
 class TableManager
@@ -23,8 +26,7 @@ public:
 	TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist);
 
 	void SetNetlistLookupTable(NetlistLookupTable& netlist) { this->netlist = netlist; }
-	void SetCdlFilePath(const std::string& path) { cdlFilePath = path; } //2026/03/08 updated
-
+	void SetCdlFilePath(const std::string& path) { cdlFilePath = path; }  //3/8
 	// **this function will re-initialize the table, make sure the old data is not needed**
 	void SetTableSize(int rowSize, int colSize);
 	void SetGroupSize(int groupSize) { this->groupSize = groupSize; }
@@ -68,8 +70,7 @@ public:
 	// dummy width check and fix
 	bool CheckAndFixDummyWidth();
 
-	// 回傳對應 CostEnum 的成本名稱（若找不到會回傳 fallback 字串）
-    std::string GetCostName(CostEnum costEnum);
+	std::string GetCostName(CostEnum costEnum);
 
 	// modify table to make it interleaving, return true if success, false if fail (if fail, the table will not be modified)
 	bool BuildInterleavingTable();
@@ -84,14 +85,15 @@ private:
 	int minDummyWidthInUnit = 1; // default min dummy width
 
 	NetlistLookupTable netlist;
-	std::string cdlFilePath; //2026/03/08 updated
+	std::string cdlFilePath;   // NEW 3/8
+
 	void InitializeTable();
 	// check colume rule(same type sequential)
 	bool ColumnRuleCheck(int rowPlace, int colPlace, Group& group);
 	// check row rule(neighborhood group can link)
 	bool RowRuleCheck(int rowPlace, int colPlace, Group& group);
 
-	
+
 
 	// cost part
 	std::unordered_map<CostEnum, double> costMap;
@@ -101,6 +103,9 @@ private:
 	void CalculateCCost();
 	void CalculateSpetationCost();
 	void CalculateDummyCost();
-	double CalculateRoutingComplexity();
+	double CalculateRoutinglength();//
 	void CalculateMILDCost();
+	void CalculateCongestionCost();
+	void CalculateHierCongestionCost();
+	void CalculateHierCCost();
 };
