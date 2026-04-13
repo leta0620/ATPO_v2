@@ -3,12 +3,14 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
-#include <iomanip>
+
 #include "TableManager.h"
 
 using namespace std;
@@ -172,9 +174,12 @@ std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
     this->CalculateRCost();
     this->CalculateCCost();
     this->CalculateSpetationCost();
-	this->CalculateDummyCost();
-    this->costMap[CostEnum::routingcomplexityCost] = this->CalculateRoutingComplexity(); // ← 新增
+    this->CalculateDummyCost();
+    this->costMap[CostEnum::routing_lengthCost] = this->CalculateRoutinglength(); // ← 新增
     this->CalculateMILDCost();
+    this->CalculateCongestionCost();
+    this->CalculateHierCongestionCost();
+    this->CalculateHierCCost();
     return this->costMap;
 }
 
@@ -382,13 +387,114 @@ void TableManager::CalculateCCost()
         };
 
     // ============================================================
-    // [Part 1] Lateral
+    // [Part 1] Per-cell congestion (routing-based wire density)
     // ============================================================
-    vector<vector<string>> grid(R);
+    // Trunk positions: SA, SB, DA, DB evenly distributed across rows
+    // Even R: floor(i * R / 4)       — e.g. R=8 -> 0,2,4,6
+    // Odd  R: round(i * (R-1) / 3)   — e.g. R=7 -> 0,2,4,6
+    auto trunkRow = [&](int i) -> int {
+        if (R % 2 == 0)
+            return i * R / 4;
+        else
+            return (int)std::round(i * (R - 1) / 3.0);
+        };
+    const int trunkSA = trunkRow(0);
+    const int trunkSB = trunkRow(1);
+    const int trunkDA = trunkRow(2);
+    const int trunkDB = trunkRow(3);
+
+    // Group signature per cell
+    auto groupSig = [&](int r, int c) -> string {
+        unordered_set<string> s;
+        for (const auto& du : table[r][c].GetDeviceUnits())
+            if (!is_dummy(du.GetSymbol())) s.insert(du.GetSymbol());
+        vector<string> v(s.begin(), s.end());
+        std::sort(v.begin(), v.end());
+        string sig;
+        for (const auto& x : v) sig += x;
+        return sig;
+        };
+
+    vector<vector<string>> sig(R, vector<string>(C));
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            sig[r][c] = groupSig(r, c);
+
+    // Identify unique groups and assign trunk pairs
+    unordered_set<string> allSigs;
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            if (!sig[r][c].empty()) allSigs.insert(sig[r][c]);
+
+    vector<string> groupList(allSigs.begin(), allSigs.end());
+    std::sort(groupList.begin(), groupList.end());
+
+    // groupList[0] -> SA, DA; groupList[1] -> SB, DB
+    unordered_map<string, int> sigTrunkS, sigTrunkD;
+    if (groupList.size() >= 1) { sigTrunkS[groupList[0]] = trunkSA; sigTrunkD[groupList[0]] = trunkDA; }
+    if (groupList.size() >= 2) { sigTrunkS[groupList[1]] = trunkSB; sigTrunkD[groupList[1]] = trunkDB; }
+
+    // Count non-dummy units per cell
+    vector<vector<int>> cellUnitCount(R, vector<int>(C, 0));
     for (int r = 0; r < R; ++r)
         for (int c = 0; c < C; ++c)
             for (const auto& du : table[r][c].GetDeviceUnits())
+                if (!is_dummy(du.GetSymbol())) cellUnitCount[r][c]++;
+
+    // For each column, compute vertical line ranges, then count lines per cell
+    vector<vector<double>> cellCongest(R, vector<double>(C, 0.0));
+
+    for (int c = 0; c < C; ++c)
+    {
+        struct Line { int rMin; int rMax; };
+        vector<Line> lines;
+
+        for (const auto& gSig : groupList)
+        {
+            if (sigTrunkS.find(gSig) == sigTrunkS.end()) continue;
+
+            vector<int> rows;
+            for (int r = 0; r < R; ++r)
+                if (sig[r][c] == gSig) rows.push_back(r);
+            if (rows.empty()) continue;
+
+            int sTrunk = sigTrunkS[gSig];
+            int dTrunk = sigTrunkD[gSig];
+
+            // S-line range
+            int sMin = sTrunk, sMax = sTrunk;
+            for (int r : rows) { sMin = std::min(sMin, r); sMax = std::max(sMax, r); }
+            lines.push_back({ sMin, sMax });
+
+            // D-line range
+            int dMin = dTrunk, dMax = dTrunk;
+            for (int r : rows) { dMin = std::min(dMin, r); dMax = std::max(dMax, r); }
+            lines.push_back({ dMin, dMax });
+        }
+
+        for (int r = 0; r < R; ++r)
+        {
+            int n = cellUnitCount[r][c];
+            if (n == 0) continue;
+            int count = 0;
+            for (const auto& l : lines)
+                if (r >= l.rMin && r <= l.rMax) count++;
+            cellCongest[r][c] = static_cast<double>(count) / n;
+        }
+    }
+
+    // ============================================================
+    // [Part 2] Lateral x congestion
+    // ============================================================
+    vector<vector<string>> grid(R);
+    vector<vector<int>>    unitCell(R);
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            for (const auto& du : table[r][c].GetDeviceUnits())
+            {
                 grid[r].push_back(du.GetSymbol());
+                unitCell[r].push_back(c);
+            }
 
     const int W = (int)grid[0].size();
     if (W <= 0) { costMap[CostEnum::cCost] = 0.0; return; }
@@ -396,22 +502,33 @@ void TableManager::CalculateCCost()
         if ((int)grid[r].size() != W) { costMap[CostEnum::cCost] = 0.0; return; }
 
     const double wH = 1.0, wV = 0.26;
-    vector<vector<int>> H_local(R, vector<int>(W, 0));
-    vector<vector<int>> V_local(R, vector<int>(W, 0));
+    vector<vector<double>> H_local(R, vector<double>(W, 0.0));
+    vector<vector<double>> V_local(R, vector<double>(W, 0.0));
 
     for (int r = 0; r < R; ++r)
         for (int i = 0; i < W - 1; ++i)
         {
-            const string& a = grid[r][i]; const string& b = grid[r][i + 1];
+            const string& a = grid[r][i];
+            const string& b = grid[r][i + 1];
             if (is_dummy(a) || is_dummy(b)) continue;
-            if (a != b) { H_local[r][i]++; H_local[r][i + 1]++; }
+            if (a != b)
+            {
+                H_local[r][i] += cellCongest[r][unitCell[r][i]];
+                H_local[r][i + 1] += cellCongest[r][unitCell[r][i + 1]];
+            }
         }
+
     for (int i = 0; i < W; ++i)
         for (int r = 0; r < R - 1; ++r)
         {
-            const string& a = grid[r][i]; const string& b = grid[r + 1][i];
+            const string& a = grid[r][i];
+            const string& b = grid[r + 1][i];
             if (is_dummy(a) || is_dummy(b)) continue;
-            if (a != b) { V_local[r][i]++; V_local[r + 1][i]++; }
+            if (a != b)
+            {
+                V_local[r][i] += cellCongest[r][unitCell[r][i]];
+                V_local[r + 1][i] += cellCongest[r + 1][unitCell[r + 1][i]];
+            }
         }
 
     unordered_map<string, double> type_row_sum, type_col_sum;
@@ -430,130 +547,22 @@ void TableManager::CalculateCCost()
     int type_num = 0;
     for (const auto& kv : type_cnt)
     {
-        const string& t = kv.first; long long cnt = kv.second;
+        const string& t = kv.first;
+        long long cnt = kv.second;
         if (cnt <= 0) continue;
         sum_avg_row += type_row_sum[t] / cnt;
         sum_avg_col += type_col_sum[t] / cnt;
         type_num++;
     }
+
     const double C_row = type_num > 0 ? sum_avg_row / type_num : 0.0;
     const double C_col = type_num > 0 ? sum_avg_col / type_num : 0.0;
-    const double lateral = wH * C_row + wV * C_col;
 
-    // ============================================================
-    // [Part 2] Fringe
-    // ============================================================
-    const double weightCoeff = 1.5;
-    const double wLateral = 1.0;
-    const double wFringe = 1.0 / static_cast<double>(R * C);
-
-    auto groupSig = [&](int r, int c) -> string {
-        unordered_set<string> s;
-        for (const auto& du : table[r][c].GetDeviceUnits())
-            if (!is_dummy(du.GetSymbol())) s.insert(du.GetSymbol());
-        vector<string> v(s.begin(), s.end());
-        std::sort(v.begin(), v.end());
-        string sig;
-        for (const auto& x : v) sig += x;
-        return sig;
-        };
-
-    vector<vector<string>> sig(R, vector<string>(C));
-    for (int r = 0; r < R; ++r)
-        for (int c = 0; c < C; ++c)
-            sig[r][c] = groupSig(r, c);
-
-    auto allAboveSame = [&](int r, int c) -> bool {
-        if (r == 0) return false;
-        for (int rr = 0; rr < r; ++rr)
-            if (sig[rr][c] != sig[r][c]) return false;
-        return true;
-        };
-
-    auto allBelowSame = [&](int r, int c) -> bool {
-        if (r == R - 1) return false;
-        for (int rr = r + 1; rr < R; ++rr)
-            if (sig[rr][c] != sig[r][c]) return false;
-        return true;
-        };
-
-    unordered_map<string, double> typeCongestSum;
-    unordered_map<string, int>    typeCongestCnt;
-
-    for (int r = 0; r < R; ++r)
-    {
-        for (int c = 0; c < C; ++c)
-        {
-            vector<string> unitSyms;
-            for (const auto& du : table[r][c].GetDeviceUnits())
-                if (!is_dummy(du.GetSymbol()))
-                    unitSyms.push_back(du.GetSymbol());
-
-            int n = (int)unitSyms.size();
-            if (n == 0) continue;
-
-            bool aboveBoundary = (r == 0);
-            bool belowBoundary = (r == R - 1);
-            bool aboveSame = aboveBoundary ? false : allAboveSame(r, c);
-            bool belowSame = belowBoundary ? false : allBelowSame(r, c);
-
-            int numer = 3;
-            bool aboveOK = aboveBoundary || aboveSame;
-            bool belowOK = belowBoundary || belowSame;
-            if (!aboveOK && !belowOK) numer += 2;
-
-            double weight = 1.0;
-            bool aboveDiff = !aboveBoundary && !aboveSame;
-            bool belowDiff = !belowBoundary && !belowSame;
-
-            if (aboveDiff && belowDiff)
-            {
-                string aboveSigVal = (r > 0) ? sig[r - 1][c] : "";
-                string belowSigVal = (r < R - 1) ? sig[r + 1][c] : "";
-                if (aboveSigVal == belowSigVal)
-                    weight = weightCoeff * weightCoeff;
-                else
-                    weight = weightCoeff * weightCoeff * weightCoeff;
-            }
-            else if (aboveDiff || belowDiff)
-            {
-                weight = weightCoeff;
-            }
-
-            double congest = (static_cast<double>(numer) / n) * weight;
-
-            unordered_set<string> seenTypes;
-            for (const auto& sym : unitSyms)
-            {
-                if (seenTypes.count(sym)) continue;
-                seenTypes.insert(sym);
-                typeCongestSum[sym] += congest;
-                typeCongestCnt[sym]++;
-            }
-        }
-    }
-
-    // Step 6: average congestion per device type
-    unordered_map<string, double> typeAvgCongest;
-    vector<string> allTypes;
-    for (const auto& kv : typeCongestSum) allTypes.push_back(kv.first);
-    std::sort(allTypes.begin(), allTypes.end());
-
-    for (const auto& sym : allTypes)
-        typeAvgCongest[sym] = typeCongestSum[sym] / typeCongestCnt[sym];
-
-    // Step 7: fringe = mean of avgCongest over all device types
-    double sumAvg = 0.0;
-    for (const auto& sym : allTypes)
-        sumAvg += typeAvgCongest[sym];
-    double fringe = (allTypes.size() > 0) ? sumAvg / (double)allTypes.size() : 0.0;
-
-    costMap[CostEnum::cCost] = wLateral * lateral + wFringe * fringe;
+    costMap[CostEnum::cCost] = wH * C_row + wV * C_col;
 }
 
 
 
-// ---- Separation: unit-cell based metric using rho(distance), then compute pairwise �m_ij ----
 void TableManager::CalculateSpetationCost() {
 
     struct Pt { int r, x; }; // r = row index, x = unit index within the row
@@ -635,7 +644,7 @@ void TableManager::CalculateSpetationCost() {
     costMap[CostEnum::sperationCost] = 1.0 / sigma;
 }
 
-double TableManager::CalculateRoutingComplexity()
+double TableManager::CalculateRoutinglength()
 {
     using std::string;
     using std::vector;
@@ -834,20 +843,74 @@ void TableManager::CalculateMILDCost()
         meanInvLOD[kv.first] = kv.second / unitCount[kv.first];
 
     // ----------------------------------------------------------
-    // Step 3: MILD = Σ_{k<l} |mean(1/LOD)_k - mean(1/LOD)_l|
+    // Step 3: MILD = Σ counterpart pairs |mean(1/LOD)_a - mean(1/LOD)_b|
+    // Counterpart: same position in different group patterns
+    //   BUT extract ONLY WITHIN the same half (left vs left, right vs right).
+    //   Cross-half comparison would introduce spurious pairs when left and
+    //   right halves use different (mirrored) cell patterns.
+    // e.g. CAAC vs DBBD -> C↔D (pos 0,3), A↔B (pos 1,2)
     // ----------------------------------------------------------
-    double mild = 0.0;
-    vector<string> symbols;
-    for (const auto& kv : meanInvLOD)
-        symbols.push_back(kv.first);
-    std::sort(symbols.begin(), symbols.end());
 
-    for (int i = 0; i < (int)symbols.size() - 1; ++i)
-        for (int j = i + 1; j < (int)symbols.size(); ++j)
-            mild += std::abs(meanInvLOD[symbols[i]] - meanInvLOD[symbols[j]]);
+    // Lambda: collect unique group patterns from a column range
+    auto collectUniquePats = [&](int cStart, int cEnd) {
+        vector<string> pats;
+        std::set<string> seen;
+        for (int r = 0; r < rowSize; ++r) {
+            for (int c = cStart; c < cEnd; ++c) {
+                string pat;
+                for (const auto& du : table[r][c].GetDeviceUnits()) {
+                    const string& s = du.GetSymbol();
+                    if (!s.empty() && s != "d") pat += s;
+                }
+                if (!pat.empty() && seen.insert(pat).second)
+                    pats.push_back(pat);
+            }
+        }
+        return pats;
+        };
+
+    // Lambda: extract counterpart pairs from pairwise comparison within a group
+    auto extractCounterparts = [](const vector<string>& pats,
+        std::set<std::pair<string, string>>& cps) {
+            for (int i = 0; i < (int)pats.size() - 1; ++i)
+                for (int j = i + 1; j < (int)pats.size(); ++j) {
+                    const string& pa = pats[i];
+                    const string& pb = pats[j];
+                    int len = std::min((int)pa.size(), (int)pb.size());
+                    for (int k = 0; k < len; ++k) {
+                        string sa(1, pa[k]), sb(1, pb[k]);
+                        if (sa != sb) {
+                            if (sa > sb) std::swap(sa, sb);
+                            cps.insert({ sa, sb });
+                        }
+                    }
+                }
+        };
+
+    const int halfCol = colSize / 2;
+    vector<string> leftPats = collectUniquePats(0, halfCol);
+    vector<string> rightPats = collectUniquePats(halfCol, colSize);
+
+    std::set<std::pair<string, string>> counterparts;
+    extractCounterparts(leftPats, counterparts);
+    extractCounterparts(rightPats, counterparts);
+
+    double mild = 0.0;
+    for (const auto& [a, b] : counterparts) {
+        if (meanInvLOD.count(a) && meanInvLOD.count(b))
+            mild += std::abs(meanInvLOD[a] - meanInvLOD[b]);
+    }
 
     costMap[CostEnum::mildCost] = mild;
+    costMap[CostEnum::mildCost] = mild < 1e-12 ? 0.0 : mild;
+
 }
+
+
+
+
+
+
 
 // =======================
 // Rule checks (currently always return true)
@@ -858,7 +921,7 @@ bool TableManager::ColumnRuleCheck(int rowPlace, int colPlace, Group& group)
 {
     int nowGroupTypeHash = group.GetTypeHash();
 
-	// check above
+    // check above
     if (rowPlace - 1 >= 0)
     {
         if (!table[rowPlace - 1][colPlace].HasDummyUnit())
@@ -869,11 +932,11 @@ bool TableManager::ColumnRuleCheck(int rowPlace, int colPlace, Group& group)
                 return false;
             }
         }
-	}
+    }
 
-	// check below
-	if (rowPlace + 1 < rowSize)
-	{
+    // check below
+    if (rowPlace + 1 < rowSize)
+    {
         if (!table[rowPlace + 1][colPlace].HasDummyUnit())
         {
             int belowGroupTypeHash = table[rowPlace + 1][colPlace].GetTypeHash();
@@ -882,7 +945,7 @@ bool TableManager::ColumnRuleCheck(int rowPlace, int colPlace, Group& group)
                 return false;
             }
         }
-	}
+    }
 
     return true;
 }
@@ -1119,36 +1182,35 @@ bool TableManager::SwapRows(int row1, int row2)
 
 
 std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValueString()
-
 {
     std::vector< std::pair<std::string, double>> costNameAndValue;
     for (const auto& [costEnum, costValue] : this->costMap)
     {
         std::string costName;
 
-		costName = GetCostName(costEnum);
+        costName = GetCostName(costEnum);
 
-   //     switch (costEnum)
-   //     {
-   //     case CostEnum::ccCost:
-   //         costName = "System variation";
-   //         break;
-   //     case CostEnum::rCost:
-   //         costName = "Routing Length";
-   //         break;
-   //     case CostEnum::cCost:
-   //         costName = "Coupling capacitance";
-   //         break;
-   //     case CostEnum::sperationCost:
-   //         costName = "Dispersion";
-   //         break;
-   //     case CostEnum::dummyCost:
-   //         costName = "Dummy Penalty";
-			//break;
-   //     default:
-   //         costName = "Unknown Cost";
-   //         break;
-   //     }
+        //     switch (costEnum)
+        //     {
+        //     case CostEnum::ccCost:
+        //         costName = "System variation";
+        //         break;
+        //     case CostEnum::rCost:
+        //         costName = "Routing Length";
+        //         break;
+        //     case CostEnum::cCost:
+        //         costName = "Coupling capacitance";
+        //         break;
+        //     case CostEnum::sperationCost:
+        //         costName = "Dispersion";
+        //         break;
+        //     case CostEnum::dummyCost:
+        //         costName = "Dummy Penalty";
+                 //break;
+        //     default:
+        //         costName = "Unknown Cost";
+        //         break;
+        //     }
         costNameAndValue.push_back(pair<string, double>(costName, costValue));
     }
     return costNameAndValue;
@@ -1364,7 +1426,7 @@ string TableManager::GetCostName(CostEnum costEnum)
     }
     else if (costEnum == CostEnum::rCost)
     {
-        return "Routing Length";
+        return "Length Maching";
     }
     else if (costEnum == CostEnum::cCost)
     {
@@ -1377,20 +1439,33 @@ string TableManager::GetCostName(CostEnum costEnum)
     else if (costEnum == CostEnum::dummyCost)
     {
         return "Dummy Penalty";
-	}
-    else if (costEnum == CostEnum::routingcomplexityCost)
+    }
+    else if (costEnum == CostEnum::routing_lengthCost)
     {
-        return "Routing Complexity";
+        return "Routing Length";
     }
 
     else if (costEnum == CostEnum::mildCost)
     {
-        return "MILD";
+        return "LOD";
     }
+    else if (costEnum == CostEnum::congestionCost)
+    {
+        return "Congestion";
+    }
+    else if (costEnum == CostEnum::hierCongestionCost)
+    {
+        return "Hierarchical Congestion";
+    }
+    else if (costEnum == CostEnum::hierCCost)
+    {
+        return "Hierarchical Coupling capacitance";
+    }
+
     else
     {
         return "Unknown Cost";
-	}
+    }
 }
 
 
@@ -1437,9 +1512,9 @@ bool TableManager::BuildInterleavingTable()
         }
     }
 
-	// build interleaving table
-	vector<vector<Group>> interleavingTable;
-	vector<vector<Group>> dummyGroupTable;
+    // build interleaving table
+    vector<vector<Group>> interleavingTable;
+    vector<vector<Group>> dummyGroupTable;
     for (auto& item : groupTypeCount)
     {
         std::string sNS = item.first;
@@ -1449,23 +1524,23 @@ bool TableManager::BuildInterleavingTable()
         {
             if (count > rowSize)
             {
-				vector<Group> rowGroups(rowSize);
+                vector<Group> rowGroups(rowSize);
                 for (int i = 0; i < rowSize; i++)
                 {
-					rowGroups[i] = groupTypeExample[sNS];
+                    rowGroups[i] = groupTypeExample[sNS];
                 }
                 interleavingTable.push_back(rowGroups);
                 count -= rowSize;
             }
             else
             {
-				int upDummy = (rowSize - count) / 2;
-				int downDummy = rowSize - count - upDummy;
+                int upDummy = (rowSize - count) / 2;
+                int downDummy = rowSize - count - upDummy;
 
-				int groupSize = groupTypeExample[sNS].GetDeviceUnits().size();
-                
+                int groupSize = groupTypeExample[sNS].GetDeviceUnits().size();
+
                 Group dummyGroup;
-				dummyGroup.BuildAllDummyGroup(groupSize);
+                dummyGroup.BuildAllDummyGroup(groupSize);
 
                 vector<Group> rowGroups;
                 for (int i = 0; i < upDummy; i++)
@@ -1475,25 +1550,25 @@ bool TableManager::BuildInterleavingTable()
                 for (int i = 0; i < count; i++)
                 {
                     rowGroups.push_back(groupTypeExample[sNS]);
-				}
+                }
                 for (int i = 0; i < downDummy; i++)
                 {
                     rowGroups.push_back(dummyGroup);
                 }
                 dummyGroupTable.push_back(rowGroups);
-				count = 0;
+                count = 0;
             }
-		}
-	}
+        }
+    }
 
-	// merge interleaving table and dummy group table
-	int dummyRowSize = dummyGroupTable.size();
-	int dummyMiddleIndex = dummyRowSize / 2;
+    // merge interleaving table and dummy group table
+    int dummyRowSize = dummyGroupTable.size();
+    int dummyMiddleIndex = dummyRowSize / 2;
 
-	int dummyIndex = 0;
+    int dummyIndex = 0;
     for (; dummyIndex < dummyMiddleIndex; dummyIndex++)
     {
-		interleavingTable.insert(interleavingTable.begin(), dummyGroupTable[dummyIndex]);
+        interleavingTable.insert(interleavingTable.begin(), dummyGroupTable[dummyIndex]);
     }
 
     for (; dummyIndex < dummyRowSize; dummyIndex++)
@@ -1502,23 +1577,23 @@ bool TableManager::BuildInterleavingTable()
     }
 
 
-	this->table.clear();
-	this->table.resize(rowSize);
-	int colNum = interleavingTable.size();
+    this->table.clear();
+    this->table.resize(rowSize);
+    int colNum = interleavingTable.size();
     for (int r = 0; r < rowSize; r++)
     {
-		table[r].resize(colNum);
-	}
-	
+        table[r].resize(colNum);
+    }
+
     for (int c = 0; c < colNum; c++)
     {
         for (int r = 0; r < rowSize; r++)
         {
             table[r][c] = interleavingTable[c][r];
         }
-	}
+    }
 
-    /*std::cout << "Interleaving Table:" << std::endl;
+    std::cout << "Interleaving Table:" << std::endl;
     for (auto& row : this->table)
     {
         for (auto& group : row)
@@ -1526,34 +1601,982 @@ bool TableManager::BuildInterleavingTable()
             std::cout << group.GetSymbolNameSequence() << " ";
         }
         std::cout << std::endl;
-    }*/
+    }
 
     return true;
 }
 
 void TableManager::CalculateDummyCost()
 {
-	int nowGroupSize = table[0][0].GetDeviceUnits().size();
+    int nowGroupSize = table[0][0].GetDeviceUnits().size();
 
-	double rowMid = nowGroupSize * static_cast<double>(rowSize - 1) / 2.0;
-	double colMid = nowGroupSize * static_cast<double>(colSize - 1) / 2.0;
+    double rowMid = nowGroupSize * static_cast<double>(rowSize - 1) / 2.0;
+    double colMid = nowGroupSize * static_cast<double>(colSize - 1) / 2.0;
 
     double totalCost = 0.0;
     for (int r = 0; r < rowSize; ++r) {
         for (int c = 0; c < colSize; ++c) {
-			vector<DeviceUnit> deviceUnits = table[r][c].GetDeviceUnits();
+            vector<DeviceUnit> deviceUnits = table[r][c].GetDeviceUnits();
             for (int i = 0; i < deviceUnits.size(); ++i) {
                 const DeviceUnit& du = deviceUnits[i];
                 if (du.GetSymbol() == "d") {
                     double x = i + c * nowGroupSize;
                     double y = r;
-					// Calculate distance from the center of the table
+                    // Calculate distance from the center of the table
                     double dist = sqrt((x - colMid) * (x - colMid) + (y - rowMid) * (y - rowMid));
                     totalCost += 1 / dist;
                 }
-			}
-            
+            }
+
         }
     }
-	costMap[CostEnum::dummyCost] = totalCost;
+    costMap[CostEnum::dummyCost] = totalCost;
+}
+
+// =======================
+// Congestion cost (trunk-based, from cCost Part 1)
+// =======================
+// Uses trunk routing model (SA/SB/DA/DB) to compute per-cell congestion,
+// then: per-cell congestion -> distribute to device units -> per-TYPE -> average
+
+void TableManager::CalculateCongestionCost()
+{
+    using std::string;
+    using std::vector;
+    using std::unordered_map;
+    using std::unordered_set;
+
+    const int R = rowSize;
+    const int C = colSize;
+    if (R <= 0 || C <= 0) { costMap[CostEnum::congestionCost] = 0.0; return; }
+
+    auto is_dummy = [](const string& s) -> bool {
+        return s.empty() || s == "d";
+        };
+
+    // Trunk positions: SA, SB, DA, DB
+    auto trunkRow = [&](int i) -> int {
+        if (R % 2 == 0)
+            return i * R / 4;
+        else
+            return (int)std::round(i * (R - 1) / 3.0);
+        };
+    const int trunkSA = trunkRow(0);
+    const int trunkSB = trunkRow(1);
+    const int trunkDA = trunkRow(2);
+    const int trunkDB = trunkRow(3);
+
+    // Group signature per cell
+    auto groupSig = [&](int r, int c) -> string {
+        unordered_set<string> s;
+        for (const auto& du : table[r][c].GetDeviceUnits())
+            if (!is_dummy(du.GetSymbol())) s.insert(du.GetSymbol());
+        vector<string> v(s.begin(), s.end());
+        std::sort(v.begin(), v.end());
+        string sig;
+        for (const auto& x : v) sig += x;
+        return sig;
+        };
+
+    vector<vector<string>> sig(R, vector<string>(C));
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            sig[r][c] = groupSig(r, c);
+
+    // Unique groups -> assign trunk pairs
+    unordered_set<string> allSigs;
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            if (!sig[r][c].empty()) allSigs.insert(sig[r][c]);
+
+    vector<string> groupList(allSigs.begin(), allSigs.end());
+    std::sort(groupList.begin(), groupList.end());
+
+    unordered_map<string, int> sigTrunkS, sigTrunkD;
+    if (groupList.size() >= 1) { sigTrunkS[groupList[0]] = trunkSA; sigTrunkD[groupList[0]] = trunkDA; }
+    if (groupList.size() >= 2) { sigTrunkS[groupList[1]] = trunkSB; sigTrunkD[groupList[1]] = trunkDB; }
+
+    // Count non-dummy units per cell
+    vector<vector<int>> cellUnitCount(R, vector<int>(C, 0));
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            for (const auto& du : table[r][c].GetDeviceUnits())
+                if (!is_dummy(du.GetSymbol())) cellUnitCount[r][c]++;
+
+    // Per-cell congestion: count vertical line passes per cell
+    vector<vector<double>> cellCongest(R, vector<double>(C, 0.0));
+
+    for (int c = 0; c < C; ++c)
+    {
+        struct Line { int rMin; int rMax; };
+        vector<Line> lines;
+
+        for (const auto& gSig : groupList)
+        {
+            if (sigTrunkS.find(gSig) == sigTrunkS.end()) continue;
+
+            vector<int> rows;
+            for (int r = 0; r < R; ++r)
+                if (sig[r][c] == gSig) rows.push_back(r);
+            if (rows.empty()) continue;
+
+            int sTrunk = sigTrunkS[gSig];
+            int dTrunk = sigTrunkD[gSig];
+
+            int sMin = sTrunk, sMax = sTrunk;
+            for (int r : rows) { sMin = std::min(sMin, r); sMax = std::max(sMax, r); }
+            lines.push_back({ sMin, sMax });
+
+            int dMin = dTrunk, dMax = dTrunk;
+            for (int r : rows) { dMin = std::min(dMin, r); dMax = std::max(dMax, r); }
+            lines.push_back({ dMin, dMax });
+        }
+
+        for (int r = 0; r < R; ++r)
+        {
+            int n = cellUnitCount[r][c];
+            if (n == 0) continue;
+            int count = 0;
+            for (const auto& l : lines)
+                if (r >= l.rMin && r <= l.rMax) count++;
+            cellCongest[r][c] = static_cast<double>(count) / n;
+        }
+    }
+
+    // Metric: distribute per-cell congestion to device units, aggregate per TYPE
+    unordered_map<string, double> typeSum;
+    unordered_map<string, int>    typeCount;
+
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c) {
+            double m = cellCongest[r][c];
+            unordered_map<string, int> cnt;
+            for (const auto& du : table[r][c].GetDeviceUnits()) {
+                const string& sym = du.GetSymbol();
+                if (!is_dummy(sym)) cnt[sym]++;
+            }
+            for (auto& [sym, n] : cnt) {
+                typeSum[sym] += n * m;
+                typeCount[sym] += n;
+            }
+        }
+
+    double sumTypeMetric = 0.0;
+    int nTypes = 0;
+    for (auto& [sym, total] : typeSum) {
+        if (typeCount[sym] > 0) {
+            sumTypeMetric += total / typeCount[sym];
+            nTypes++;
+        }
+    }
+
+    costMap[CostEnum::congestionCost] = nTypes > 0 ? sumTypeMetric / nTypes : 0.0;
+}
+
+// =======================
+// Hierarchical Congestion routing cost
+// =======================
+// Metric: per-GROUP(=cell) congestion / cellGridCount -> distribute to device units
+//         -> per-TYPE sum / device unit count -> average over types
+
+void TableManager::CalculateHierCongestionCost()
+{
+    const int R = rowSize;
+    const int C = colSize;
+    if (R <= 0 || C <= 0) { costMap[CostEnum::hierCongestionCost] = 0.0; return; }
+
+    // --- helpers ---
+    auto is_dummy = [](const std::string& s) { return s.empty() || s == "d"; };
+    auto normPairFn = [](char a, char b) -> std::string { return { std::min(a,b), std::max(a,b) }; };
+
+    static const int NUM_SUB = 4;
+
+    // Build pattern strings per cell (e.g. "AAACCCCA")
+    std::vector<std::vector<std::string>> cellPat(R, std::vector<std::string>(C));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++) {
+            std::string s;
+            for (const auto& du : table[r][c].GetDeviceUnits())
+                s += du.GetSymbol();
+            cellPat[r][c] = s;
+        }
+
+    int patLen = (int)cellPat[0][0].size();
+    if (patLen < 2) { costMap[CostEnum::hierCongestionCost] = 0.0; return; }
+    int gapsPerCell = patLen - 1;
+
+    auto netAtPos = [&](int r, int c, int gi) -> std::string {
+        return normPairFn(cellPat[r][c][gi], cellPat[r][c][gi + 1]);
+        };
+
+    // Auto-detect target nets, exclude outer letter same-pairs
+    std::set<char> outerLetters;
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            outerLetters.insert(cellPat[r][c][0]);
+
+    std::set<std::string> targetNets;
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            for (int gi = 0; gi < gapsPerCell; gi++) {
+                std::string net = netAtPos(r, c, gi);
+                if (net[0] == net[1] && outerLetters.count(net[0])) continue;
+                targetNets.insert(net);
+            }
+
+    int gridRows = R * NUM_SUB;
+    int gridCols = C * gapsPerCell;
+
+    // Per-cell sub-row assignment (order of first appearance)
+    std::vector<std::vector<std::map<std::string, int>>> cellSubRow(R, std::vector<std::map<std::string, int>>(C));
+    std::vector<std::vector<std::map<std::string, int>>> cellRepGap(R, std::vector<std::map<std::string, int>>(C));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++) {
+            int nextSub = 0;
+            std::set<std::string> seen;
+            for (int gi = 0; gi < gapsPerCell; gi++) {
+                std::string net = netAtPos(r, c, gi);
+                if (!targetNets.count(net)) continue;
+                if (seen.insert(net).second) {
+                    cellSubRow[r][c][net] = nextSub++;
+                    cellRepGap[r][c][net] = gi;
+                }
+            }
+        }
+
+    // --- UnionFind ---
+    struct UF {
+        std::vector<int> p;
+        UF() {}
+        UF(int n) : p(n) { for (int i = 0; i < n; i++) p[i] = i; }
+        int find(int x) { while (p[x] != x) { p[x] = p[p[x]]; x = p[x]; } return x; }
+        void unite(int a, int b) { a = find(a); b = find(b); if (a != b) p[a] = b; }
+        bool connected(int a, int b) { return find(a) == find(b); }
+    };
+
+    auto cid = [&](int r, int c) { return r * gridCols + c; };
+    auto toGC = [&](int cell, int gi) { return cell * gapsPerCell + gi; };
+
+    auto isSeed = [&](int sr, int gc) -> bool {
+        int origRow = sr / NUM_SUB;
+        int cellCol = gc / gapsPerCell;
+        int gi = gc % gapsPerCell;
+        int subIdx = sr % NUM_SUB;
+        std::string net = netAtPos(origRow, cellCol, gi);
+        if (!targetNets.count(net)) return false;
+        auto it = cellSubRow[origRow][cellCol].find(net);
+        if (it == cellSubRow[origRow][cellCol].end() || it->second != subIdx) return false;
+        auto it2 = cellRepGap[origRow][cellCol].find(net);
+        return it2 != cellRepGap[origRow][cellCol].end() && it2->second == gi;
+        };
+
+    int totalCells = gridRows * gridCols;
+    std::map<std::string, UF> nameUF;
+    for (auto& n : targetNets)
+        nameUF[n] = UF(totalCells);
+
+    // Congestion accumulator
+    std::vector<std::vector<int>> congestion(gridRows, std::vector<int>(gridCols, 0));
+
+    auto addLayer = [&](const std::vector<std::vector<int>>& L) {
+        for (int r = 0; r < gridRows; r++)
+            for (int c = 0; c < gridCols; c++)
+                congestion[r][c] += L[r][c];
+        };
+
+    // Connect helpers
+    auto connectH = [&](int sr, int gc1, int gc2, std::vector<std::vector<int>>& L, const std::string& name) {
+        auto& uf = nameUF[name];
+        int gMin = std::min(gc1, gc2), gMax = std::max(gc1, gc2);
+        for (int g = gMin; g <= gMax; g++) {
+            if (L[sr][g] == 0) L[sr][g] = 1;
+            uf.unite(cid(sr, gc1), cid(sr, g));
+        }
+        };
+
+    auto connectV = [&](int gc, int sr1, int sr2, std::vector<std::vector<int>>& L, const std::string& name) {
+        auto& uf = nameUF[name];
+        int sMin = std::min(sr1, sr2), sMax = std::max(sr1, sr2);
+        for (int sr = sMin; sr <= sMax; sr++) {
+            if (L[sr][gc] == 0) L[sr][gc] = 1;
+            uf.unite(cid(sr1, gc), cid(sr, gc));
+        }
+        };
+
+    auto connectLShape = [&](int sr1, int gc1, int sr2, int gc2,
+        std::vector<std::vector<int>>& Lv, std::vector<std::vector<int>>& Lh,
+        const std::string& name) {
+            auto& uf = nameUF[name];
+            int sMin = std::min(sr1, sr2), sMax = std::max(sr1, sr2);
+            for (int sr = sMin; sr <= sMax; sr++) {
+                if (Lv[sr][gc1] == 0) Lv[sr][gc1] = 1;
+                uf.unite(cid(sr1, gc1), cid(sr, gc1));
+            }
+            int gMin = std::min(gc1, gc2), gMax = std::max(gc1, gc2);
+            for (int g = gMin; g <= gMax; g++) {
+                if (Lh[sr2][g] == 0) Lh[sr2][g] = 1;
+                uf.unite(cid(sr1, gc1), cid(sr2, g));
+            }
+        };
+
+    // ============================================================
+    // LG: vertical conductors within each cell (UF only, no congestion)
+    // ============================================================
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            for (int gi = 0; gi < gapsPerCell; gi++) {
+                std::string net = netAtPos(r, c, gi);
+                if (!targetNets.count(net)) continue;
+                int gc = toGC(c, gi);
+                int srBase = r * NUM_SUB;
+                auto& uf = nameUF[net];
+                for (int s = 1; s < NUM_SUB; s++)
+                    uf.unite(cid(srBase, gc), cid(srBase + s, gc));
+            }
+
+    // ============================================================
+    // LG1: intra-cell horizontal same-name connection
+    // ============================================================
+    {
+        std::vector<std::vector<int>> L(gridRows, std::vector<int>(gridCols, 0));
+        for (int r = 0; r < R; r++)
+            for (int c = 0; c < C; c++) {
+                std::map<std::string, std::vector<int>> netGaps;
+                for (int gi = 0; gi < gapsPerCell; gi++) {
+                    std::string net = netAtPos(r, c, gi);
+                    if (targetNets.count(net))
+                        netGaps[net].push_back(gi);
+                }
+                for (auto& [net, gis] : netGaps) {
+                    if (gis.size() < 2) continue;
+                    auto it = cellSubRow[r][c].find(net);
+                    if (it == cellSubRow[r][c].end()) continue;
+                    int subIdx = it->second;
+                    int sr = r * NUM_SUB + subIdx;
+                    int gcFirst = toGC(c, gis.front());
+                    int gcLast = toGC(c, gis.back());
+                    auto& uf = nameUF[net];
+                    for (int g = gcFirst; g <= gcLast; g++) {
+                        if (L[sr][g] == 0) L[sr][g] = 1;
+                        uf.unite(cid(sr, gcFirst), cid(sr, g));
+                    }
+                }
+            }
+        addLayer(L);
+    }
+
+    // ============================================================
+    // L0: cross-cell vertical for 2-row pairs (same gi & same sub-row only)
+    // ============================================================
+    {
+        std::vector<std::vector<int>> L(gridRows, std::vector<int>(gridCols, 0));
+        for (int rPair = 0; rPair + 1 < R; rPair += 2)
+            for (int c = 0; c < C; c++)
+                for (auto& net : targetNets) {
+                    auto& rep0 = cellRepGap[rPair][c];
+                    auto& rep1 = cellRepGap[rPair + 1][c];
+                    auto& sub0 = cellSubRow[rPair][c];
+                    auto& sub1 = cellSubRow[rPair + 1][c];
+                    bool has0 = rep0.count(net) > 0;
+                    bool has1 = rep1.count(net) > 0;
+                    if (!has0 || !has1) continue;
+                    if (rep0.at(net) != rep1.at(net) || sub0.at(net) != sub1.at(net)) continue;
+                    int gi = rep0.at(net);
+                    int gc = toGC(c, gi);
+                    int subIdx = sub0.at(net);
+                    int sr0 = rPair * NUM_SUB + subIdx;
+                    int sr1 = (rPair + 1) * NUM_SUB + subIdx;
+                    auto& uf = nameUF[net];
+                    for (int sr = sr0; sr <= sr1; sr++) {
+                        L[sr][gc] = 1;
+                        uf.unite(cid(sr0, gc), cid(sr, gc));
+                    }
+                }
+        addLayer(L);
+    }
+
+    // ============================================================
+    // Expansion layers: H/V merge with increasing block sizes
+    // ============================================================
+    {
+        struct Step { int rBlk, cBlk; bool horiz; };
+        std::vector<Step> steps;
+        int rb = 2, cb = 1;
+        bool h = true;
+        while (rb < R || cb < C) {
+            if (h) cb = std::min(cb * 2, C);
+            else   rb = std::min(rb * 2, R);
+            steps.push_back({ rb, cb, h });
+            if (rb >= R && cb >= C) break;
+            h = !h;
+        }
+        if (steps.empty()) steps.push_back({ R, C, true });
+
+        for (auto& [rBlk, cBlk, horiz] : steps) {
+            std::vector<std::vector<int>> L(gridRows, std::vector<int>(gridCols, 0));
+            bool anyChange = false;
+
+            for (int rS = 0; rS < R; rS += rBlk) {
+                int rE = std::min(rS + rBlk, R);
+                for (int cS = 0; cS < C; cS += cBlk) {
+                    int cE = std::min(cS + cBlk, C);
+                    int srS = rS * NUM_SUB;
+                    int srE = rE * NUM_SUB;
+                    int gcS = cS * gapsPerCell;
+                    int gcE = cE * gapsPerCell;
+
+                    for (const std::string& name : targetNets) {
+                        std::vector<std::pair<int, int>> seeds;
+                        for (int sr = srS; sr < srE; sr++)
+                            for (int gc = gcS; gc < gcE; gc++)
+                                if (isSeed(sr, gc) &&
+                                    netAtPos(sr / NUM_SUB, gc / gapsPerCell, gc % gapsPerCell) == name)
+                                    seeds.push_back({ sr, gc });
+                        if (seeds.size() < 2) continue;
+
+                        auto& uf = nameUF[name];
+                        if (horiz) {
+                            std::map<int, std::vector<int>> srToGCs;
+                            for (auto& [sr, gc] : seeds) srToGCs[sr].push_back(gc);
+                            std::vector<std::pair<int, std::vector<int>>> sorted_vec(srToGCs.begin(), srToGCs.end());
+                            for (auto& [sr, gcs] : sorted_vec) std::sort(gcs.begin(), gcs.end());
+                            std::sort(sorted_vec.begin(), sorted_vec.end(), [](auto& a, auto& b) {
+                                return (a.second.back() - a.second.front()) >
+                                    (b.second.back() - b.second.front());
+                                });
+                            for (auto& [sr, gcs] : sorted_vec) {
+                                for (int i = 1; i < (int)gcs.size(); i++) {
+                                    if (!uf.connected(cid(sr, gcs[i - 1]), cid(sr, gcs[i]))) {
+                                        connectH(sr, gcs[i - 1], gcs[i], L, name);
+                                        anyChange = true;
+                                    }
+                                }
+                            }
+                        }
+                        else {
+                            std::map<int, std::vector<int>> gcToSRs;
+                            for (auto& [sr, gc] : seeds) gcToSRs[gc].push_back(sr);
+                            std::vector<std::pair<int, std::vector<int>>> sorted_vec(gcToSRs.begin(), gcToSRs.end());
+                            for (auto& [gc, srs] : sorted_vec) std::sort(srs.begin(), srs.end());
+                            std::sort(sorted_vec.begin(), sorted_vec.end(), [](auto& a, auto& b) {
+                                return (a.second.back() - a.second.front()) >
+                                    (b.second.back() - b.second.front());
+                                });
+                            for (auto& [gc, srs] : sorted_vec) {
+                                for (int i = 1; i < (int)srs.size(); i++) {
+                                    if (!uf.connected(cid(srs[i - 1], gc), cid(srs[i], gc))) {
+                                        connectV(gc, srs[i - 1], srs[i], L, name);
+                                        anyChange = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (anyChange) addLayer(L);
+        }
+    }
+
+    // ============================================================
+    // L-shape for remaining unconnected seeds
+    // ============================================================
+    {
+        std::vector<std::vector<int>> Lv(gridRows, std::vector<int>(gridCols, 0));
+        std::vector<std::vector<int>> Lh(gridRows, std::vector<int>(gridCols, 0));
+
+        for (const std::string& name : targetNets) {
+            std::vector<std::pair<int, int>> seeds;
+            for (int sr = 0; sr < gridRows; sr++)
+                for (int gc = 0; gc < gridCols; gc++)
+                    if (isSeed(sr, gc) &&
+                        netAtPos(sr / NUM_SUB, gc / gapsPerCell, gc % gapsPerCell) == name)
+                        seeds.push_back({ sr, gc });
+            if (seeds.size() < 2) continue;
+
+            auto& uf = nameUF[name];
+            for (int i = 1; i < (int)seeds.size(); i++) {
+                auto [s0, g0] = seeds[0];
+                auto [si, gi] = seeds[i];
+                if (!uf.connected(cid(s0, g0), cid(si, gi)))
+                    connectLShape(s0, g0, si, gi, Lv, Lh, name);
+            }
+        }
+
+        bool hasV = false, hasH = false;
+        for (int r = 0; r < gridRows && !hasV; r++)
+            for (int c = 0; c < gridCols && !hasV; c++)
+                if (Lv[r][c] > 0) hasV = true;
+        for (int r = 0; r < gridRows && !hasH; r++)
+            for (int c = 0; c < gridCols && !hasH; c++)
+                if (Lh[r][c] > 0) hasH = true;
+
+        if (hasV) addLayer(Lv);
+        if (hasH) addLayer(Lh);
+    }
+
+    // ============================================================
+    // Metric calculation
+    // ============================================================
+
+    // Step 1-2: per-cell congestion sum
+    std::vector<std::vector<int>> cellCong(R, std::vector<int>(C, 0));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            for (int sr = 0; sr < NUM_SUB; sr++) {
+                int gr = r * NUM_SUB + sr;
+                for (int gi = 0; gi < gapsPerCell; gi++) {
+                    int gc = c * gapsPerCell + gi;
+                    cellCong[r][c] += congestion[gr][gc];
+                }
+            }
+
+    // Step 3: GROUP metric = cellCong / cellGridCount (NUM_SUB * gapsPerCell)
+    int cellGridCount = NUM_SUB * gapsPerCell;
+    std::vector<std::vector<double>> cellMetric(R, std::vector<double>(C, 0.0));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            cellMetric[r][c] = (double)cellCong[r][c] / cellGridCount;
+
+    // Step 4-5: distribute GROUP metric to each device unit, aggregate per TYPE
+    std::unordered_map<std::string, double> typeSum;   // type -> sum(count * metric)
+    std::unordered_map<std::string, int>    typeCount; // type -> total device units
+
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++) {
+            double m = cellMetric[r][c];
+            std::unordered_map<std::string, int> cnt;
+            for (const auto& du : table[r][c].GetDeviceUnits()) {
+                const std::string& sym = du.GetSymbol();
+                if (!is_dummy(sym)) cnt[sym]++;
+            }
+            for (auto& [sym, n] : cnt) {
+                typeSum[sym] += n * m;
+                typeCount[sym] += n;
+            }
+        }
+
+    // Step 6: final = average of per-TYPE metrics
+    double sumTypeMetric = 0.0;
+    int nTypes = 0;
+    for (auto& [sym, total] : typeSum) {
+        if (typeCount[sym] > 0) {
+            sumTypeMetric += total / typeCount[sym];
+            nTypes++;
+        }
+    }
+
+    costMap[CostEnum::hierCongestionCost] = nTypes > 0 ? sumTypeMetric / nTypes : 0.0;
+}
+
+// =======================
+// Hierarchical cCost (cCost with hierarchical congestion replacing trunk-based)
+// =======================
+// Part 1: hierarchical routing congestion (same as CalculateHierCongestionCost)
+// Part 2: lateral H/V coupling (same as original cCost Part 2)
+
+void TableManager::CalculateHierCCost()
+{
+    using std::string;
+    using std::vector;
+    using std::unordered_map;
+
+    const int R = rowSize;
+    const int C = colSize;
+    if (R <= 0 || C <= 0) { costMap[CostEnum::hierCCost] = 0.0; return; }
+
+    auto is_dummy = [](const string& s) { return s.empty() || s == "d"; };
+    auto normPairFn = [](char a, char b) -> string { return { std::min(a,b), std::max(a,b) }; };
+
+    static const int NUM_SUB = 4;
+
+    // ============================================================
+    // [Part 1] Hierarchical routing -> per-cell congestion
+    // ============================================================
+
+    // Build pattern strings per cell
+    vector<vector<string>> cellPat(R, vector<string>(C));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++) {
+            string s;
+            for (const auto& du : table[r][c].GetDeviceUnits())
+                s += du.GetSymbol();
+            cellPat[r][c] = s;
+        }
+
+    int patLen = (int)cellPat[0][0].size();
+    if (patLen < 2) { costMap[CostEnum::hierCCost] = 0.0; return; }
+    int gapsPerCell = patLen - 1;
+
+    auto netAtPos = [&](int r, int c, int gi) -> string {
+        return normPairFn(cellPat[r][c][gi], cellPat[r][c][gi + 1]);
+        };
+
+    // Auto-detect target nets, exclude outer letter same-pairs
+    std::set<char> outerLetters;
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            outerLetters.insert(cellPat[r][c][0]);
+
+    std::set<string> targetNets;
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            for (int gi = 0; gi < gapsPerCell; gi++) {
+                string net = netAtPos(r, c, gi);
+                if (net[0] == net[1] && outerLetters.count(net[0])) continue;
+                targetNets.insert(net);
+            }
+
+    int gridRows = R * NUM_SUB;
+    int gridCols = C * gapsPerCell;
+
+    // Per-cell sub-row assignment (order of first appearance)
+    vector<vector<std::map<string, int>>> cellSubRow(R, vector<std::map<string, int>>(C));
+    vector<vector<std::map<string, int>>> cellRepGap(R, vector<std::map<string, int>>(C));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++) {
+            int nextSub = 0;
+            std::set<string> seen;
+            for (int gi = 0; gi < gapsPerCell; gi++) {
+                string net = netAtPos(r, c, gi);
+                if (!targetNets.count(net)) continue;
+                if (seen.insert(net).second) {
+                    cellSubRow[r][c][net] = nextSub++;
+                    cellRepGap[r][c][net] = gi;
+                }
+            }
+        }
+
+    // UnionFind
+    struct UF {
+        vector<int> p;
+        UF() {}
+        UF(int n) : p(n) { for (int i = 0; i < n; i++) p[i] = i; }
+        int find(int x) { while (p[x] != x) { p[x] = p[p[x]]; x = p[x]; } return x; }
+        void unite(int a, int b) { a = find(a); b = find(b); if (a != b) p[a] = b; }
+        bool connected(int a, int b) { return find(a) == find(b); }
+    };
+
+    auto cid = [&](int r, int c) { return r * gridCols + c; };
+    auto toGC = [&](int cell, int gi) { return cell * gapsPerCell + gi; };
+
+    auto isSeed = [&](int sr, int gc) -> bool {
+        int origRow = sr / NUM_SUB;
+        int cellCol = gc / gapsPerCell;
+        int gi = gc % gapsPerCell;
+        int subIdx = sr % NUM_SUB;
+        string net = netAtPos(origRow, cellCol, gi);
+        if (!targetNets.count(net)) return false;
+        auto it = cellSubRow[origRow][cellCol].find(net);
+        if (it == cellSubRow[origRow][cellCol].end() || it->second != subIdx) return false;
+        auto it2 = cellRepGap[origRow][cellCol].find(net);
+        return it2 != cellRepGap[origRow][cellCol].end() && it2->second == gi;
+        };
+
+    int totalCells = gridRows * gridCols;
+    std::map<string, UF> nameUF;
+    for (auto& n : targetNets)
+        nameUF[n] = UF(totalCells);
+
+    vector<vector<int>> congestion(gridRows, vector<int>(gridCols, 0));
+
+    auto addLayer = [&](const vector<vector<int>>& L) {
+        for (int r = 0; r < gridRows; r++)
+            for (int c = 0; c < gridCols; c++)
+                congestion[r][c] += L[r][c];
+        };
+
+    auto connectH = [&](int sr, int gc1, int gc2, vector<vector<int>>& L, const string& name) {
+        auto& uf = nameUF[name];
+        int gMin = std::min(gc1, gc2), gMax = std::max(gc1, gc2);
+        for (int g = gMin; g <= gMax; g++) {
+            if (L[sr][g] == 0) L[sr][g] = 1;
+            uf.unite(cid(sr, gc1), cid(sr, g));
+        }
+        };
+
+    auto connectV = [&](int gc, int sr1, int sr2, vector<vector<int>>& L, const string& name) {
+        auto& uf = nameUF[name];
+        int sMin = std::min(sr1, sr2), sMax = std::max(sr1, sr2);
+        for (int sr = sMin; sr <= sMax; sr++) {
+            if (L[sr][gc] == 0) L[sr][gc] = 1;
+            uf.unite(cid(sr1, gc), cid(sr, gc));
+        }
+        };
+
+    auto connectLShape = [&](int sr1, int gc1, int sr2, int gc2,
+        vector<vector<int>>& Lv, vector<vector<int>>& Lh,
+        const string& name) {
+            auto& uf = nameUF[name];
+            int sMin = std::min(sr1, sr2), sMax = std::max(sr1, sr2);
+            for (int sr = sMin; sr <= sMax; sr++) {
+                if (Lv[sr][gc1] == 0) Lv[sr][gc1] = 1;
+                uf.unite(cid(sr1, gc1), cid(sr, gc1));
+            }
+            int gMin = std::min(gc1, gc2), gMax = std::max(gc1, gc2);
+            for (int g = gMin; g <= gMax; g++) {
+                if (Lh[sr2][g] == 0) Lh[sr2][g] = 1;
+                uf.unite(cid(sr1, gc1), cid(sr2, g));
+            }
+        };
+
+    // LG: vertical conductors within each cell (UF only, no congestion)
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            for (int gi = 0; gi < gapsPerCell; gi++) {
+                string net = netAtPos(r, c, gi);
+                if (!targetNets.count(net)) continue;
+                int gc = toGC(c, gi);
+                int srBase = r * NUM_SUB;
+                auto& uf = nameUF[net];
+                for (int s = 1; s < NUM_SUB; s++)
+                    uf.unite(cid(srBase, gc), cid(srBase + s, gc));
+            }
+
+    // LG1: intra-cell horizontal same-name connection
+    {
+        vector<vector<int>> L(gridRows, vector<int>(gridCols, 0));
+        for (int r = 0; r < R; r++)
+            for (int c = 0; c < C; c++) {
+                std::map<string, vector<int>> netGaps;
+                for (int gi = 0; gi < gapsPerCell; gi++) {
+                    string net = netAtPos(r, c, gi);
+                    if (targetNets.count(net))
+                        netGaps[net].push_back(gi);
+                }
+                for (auto& [net, gis] : netGaps) {
+                    if (gis.size() < 2) continue;
+                    auto it = cellSubRow[r][c].find(net);
+                    if (it == cellSubRow[r][c].end()) continue;
+                    int subIdx = it->second;
+                    int sr = r * NUM_SUB + subIdx;
+                    int gcFirst = toGC(c, gis.front());
+                    int gcLast = toGC(c, gis.back());
+                    auto& uf = nameUF[net];
+                    for (int g = gcFirst; g <= gcLast; g++) {
+                        if (L[sr][g] == 0) L[sr][g] = 1;
+                        uf.unite(cid(sr, gcFirst), cid(sr, g));
+                    }
+                }
+            }
+        addLayer(L);
+    }
+
+    // L0: cross-cell vertical for 2-row pairs (same gi & same sub-row only)
+    {
+        vector<vector<int>> L(gridRows, vector<int>(gridCols, 0));
+        for (int rPair = 0; rPair + 1 < R; rPair += 2)
+            for (int c = 0; c < C; c++)
+                for (auto& net : targetNets) {
+                    auto& rep0 = cellRepGap[rPair][c];
+                    auto& rep1 = cellRepGap[rPair + 1][c];
+                    auto& sub0 = cellSubRow[rPair][c];
+                    auto& sub1 = cellSubRow[rPair + 1][c];
+                    bool has0 = rep0.count(net) > 0;
+                    bool has1 = rep1.count(net) > 0;
+                    if (!has0 || !has1) continue;
+                    if (rep0.at(net) != rep1.at(net) || sub0.at(net) != sub1.at(net)) continue;
+                    int gi = rep0.at(net);
+                    int gc = toGC(c, gi);
+                    int subIdx = sub0.at(net);
+                    int sr0 = rPair * NUM_SUB + subIdx;
+                    int sr1 = (rPair + 1) * NUM_SUB + subIdx;
+                    auto& uf = nameUF[net];
+                    for (int sr = sr0; sr <= sr1; sr++) {
+                        L[sr][gc] = 1;
+                        uf.unite(cid(sr0, gc), cid(sr, gc));
+                    }
+                }
+        addLayer(L);
+    }
+
+    // Expansion layers: H/V merge with increasing block sizes
+    {
+        struct Step { int rBlk, cBlk; bool horiz; };
+        vector<Step> steps;
+        int rb = 2, cb = 1;
+        bool h = true;
+        while (rb < R || cb < C) {
+            if (h) cb = std::min(cb * 2, C);
+            else   rb = std::min(rb * 2, R);
+            steps.push_back({ rb, cb, h });
+            if (rb >= R && cb >= C) break;
+            h = !h;
+        }
+        if (steps.empty()) steps.push_back({ R, C, true });
+
+        for (auto& [rBlk, cBlk, horiz] : steps) {
+            vector<vector<int>> L(gridRows, vector<int>(gridCols, 0));
+            bool anyChange = false;
+            for (int rS = 0; rS < R; rS += rBlk) {
+                int rE = std::min(rS + rBlk, R);
+                for (int cS = 0; cS < C; cS += cBlk) {
+                    int cE = std::min(cS + cBlk, C);
+                    int srS = rS * NUM_SUB, srE = rE * NUM_SUB;
+                    int gcS = cS * gapsPerCell, gcE = cE * gapsPerCell;
+                    for (const string& name : targetNets) {
+                        vector<std::pair<int, int>> seeds;
+                        for (int sr = srS; sr < srE; sr++)
+                            for (int gc = gcS; gc < gcE; gc++)
+                                if (isSeed(sr, gc) &&
+                                    netAtPos(sr / NUM_SUB, gc / gapsPerCell, gc % gapsPerCell) == name)
+                                    seeds.push_back({ sr, gc });
+                        if (seeds.size() < 2) continue;
+                        auto& uf = nameUF[name];
+                        if (horiz) {
+                            std::map<int, vector<int>> srToGCs;
+                            for (auto& [sr, gc] : seeds) srToGCs[sr].push_back(gc);
+                            vector<std::pair<int, vector<int>>> sorted_vec(srToGCs.begin(), srToGCs.end());
+                            for (auto& [sr, gcs] : sorted_vec) std::sort(gcs.begin(), gcs.end());
+                            std::sort(sorted_vec.begin(), sorted_vec.end(), [](auto& a, auto& b) {
+                                return (a.second.back() - a.second.front()) >
+                                    (b.second.back() - b.second.front());
+                                });
+                            for (auto& [sr, gcs] : sorted_vec) {
+                                for (int i = 1; i < (int)gcs.size(); i++)
+                                    if (!uf.connected(cid(sr, gcs[i - 1]), cid(sr, gcs[i]))) {
+                                        connectH(sr, gcs[i - 1], gcs[i], L, name);
+                                        anyChange = true;
+                                    }
+                            }
+                        }
+                        else {
+                            std::map<int, vector<int>> gcToSRs;
+                            for (auto& [sr, gc] : seeds) gcToSRs[gc].push_back(sr);
+                            vector<std::pair<int, vector<int>>> sorted_vec(gcToSRs.begin(), gcToSRs.end());
+                            for (auto& [gc, srs] : sorted_vec) std::sort(srs.begin(), srs.end());
+                            std::sort(sorted_vec.begin(), sorted_vec.end(), [](auto& a, auto& b) {
+                                return (a.second.back() - a.second.front()) >
+                                    (b.second.back() - b.second.front());
+                                });
+                            for (auto& [gc, srs] : sorted_vec) {
+                                for (int i = 1; i < (int)srs.size(); i++)
+                                    if (!uf.connected(cid(srs[i - 1], gc), cid(srs[i], gc))) {
+                                        connectV(gc, srs[i - 1], srs[i], L, name);
+                                        anyChange = true;
+                                    }
+                            }
+                        }
+                    }
+                }
+            }
+            if (anyChange) addLayer(L);
+        }
+    }
+
+    // L-shape for remaining unconnected seeds
+    {
+        vector<vector<int>> Lv(gridRows, vector<int>(gridCols, 0));
+        vector<vector<int>> Lh(gridRows, vector<int>(gridCols, 0));
+        for (const string& name : targetNets) {
+            vector<std::pair<int, int>> seeds;
+            for (int sr = 0; sr < gridRows; sr++)
+                for (int gc = 0; gc < gridCols; gc++)
+                    if (isSeed(sr, gc) &&
+                        netAtPos(sr / NUM_SUB, gc / gapsPerCell, gc % gapsPerCell) == name)
+                        seeds.push_back({ sr, gc });
+            if (seeds.size() < 2) continue;
+            auto& uf = nameUF[name];
+            for (int i = 1; i < (int)seeds.size(); i++) {
+                auto [s0, g0] = seeds[0];
+                auto [si, gi] = seeds[i];
+                if (!uf.connected(cid(s0, g0), cid(si, gi)))
+                    connectLShape(s0, g0, si, gi, Lv, Lh, name);
+            }
+        }
+        bool hasV = false, hasH = false;
+        for (int r = 0; r < gridRows && !hasV; r++)
+            for (int c = 0; c < gridCols && !hasV; c++)
+                if (Lv[r][c] > 0) hasV = true;
+        for (int r = 0; r < gridRows && !hasH; r++)
+            for (int c = 0; c < gridCols && !hasH; c++)
+                if (Lh[r][c] > 0) hasH = true;
+        if (hasV) addLayer(Lv);
+        if (hasH) addLayer(Lh);
+    }
+
+    // Per-cell congestion
+    int cellGridCount = NUM_SUB * gapsPerCell;
+    vector<vector<double>> cellCongest(R, vector<double>(C, 0.0));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++) {
+            int s = 0;
+            for (int sr = 0; sr < NUM_SUB; sr++) {
+                int gr = r * NUM_SUB + sr;
+                for (int gi = 0; gi < gapsPerCell; gi++)
+                    s += congestion[gr][c * gapsPerCell + gi];
+            }
+            cellCongest[r][c] = (double)s / cellGridCount;
+        }
+
+    // ============================================================
+    // [Part 2] Lateral x congestion (same as original cCost)
+    // ============================================================
+    vector<vector<string>> unitGrid(R);
+    vector<vector<int>>    unitCell(R);
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            for (const auto& du : table[r][c].GetDeviceUnits()) {
+                unitGrid[r].push_back(du.GetSymbol());
+                unitCell[r].push_back(c);
+            }
+
+    const int W = (int)unitGrid[0].size();
+    if (W <= 0) { costMap[CostEnum::hierCCost] = 0.0; return; }
+    for (int r = 1; r < R; ++r)
+        if ((int)unitGrid[r].size() != W) { costMap[CostEnum::hierCCost] = 0.0; return; }
+
+    const double wH = 1.0, wV = 0.26;
+    vector<vector<double>> H_local(R, vector<double>(W, 0.0));
+    vector<vector<double>> V_local(R, vector<double>(W, 0.0));
+
+    for (int r = 0; r < R; ++r)
+        for (int i = 0; i < W - 1; ++i) {
+            const string& a = unitGrid[r][i];
+            const string& b = unitGrid[r][i + 1];
+            if (is_dummy(a) || is_dummy(b)) continue;
+            if (a != b) {
+                H_local[r][i] += cellCongest[r][unitCell[r][i]];
+                H_local[r][i + 1] += cellCongest[r][unitCell[r][i + 1]];
+            }
+        }
+
+    for (int i = 0; i < W; ++i)
+        for (int r = 0; r < R - 1; ++r) {
+            const string& a = unitGrid[r][i];
+            const string& b = unitGrid[r + 1][i];
+            if (is_dummy(a) || is_dummy(b)) continue;
+            if (a != b) {
+                V_local[r][i] += cellCongest[r][unitCell[r][i]];
+                V_local[r + 1][i] += cellCongest[r + 1][unitCell[r + 1][i]];
+            }
+        }
+
+    unordered_map<string, double> type_row_sum, type_col_sum;
+    unordered_map<string, long long> type_cnt;
+    for (int r = 0; r < R; ++r)
+        for (int i = 0; i < W; ++i) {
+            const string& t = unitGrid[r][i];
+            if (is_dummy(t)) continue;
+            type_row_sum[t] += H_local[r][i];
+            type_col_sum[t] += V_local[r][i];
+            type_cnt[t]++;
+        }
+
+    double sum_avg_row = 0.0, sum_avg_col = 0.0;
+    int type_num = 0;
+    for (const auto& kv : type_cnt) {
+        const string& t = kv.first;
+        long long cnt = kv.second;
+        if (cnt <= 0) continue;
+        sum_avg_row += type_row_sum[t] / cnt;
+        sum_avg_col += type_col_sum[t] / cnt;
+        type_num++;
+    }
+
+    const double C_row = type_num > 0 ? sum_avg_row / type_num : 0.0;
+    const double C_col = type_num > 0 ? sum_avg_col / type_num : 0.0;
+
+    costMap[CostEnum::hierCCost] = wH * C_row + wV * C_col;
 }
