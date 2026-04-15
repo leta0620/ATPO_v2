@@ -15,6 +15,9 @@
 
 using namespace std;
 
+// Static member definition: routing length perturbation switch (default = on)
+int TableManager::routingLengthEnable = 0;
+
 // Utility: return the first non-"d" symbol inside a group.
 // If the group contains only "d", return empty string.
 static std::string ExtractGroupName(const Group& g) {
@@ -175,7 +178,7 @@ std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
     this->CalculateCCost();
     this->CalculateSpetationCost();
     this->CalculateDummyCost();
-    this->costMap[CostEnum::routing_lengthCost] = this->CalculateRoutinglength(); // ← 新增
+    this->CalculateRoutinglength(); // ← 新增
     this->CalculateMILDCost();
     this->CalculateCongestionCost();
     this->CalculateHierCongestionCost();
@@ -644,141 +647,331 @@ void TableManager::CalculateSpetationCost() {
     costMap[CostEnum::sperationCost] = 1.0 / sigma;
 }
 
-double TableManager::CalculateRoutinglength()
+void TableManager::CalculateRoutinglength()
 {
+    // Routing length = total congestion from hierarchical routing.
+    // Runs its own independent hierarchical routing algorithm (does not rely on
+    // any other cost function having been called first).
+    //
+    // Switch: routingLengthEnable (set via SetRoutingLengthEnable(0/1))
+    //   0 → this cost is disabled, always 0 (does not perturb optimizer)
+    //   1 → normally computed
     using std::string;
     using std::vector;
-    using std::unordered_map;
 
-    struct GroupInfo {
-        int row;
-        int gc;
-        int xStart;
-        std::unordered_map<std::string, std::vector<int>> symXs;
-    };
+    //if (routingLengthEnable == 0) {
+    //    costMap[CostEnum::routing_lengthCost] = 0.0;
+    //    return;
+    //}
 
-    vector<GroupInfo> allGroups;
-    int col_x = 0;
+    const int R = rowSize;
+    const int C = colSize;
+    if (R <= 0 || C <= 0) { costMap[CostEnum::routing_lengthCost] = 0.0; return; }
 
-    for (int r = 0; r < rowSize; ++r)
-    {
-        col_x = 0;
-        for (int c = 0; c < colSize; ++c)
-        {
-            GroupInfo gi;
-            gi.row = r;
-            gi.gc = c;
-            gi.xStart = col_x;
+    auto is_dummy = [](const string& s) { return s.empty() || s == "d"; };
+    auto normPairFn = [](char a, char b) -> string { return { std::min(a,b), std::max(a,b) }; };
 
-            const auto& units = table[r][c].GetDeviceUnits();
-            for (const auto& du : units)
-            {
-                const string& sym = du.GetSymbol();
-                if (!sym.empty() && sym != "d")
-                    gi.symXs[sym].push_back(col_x);
-                ++col_x;
-            }
-            allGroups.push_back(gi);
+    static const int NUM_SUB = 4;
+
+    // Build pattern strings per cell
+    vector<vector<string>> cellPat(R, vector<string>(C));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++) {
+            string s;
+            for (const auto& du : table[r][c].GetDeviceUnits())
+                s += du.GetSymbol();
+            cellPat[r][c] = s;
         }
-    }
 
-    if (allGroups.empty()) return 0.0;
+    int patLen = (int)cellPat[0][0].size();
+    if (patLen < 2) { costMap[CostEnum::routing_lengthCost] = 0.0; return; }
+    int gapsPerCell = patLen - 1;
 
-    // Build instName -> symbolName, then parse CDL
-    unordered_map<string, string> instToSymbol;
-    for (const auto& sym : netlist.GetAllSymbolNames())
-    {
-        NetlistUnit nu = netlist.GetNetlistUnit(sym);
-        instToSymbol[nu.GetInstName()] = sym;
-    }
+    auto netAtPos = [&](int r, int c, int gi) -> string {
+        return normPairFn(cellPat[r][c][gi], cellPat[r][c][gi + 1]);
+        };
 
-    unordered_map<string, std::unordered_set<string>> netSymbols;
+    // Target nets: exclude same-pair where symbol is outer letter
+    std::set<char> outerLetters;
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            outerLetters.insert(cellPat[r][c][0]);
 
-    std::ifstream cdlFile(cdlFilePath);
-    if (!cdlFile.is_open())
-    {
-        std::cerr << "[Routing] Cannot open CDL file: " << cdlFilePath << "\n";
-        return 0.0;
-    }
+    std::set<string> targetNets;
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            for (int gi = 0; gi < gapsPerCell; gi++) {
+                string net = netAtPos(r, c, gi);
+                if (net[0] == net[1] && outerLetters.count(net[0])) continue;
+                targetNets.insert(net);
+            }
 
-    string line;
-    while (std::getline(cdlFile, line))
-    {
-        if (line.empty() || line[0] == '*' || line[0] == '.') continue;
-        std::istringstream iss(line);
-        string instName, netD, netG, netS, netB;
-        if (!(iss >> instName >> netD >> netG >> netS >> netB)) continue;
+    int gridRows = R * NUM_SUB;
+    int gridCols = C * gapsPerCell;
 
-        auto it = instToSymbol.find(instName);
-        if (it == instToSymbol.end()) continue;
-        const string& sym = it->second;
-
-        netSymbols[netD].insert(sym);
-        netSymbols[netG].insert(sym);
-        netSymbols[netS].insert(sym);
-    }
-    cdlFile.close();
-
-    // For each net, calculate routing length
-    double totalRC = 0.0;
-
-    for (const auto& kv : netSymbols)
-    {
-        const auto& symsInNet = kv.second;
-
-        double horizTotal = 0.0;
-        std::unordered_map<int, std::vector<int>> gcToRows;
-        std::unordered_map<int, int> gcCenterX;
-
-        for (const auto& gi : allGroups)
-        {
-            int minX = INT_MAX, maxX = INT_MIN;
-            bool found = false;
-
-            for (const auto& kvSym : gi.symXs)
-            {
-                if (!symsInNet.count(kvSym.first)) continue;
-                for (int x : kvSym.second) {
-                    minX = std::min(minX, x);
-                    maxX = std::max(maxX, x);
-                    found = true;
+    // Per-cell sub-row / rep-gap
+    vector<vector<std::map<string, int>>> cellSubRow(R, vector<std::map<string, int>>(C));
+    vector<vector<std::map<string, int>>> cellRepGap(R, vector<std::map<string, int>>(C));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++) {
+            int nextSub = 0;
+            std::set<string> seen;
+            for (int gi = 0; gi < gapsPerCell; gi++) {
+                string net = netAtPos(r, c, gi);
+                if (!targetNets.count(net)) continue;
+                if (seen.insert(net).second) {
+                    cellSubRow[r][c][net] = nextSub++;
+                    cellRepGap[r][c][net] = gi;
                 }
             }
+        }
 
-            if (found)
-            {
-                horizTotal += (maxX - minX);
-                gcToRows[gi.gc].push_back(gi.row);
-                int totalUnits = 0;
-                for (const auto& kvSym : gi.symXs) totalUnits += (int)kvSym.second.size();
-                gcCenterX[gi.gc] = gi.xStart + totalUnits / 2;
+    // UnionFind
+    struct UF {
+        vector<int> p;
+        UF() {}
+        UF(int n) : p(n) { for (int i = 0; i < n; i++) p[i] = i; }
+        int find(int x) { while (p[x] != x) { p[x] = p[p[x]]; x = p[x]; } return x; }
+        void unite(int a, int b) { a = find(a); b = find(b); if (a != b) p[a] = b; }
+        bool connected(int a, int b) { return find(a) == find(b); }
+    };
+
+    auto cid = [&](int r, int c) { return r * gridCols + c; };
+    auto toGC = [&](int cell, int gi) { return cell * gapsPerCell + gi; };
+
+    auto isSeed = [&](int sr, int gc) -> bool {
+        int origRow = sr / NUM_SUB;
+        int cellCol = gc / gapsPerCell;
+        int gi = gc % gapsPerCell;
+        int subIdx = sr % NUM_SUB;
+        string net = netAtPos(origRow, cellCol, gi);
+        if (!targetNets.count(net)) return false;
+        auto it = cellSubRow[origRow][cellCol].find(net);
+        if (it == cellSubRow[origRow][cellCol].end() || it->second != subIdx) return false;
+        auto it2 = cellRepGap[origRow][cellCol].find(net);
+        return it2 != cellRepGap[origRow][cellCol].end() && it2->second == gi;
+        };
+
+    int totalCells = gridRows * gridCols;
+    std::map<string, UF> nameUF;
+    for (auto& n : targetNets) nameUF[n] = UF(totalCells);
+
+    vector<vector<int>> congestion(gridRows, vector<int>(gridCols, 0));
+    auto addLayer = [&](const vector<vector<int>>& L) {
+        for (int r = 0; r < gridRows; r++)
+            for (int c = 0; c < gridCols; c++)
+                congestion[r][c] += L[r][c];
+        };
+
+    auto connectH = [&](int sr, int gc1, int gc2, vector<vector<int>>& L, const string& name) {
+        auto& uf = nameUF[name];
+        int gMin = std::min(gc1, gc2), gMax = std::max(gc1, gc2);
+        for (int g = gMin; g <= gMax; g++) {
+            if (L[sr][g] == 0) L[sr][g] = 1;
+            uf.unite(cid(sr, gc1), cid(sr, g));
+        }
+        };
+    auto connectV = [&](int gc, int sr1, int sr2, vector<vector<int>>& L, const string& name) {
+        auto& uf = nameUF[name];
+        int sMin = std::min(sr1, sr2), sMax = std::max(sr1, sr2);
+        for (int sr = sMin; sr <= sMax; sr++) {
+            if (L[sr][gc] == 0) L[sr][gc] = 1;
+            uf.unite(cid(sr1, gc), cid(sr, gc));
+        }
+        };
+    auto connectLShape = [&](int sr1, int gc1, int sr2, int gc2,
+        vector<vector<int>>& Lv, vector<vector<int>>& Lh, const string& name) {
+            auto& uf = nameUF[name];
+            int sMin = std::min(sr1, sr2), sMax = std::max(sr1, sr2);
+            for (int sr = sMin; sr <= sMax; sr++) {
+                if (Lv[sr][gc1] == 0) Lv[sr][gc1] = 1;
+                uf.unite(cid(sr1, gc1), cid(sr, gc1));
             }
-        }
+            int gMin = std::min(gc1, gc2), gMax = std::max(gc1, gc2);
+            for (int g = gMin; g <= gMax; g++) {
+                if (Lh[sr2][g] == 0) Lh[sr2][g] = 1;
+                uf.unite(cid(sr1, gc1), cid(sr2, g));
+            }
+        };
 
-        double vertTotal = 0.0;
-        std::vector<int> activeCols;
-        for (auto& gcKv : gcToRows)
-        {
-            auto& rows = gcKv.second;
-            std::sort(rows.begin(), rows.end());
-            vertTotal += (rows.back() - rows.front());
-            activeCols.push_back(gcKv.first);
-        }
-        std::sort(activeCols.begin(), activeCols.end());
+    // LG (UF only, no congestion)
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            for (int gi = 0; gi < gapsPerCell; gi++) {
+                string net = netAtPos(r, c, gi);
+                if (!targetNets.count(net)) continue;
+                int gc = toGC(c, gi);
+                int srBase = r * NUM_SUB;
+                auto& uf = nameUF[net];
+                for (int s = 1; s < NUM_SUB; s++)
+                    uf.unite(cid(srBase, gc), cid(srBase + s, gc));
+            }
 
-        double hMidTotal = 0.0;
-        if (activeCols.size() >= 2)
-        {
-            int leftX = gcCenterX[activeCols.front()];
-            int rightX = gcCenterX[activeCols.back()];
-            hMidTotal = rightX - leftX;
-        }
-
-        totalRC += horizTotal + vertTotal + hMidTotal;
+    // LG1
+    {
+        vector<vector<int>> L(gridRows, vector<int>(gridCols, 0));
+        for (int r = 0; r < R; r++)
+            for (int c = 0; c < C; c++) {
+                std::map<string, vector<int>> netGaps;
+                for (int gi = 0; gi < gapsPerCell; gi++) {
+                    string net = netAtPos(r, c, gi);
+                    if (targetNets.count(net)) netGaps[net].push_back(gi);
+                }
+                for (auto& [net, gis] : netGaps) {
+                    if (gis.size() < 2) continue;
+                    auto it = cellSubRow[r][c].find(net);
+                    if (it == cellSubRow[r][c].end()) continue;
+                    int sr = r * NUM_SUB + it->second;
+                    int gcFirst = toGC(c, gis.front());
+                    int gcLast = toGC(c, gis.back());
+                    auto& uf = nameUF[net];
+                    for (int g = gcFirst; g <= gcLast; g++) {
+                        if (L[sr][g] == 0) L[sr][g] = 1;
+                        uf.unite(cid(sr, gcFirst), cid(sr, g));
+                    }
+                }
+            }
+        addLayer(L);
     }
 
-    return totalRC;
+    // L0 (2-row pair vertical)
+    {
+        vector<vector<int>> L(gridRows, vector<int>(gridCols, 0));
+        for (int rPair = 0; rPair + 1 < R; rPair += 2)
+            for (int c = 0; c < C; c++)
+                for (auto& net : targetNets) {
+                    auto& rep0 = cellRepGap[rPair][c];
+                    auto& rep1 = cellRepGap[rPair + 1][c];
+                    auto& sub0 = cellSubRow[rPair][c];
+                    auto& sub1 = cellSubRow[rPair + 1][c];
+                    if (!rep0.count(net) || !rep1.count(net)) continue;
+                    if (rep0.at(net) != rep1.at(net) || sub0.at(net) != sub1.at(net)) continue;
+                    int gi = rep0.at(net);
+                    int gc = toGC(c, gi);
+                    int subIdx = sub0.at(net);
+                    int sr0 = rPair * NUM_SUB + subIdx;
+                    int sr1 = (rPair + 1) * NUM_SUB + subIdx;
+                    auto& uf = nameUF[net];
+                    for (int sr = sr0; sr <= sr1; sr++) {
+                        L[sr][gc] = 1;
+                        uf.unite(cid(sr0, gc), cid(sr, gc));
+                    }
+                }
+        addLayer(L);
+    }
+
+    // Expansion layers
+    {
+        struct Step { int rBlk, cBlk; bool horiz; };
+        vector<Step> steps;
+        int rb = 2, cb = 1;
+        bool h = true;
+        while (rb < R || cb < C) {
+            if (h) cb = std::min(cb * 2, C);
+            else   rb = std::min(rb * 2, R);
+            steps.push_back({ rb, cb, h });
+            if (rb >= R && cb >= C) break;
+            h = !h;
+        }
+        if (steps.empty()) steps.push_back({ R, C, true });
+
+        for (auto& [rBlk, cBlk, horiz] : steps) {
+            vector<vector<int>> L(gridRows, vector<int>(gridCols, 0));
+            bool anyChange = false;
+            for (int rS = 0; rS < R; rS += rBlk) {
+                int rE = std::min(rS + rBlk, R);
+                for (int cS = 0; cS < C; cS += cBlk) {
+                    int cE = std::min(cS + cBlk, C);
+                    int srS = rS * NUM_SUB, srE = rE * NUM_SUB;
+                    int gcS = cS * gapsPerCell, gcE = cE * gapsPerCell;
+                    for (const string& name : targetNets) {
+                        vector<std::pair<int, int>> seeds;
+                        for (int sr = srS; sr < srE; sr++)
+                            for (int gc = gcS; gc < gcE; gc++)
+                                if (isSeed(sr, gc) &&
+                                    netAtPos(sr / NUM_SUB, gc / gapsPerCell, gc % gapsPerCell) == name)
+                                    seeds.push_back({ sr, gc });
+                        if (seeds.size() < 2) continue;
+                        auto& uf = nameUF[name];
+                        if (horiz) {
+                            std::map<int, vector<int>> srToGCs;
+                            for (auto& [sr, gc] : seeds) srToGCs[sr].push_back(gc);
+                            vector<std::pair<int, vector<int>>> sv(srToGCs.begin(), srToGCs.end());
+                            for (auto& [sr, gcs] : sv) std::sort(gcs.begin(), gcs.end());
+                            std::sort(sv.begin(), sv.end(), [](auto& a, auto& b) {
+                                return (a.second.back() - a.second.front()) > (b.second.back() - b.second.front());
+                                });
+                            for (auto& [sr, gcs] : sv) {
+                                for (int i = 1; i < (int)gcs.size(); i++) {
+                                    if (!uf.connected(cid(sr, gcs[i - 1]), cid(sr, gcs[i]))) {
+                                        connectH(sr, gcs[i - 1], gcs[i], L, name);
+                                        anyChange = true;
+                                    }
+                                }
+                            }
+                        }
+                        else {
+                            std::map<int, vector<int>> gcToSRs;
+                            for (auto& [sr, gc] : seeds) gcToSRs[gc].push_back(sr);
+                            vector<std::pair<int, vector<int>>> sv(gcToSRs.begin(), gcToSRs.end());
+                            for (auto& [gc, srs] : sv) std::sort(srs.begin(), srs.end());
+                            std::sort(sv.begin(), sv.end(), [](auto& a, auto& b) {
+                                return (a.second.back() - a.second.front()) > (b.second.back() - b.second.front());
+                                });
+                            for (auto& [gc, srs] : sv) {
+                                for (int i = 1; i < (int)srs.size(); i++) {
+                                    if (!uf.connected(cid(srs[i - 1], gc), cid(srs[i], gc))) {
+                                        connectV(gc, srs[i - 1], srs[i], L, name);
+                                        anyChange = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (anyChange) addLayer(L);
+        }
+    }
+
+    // L-shape
+    {
+        vector<vector<int>> Lv(gridRows, vector<int>(gridCols, 0));
+        vector<vector<int>> Lh(gridRows, vector<int>(gridCols, 0));
+        for (const string& name : targetNets) {
+            vector<std::pair<int, int>> seeds;
+            for (int sr = 0; sr < gridRows; sr++)
+                for (int gc = 0; gc < gridCols; gc++)
+                    if (isSeed(sr, gc) &&
+                        netAtPos(sr / NUM_SUB, gc / gapsPerCell, gc % gapsPerCell) == name)
+                        seeds.push_back({ sr, gc });
+            if (seeds.size() < 2) continue;
+            auto& uf = nameUF[name];
+            for (int i = 1; i < (int)seeds.size(); i++) {
+                auto [s0, g0] = seeds[0];
+                auto [si, gi] = seeds[i];
+                if (!uf.connected(cid(s0, g0), cid(si, gi)))
+                    connectLShape(s0, g0, si, gi, Lv, Lh, name);
+            }
+        }
+        bool hasV = false, hasH = false;
+        for (int r = 0; r < gridRows && !hasV; r++)
+            for (int c = 0; c < gridCols && !hasV; c++) if (Lv[r][c] > 0) hasV = true;
+        for (int r = 0; r < gridRows && !hasH; r++)
+            for (int c = 0; c < gridCols && !hasH; c++) if (Lh[r][c] > 0) hasH = true;
+        if (hasV) addLayer(Lv);
+        if (hasH) addLayer(Lh);
+    }
+
+    // Total congestion sum
+    long long total = 0;
+    for (int r = 0; r < gridRows; r++)
+        for (int c = 0; c < gridCols; c++)
+            total += congestion[r][c];
+
+    costMap[CostEnum::routing_lengthCost] = (double)total;
 }
+
 
 void TableManager::CalculateMILDCost()
 {
