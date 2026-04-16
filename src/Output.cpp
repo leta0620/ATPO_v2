@@ -559,9 +559,9 @@ void Output::SelectCoBetterSolution()
 			unordered_map<CostEnum, double> costB = b.first.GetCostMap();
 
 			return (costA[CostEnum::cCost] < costB[CostEnum::cCost]) || 
-				(costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::rCost] < costB[CostEnum::rCost]) ||
-				(costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::rCost] == costB[CostEnum::rCost] && costA[CostEnum::sperationCost] < costB[CostEnum::sperationCost]) ||
-				(costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::rCost] == costB[CostEnum::rCost] && costA[CostEnum::sperationCost] == costB[CostEnum::sperationCost] && costA[CostEnum::mildCost] < costB[CostEnum::mildCost]);
+				(costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::hierCongestionCost] < costB[CostEnum::hierCongestionCost]) ||
+				(costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::hierCongestionCost] == costB[CostEnum::hierCongestionCost] && costA[CostEnum::sperationCost] < costB[CostEnum::sperationCost]) ||
+				(costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::hierCongestionCost] == costB[CostEnum::hierCongestionCost] && costA[CostEnum::sperationCost] == costB[CostEnum::sperationCost] && costA[CostEnum::mildCost] < costB[CostEnum::mildCost]);
 		}
 
 

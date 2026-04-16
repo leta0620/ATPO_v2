@@ -281,6 +281,14 @@ bool doesADominateB(const std::unordered_map<CostEnum, double>& aCost, const std
 		//{
 		//	aBetterInAtLeastOne = true; // a is better in this objective
 		//}
+		CostEnum costEnum = static_cast<CostEnum>(i);
+
+		// Skip routing_lengthCost from dominance check when the switch is disabled.
+		// This lets the cost value still appear in cost reports without perturbing
+		// the optimizer's Pareto-front selection.
+		if (costEnum == CostEnum::routing_lengthCost &&
+			TableManager::GetRoutingLengthEnable() == 0)
+			continue;
 
 		// 把上面改寫法成map 
 		auto it = aCost.find(static_cast<CostEnum>(i));

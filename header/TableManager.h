@@ -94,16 +94,23 @@ private:
 	bool RowRuleCheck(int rowPlace, int colPlace, Group& group);
 
 
-
+public:
 	// cost part
 	std::unordered_map<CostEnum, double> costMap;
+	// Routing length switch: 0 = skip in dominance/perturbation, 1 = include.
+	// Static so free functions (e.g. doesADominateB) can query without an instance.
+	// Value is still always computed and written to costMap for reporting.
+	static int routingLengthEnable;
+	static void SetRoutingLengthEnable(int v) { routingLengthEnable = (v != 0) ? 1 : 0; }
+	static int  GetRoutingLengthEnable() { return routingLengthEnable; }
 
+private:
 	void CalculateCCCost();
 	void CalculateRCost();
 	void CalculateCCost();
 	void CalculateSpetationCost();
 	void CalculateDummyCost();
-	double CalculateRoutinglength();//
+	void CalculateRoutinglength();//k
 	void CalculateMILDCost();
 	void CalculateCongestionCost();
 	void CalculateHierCongestionCost();
