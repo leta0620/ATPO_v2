@@ -16,7 +16,7 @@
 using namespace std;
 
 // Static member definition: routing length perturbation switch (default = on)
-int TableManager::routingLengthEnable = 0;
+int TableManager::routingLengthEnable = 1;
 
 // Utility: return the first non-"d" symbol inside a group.
 // If the group contains only "d", return empty string.

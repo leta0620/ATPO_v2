@@ -294,15 +294,16 @@ bool doesADominateB(const std::unordered_map<CostEnum, double>& aCost, const std
 		auto it = aCost.find(static_cast<CostEnum>(i));
 		if (it != aCost.end())
 		{
-			int aValue = it->second;
-			int bValue = bCost.at(static_cast<CostEnum>(i));
-			if (aValue > bValue)
+			double aValue = it->second;
+			double bValue = bCost.at(static_cast<CostEnum>(i));
+			constexpr double kEps = 1e-9;
+			if (aValue > bValue + kEps)
 			{
-				return false; // a is worse in this objective
+				return false;
 			}
-			else if (aValue < bValue)
+			else if (aValue < bValue - kEps)
 			{
-				aBetterInAtLeastOne = true; // a is better in this objective
+				aBetterInAtLeastOne = true;
 			}
 		}
 
