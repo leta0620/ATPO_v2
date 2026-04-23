@@ -1786,15 +1786,15 @@ bool TableManager::BuildInterleavingTable()
         }
     }
 
-    std::cout << "Interleaving Table:" << std::endl;
-    for (auto& row : this->table)
-    {
-        for (auto& group : row)
-        {
-            std::cout << group.GetSymbolNameSequence() << " ";
-        }
-        std::cout << std::endl;
-    }
+    //std::cout << "Interleaving Table:" << std::endl;
+    //for (auto& row : this->table)
+    //{
+    //    for (auto& group : row)
+    //    {
+    //        std::cout << group.GetSymbolNameSequence() << " ";
+    //    }
+    //    std::cout << std::endl;
+    //}
 
     return true;
 }
