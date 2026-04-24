@@ -9,7 +9,7 @@
 class InitialPlacement
 {
 public:
-	InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist);
+	InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist, std::vector<CostEnum> costEnumList);
 
 	std::vector<TableManager>& GetInitialTableList() 
 	{
@@ -25,6 +25,7 @@ private:
 	int groupSize;
 	int rowSize;
 	int colSize; // to be determined
+	std::vector<CostEnum> costEnumList;
 
 	// Calculate initial placement tables list
 	void CalculateInitialTableList();

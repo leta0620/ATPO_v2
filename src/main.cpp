@@ -54,6 +54,28 @@ int main(int argc, char* argv[]) {
 	string sa_mode_str = argv[7];
 	int saRoundPerTemp = stoi(argv[8]);
 
+	vector<CostEnum> costEnumList;
+
+	switch (stoi(sa_mode_str))
+	{
+	case 0:
+		// Random Mode
+		costEnumList = { CostEnum::ccCost, CostEnum::rCost, CostEnum::cCost, CostEnum::sperationCost, CostEnum::dummyCost, CostEnum::routing_lengthCost, CostEnum::mildCost, CostEnum::congestionCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
+		break;
+	case 1:
+		// CC Mode
+		costEnumList = { CostEnum::sperationCost, CostEnum::mildCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
+		break;
+	case 2:
+		// Interleaving Mode
+		costEnumList = { CostEnum::sperationCost, CostEnum::windowSizeCost, CostEnum::symmetryCost };
+		break;
+	default:
+		cerr << "Unknown SA Mode, set to RandomMode by default." << endl;
+		costEnumList = { CostEnum::ccCost, CostEnum::rCost, CostEnum::cCost, CostEnum::sperationCost, CostEnum::dummyCost, CostEnum::routing_lengthCost, CostEnum::mildCost, CostEnum::congestionCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
+	}
+
+
 	// Generate intermediate file from CDL and Pattern files
 	string intermediate_code_file_path = "intermediate_temp.txt";
 	//OuterInput outerInput(cdl_input_file_path, pattern_input_file_path);
@@ -85,7 +107,7 @@ int main(int argc, char* argv[]) {
 	}
 
 
-	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable());
+	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable(), costEnumList);
 	vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
 	for (auto& t : initialTableList)
 		t.SetCdlFilePath(cdl_input_file_path);//Add tablemanager known  parser 
@@ -100,7 +122,7 @@ int main(int argc, char* argv[]) {
 		for (int i = 0; i < initialTableList.size(); ++i)
 		{
 			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
-			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, saRoundPerTemp, true, sa_mode_str);
+			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, saRoundPerTemp, true, sa_mode_str, costEnumList);
 			allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
 			
 			cout << "\r";
@@ -140,7 +162,7 @@ int main(int argc, char* argv[]) {
 				if (i >= jobCount) break;
 
 				// 跑 SA（你的參數照舊）
-				SAManager saManager(initialTableList[i], netlistLUT, 0.9, 100.0, 1.0, saRoundPerTemp, false, sa_mode_str);
+				SAManager saManager(initialTableList[i], netlistLUT, 0.9, 100.0, 1.0, saRoundPerTemp, false, sa_mode_str, costEnumList);
 
 				// 每個 index 只被寫一次 -> 不需要 mutex
 				results[i] = saManager.GetNondominatedSolution();

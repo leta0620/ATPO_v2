@@ -50,12 +50,27 @@ bool CheckAllGroupMemberDummy(const Group& g) {
 // Constructor & basic operations
 // =======================
 
-TableManager::TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist)
+//TableManager::TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist)
+//{
+//    this->groupSize = groupSize;
+//    this->rowSize = rowSize;
+//    this->colSize = colSize;
+//    this->netlist = netlist;
+//
+//	// set cost enum list to default (all cost types), use for loop
+//    for (int i = static_cast<int>(CostEnum::ccCost); i <= static_cast<int>(CostEnum::hierCCost); i++) {
+//        costEnumList.push_back(static_cast<CostEnum>(i));
+//	}
+//    InitializeTable();
+//}
+
+TableManager::TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist, std::vector<CostEnum> costEnumList)
 {
     this->groupSize = groupSize;
     this->rowSize = rowSize;
     this->colSize = colSize;
     this->netlist = netlist;
+	this->costEnumList = costEnumList;
     InitializeTable();
 }
 
@@ -173,16 +188,61 @@ std::vector<std::string> TableManager::GetTableRotationPattern(bool leftS)
 std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
 {
     this->costMap.clear();
-    this->CalculateCCCost();
-    this->CalculateRCost();
-    this->CalculateCCost();
-    this->CalculateSpetationCost();
-    this->CalculateDummyCost();
-    this->CalculateRoutinglength(); // ← 新增
-    this->CalculateMILDCost();
-    this->CalculateCongestionCost();
-    this->CalculateHierCongestionCost();
-    this->CalculateHierCCost();
+
+    for (auto& cItem : this->costEnumList)
+    {
+        switch (cItem)
+        {
+            case CostEnum::ccCost:
+                this->CalculateCCCost();
+				break;
+            case CostEnum::rCost:
+                this->CalculateRCost();
+                break;
+            case CostEnum::cCost:
+                this->CalculateCCost();
+                break;
+            case CostEnum::sperationCost:
+                this->CalculateSpetationCost();
+                break;
+            case CostEnum::dummyCost:
+                this->CalculateDummyCost();
+                break;
+            case CostEnum::routing_lengthCost:
+                this->CalculateRoutinglength();
+                break;
+            case CostEnum::mildCost:
+                this->CalculateMILDCost();
+                break;
+            case CostEnum::congestionCost:
+                this->CalculateCongestionCost();
+                break;
+            case CostEnum::symmetryCost:
+                this->CalculateSymmetryCost();
+				break;
+            case CostEnum::windowSizeCost:
+                this->CalculateWindowSizeCost();
+				break;
+            case CostEnum::hierCongestionCost:
+                this->CalculateHierCongestionCost();
+                break;
+            case CostEnum::hierCCost:
+                this->CalculateHierCCost();
+				break;
+        default:
+            break;
+        }
+    }
+    //this->CalculateCCCost();
+    //this->CalculateRCost();
+    //this->CalculateCCost();
+    //this->CalculateSpetationCost();
+    //this->CalculateDummyCost();
+    //this->CalculateRoutinglength(); // ← 新增
+    //this->CalculateMILDCost();
+    //this->CalculateCongestionCost();
+    //this->CalculateHierCongestionCost();
+    //this->CalculateHierCCost();
     return this->costMap;
 }
 
@@ -1654,7 +1714,14 @@ string TableManager::GetCostName(CostEnum costEnum)
     {
         return "Hierarchical Coupling capacitance";
     }
-
+    else if (costEnum == CostEnum::windowSizeCost)
+    {
+        return "Window Size Cost";
+	}
+    else if (costEnum == CostEnum::symmetryCost)
+    {
+        return "Symmetry Cost";
+	}
     else
     {
         return "Unknown Cost";
@@ -2772,4 +2839,106 @@ void TableManager::CalculateHierCCost()
     const double C_col = type_num > 0 ? sum_avg_col / type_num : 0.0;
 
     costMap[CostEnum::hierCCost] = wH * C_row + wV * C_col;
+}
+
+void TableManager::CalculateSymmetryCost()
+{
+    double noSymmetryScore = 0.0;
+    for (int r = 0; r < rowSize / 2; r++)
+    {
+        for (int c = 0; c < colSize / 2; c++)
+        {
+            Group g = table[r][c];
+            Group gSym = table[rowSize - 1 - r][colSize - 1 - c];
+
+            if (g == gSym) continue;
+            else noSymmetryScore += 1.0;
+        }
+    }
+
+	costMap[CostEnum::symmetryCost] = noSymmetryScore; // lower is better
+}
+
+pair<double, double> CalEachWindowSizeCost(TableManager table, int rowSize, int colSize, int rowWindowSize, int colWindowSize)
+{
+    int sameGroupCount = 0;
+    int allGroupCount = 0;
+
+    for (int i = 0; i + rowWindowSize - 1 < rowSize; i += rowWindowSize)
+    {
+        for (int j = 0; j + colWindowSize - 1 < colSize; j += colWindowSize)
+        {
+            allGroupCount++;
+            Group currentGroup = table.GetGroup(i, j);
+
+            //cout << rowSize << " " << colSize << " " << rowWindowSize << " " << colWindowSize << "\n";
+
+            bool sameGroup = true;
+            // 修正邊界：只檢查當前的 Window 範圍
+            for (int x = i; x < i + rowWindowSize; ++x)
+            {
+                for (int y = j; y < j + colWindowSize; ++y)
+                {
+                    if (table.GetGroup(x, y).GetSymbolNameSequence() != currentGroup.GetSymbolNameSequence())
+                    {
+                        sameGroup = false;
+                        break;
+                    }
+                }
+                if (!sameGroup)
+                {
+                    break;
+                }
+            }
+
+            if (sameGroup)
+            {
+                sameGroupCount++;
+            }
+        }
+    }
+
+
+    double coverageRate = (double)sameGroupCount / allGroupCount;
+    int bestRowWindowSize = rowWindowSize, bestColWindowSize = colWindowSize;
+
+
+    if (rowWindowSize > 1)
+    {
+        pair<double, double> newCoverageRate = CalEachWindowSizeCost(table, rowSize, colSize, rowWindowSize / 2, colWindowSize);
+        if (newCoverageRate.first > coverageRate || (newCoverageRate.first == coverageRate && (rowWindowSize / 2 * colWindowSize > bestRowWindowSize * bestColWindowSize)))
+        {
+            coverageRate = newCoverageRate.first;
+            bestRowWindowSize = rowWindowSize / 2;
+            bestColWindowSize = colWindowSize;
+        }
+    }
+
+    if (colWindowSize > 1)
+    {
+        pair<double, double> newCoverageRate = CalEachWindowSizeCost(table, rowSize, colSize, rowWindowSize, colWindowSize / 2);
+        if (newCoverageRate.first > coverageRate || (newCoverageRate.first == coverageRate && (rowWindowSize * colWindowSize / 2 > bestRowWindowSize * bestColWindowSize)))
+        {
+            coverageRate = newCoverageRate.first;
+            bestRowWindowSize = rowWindowSize;
+            bestColWindowSize = colWindowSize / 2;
+        }
+    }
+
+	return { coverageRate, (double)(bestRowWindowSize * bestColWindowSize) / (rowSize * colSize) };
+}
+
+void TableManager::CalculateWindowSizeCost()
+{
+    int rowWindowSize = rowSize;
+    int colWindowSize = colSize;
+    pair<double, double> windowSizeCost = CalEachWindowSizeCost(*this, rowSize, colSize, rowWindowSize, colWindowSize);
+    if ((int)(windowSizeCost.first * 100) != 100)
+    {
+        costMap[CostEnum::windowSizeCost] = INT_MAX; // perfect coverage, no penalty
+    }
+    else
+    {
+		costMap[CostEnum::windowSizeCost] = 1.0 / (windowSizeCost.second * table[0][0].GetDeviceUnits().size()); // lower is better, normalized by device units
+    }
 }

@@ -48,6 +48,7 @@ void Output::WriteAllResultToFile(std::string fileName)
 
 			// 遍歷cost並輸出，要有項目名稱和數值
 			auto costNameAndValue = tableList[i].GetCostNameAndCostValueString();
+			//cout << costNameAndValue.size() << "\n";
 			for (auto cost : costNameAndValue)
 			{
 				outFile << cost.first << ":" << cost.second << "\t";

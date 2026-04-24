@@ -54,6 +54,19 @@ public:
 
 	void BuildAllDummyGroup(int groupSize);
 
+	bool operator== (const Group& other) const 
+	{
+		if (deviceUnits.size() != other.deviceUnits.size()) {
+			return false;
+		}
+		for (size_t i = 0; i < deviceUnits.size(); ++i) {
+			if (!(deviceUnits[i] == other.deviceUnits[i])) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 private:
 	//std::string name;
 	std::vector<DeviceUnit> deviceUnits;

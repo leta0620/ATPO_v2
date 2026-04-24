@@ -3,7 +3,7 @@
 #include "NetListLookupTable.h"
 #include <random>
 #include <string>
-#include <vector>`
+#include <vector>
 #include <unordered_map>
 
 enum SAMode
@@ -24,6 +24,7 @@ private:
 	double currentTemp;
 	int iterationPerTemp;
 	bool openCommandLineOutput = false;
+	std::vector<CostEnum> costEnumList = { CostEnum::ccCost, CostEnum::rCost, CostEnum::cCost, CostEnum::sperationCost, CostEnum::dummyCost, CostEnum::routing_lengthCost, CostEnum::mildCost, CostEnum::congestionCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
 
 	std::vector<TableManager> nondominatedSolution;
 	TableManager initialTable;
@@ -51,7 +52,7 @@ private:
 
 	void SetupGroupTypePositionMap();
 public:
-	SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate = 0.95, double initialTemp = 1000.0, double finalTemp = 1.0, int iterationPerTemp = 100, bool openCommandLineOutput = false, std::string saMode = "RandomMode");
+	SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate = 0.95, double initialTemp = 1000.0, double finalTemp = 1.0, int iterationPerTemp = 100, bool openCommandLineOutput = false, std::string saMode = "RandomMode", std::vector<CostEnum> costEnumList = { CostEnum::ccCost, CostEnum::rCost, CostEnum::cCost, CostEnum::sperationCost, CostEnum::dummyCost, CostEnum::routing_lengthCost, CostEnum::mildCost, CostEnum::congestionCost, CostEnum::hierCongestionCost, CostEnum::hierCCost });
 
 	std::vector<TableManager> GetNondominatedSolution() { return nondominatedSolution; }
 

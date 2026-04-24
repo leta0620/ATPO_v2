@@ -8,7 +8,7 @@
 
 using namespace std;
 
-SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate, double initialTemp, double finalTemp, int iterationPerTemp, bool openCommandLineOutput, std::string saMode)
+SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, double coolRate, double initialTemp, double finalTemp, int iterationPerTemp, bool openCommandLineOutput, std::string saMode, std::vector<CostEnum> costEnumList)
 	: initialTable(initialTable)
 	, netlistLookupTable(netlist)
 	, coolRate(coolRate)
@@ -17,6 +17,7 @@ SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, do
 	, currentTemp(initialTemp)
 	, iterationPerTemp(iterationPerTemp)
 	, openCommandLineOutput(openCommandLineOutput)
+	, costEnumList(costEnumList)
 {
 	if (saMode == "RandomMode" || saMode == "0")
 	{
