@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <fstream>
 #include <sstream>
+#include <climits>
 
 #include "TableManager.h"
 
