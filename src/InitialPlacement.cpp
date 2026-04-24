@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <unordered_map>
 
-InitialPlacement::InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist) : groupSize(groupSize), rowSize(rowSize), colSize(0), netListLookupTable(netlist)
+InitialPlacement::InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist, std::vector<CostEnum> costEnumList) : groupSize(groupSize), rowSize(rowSize), colSize(0), netListLookupTable(netlist), costEnumList(costEnumList)
 {
 	//InitialTableList.resize(rowSize, TableManager(groupSize, rowSize, colSize, netListLookupTable));
 	this->GroupAllocation(); //floorplan
@@ -498,7 +498,7 @@ void InitialPlacement::CalculateInitialTableList()
 		int nowTableColSize = ((tableSize + rowSize - 1) / rowSize) * 2;// ceiling division
 		int nowTableGroupSize = groupsInATable[0].GetDeviceUnits().size();
 		//std::cout << "Calculated column size: " << this->colSize << std::endl;
-		TableManager nowTableManager(nowTableGroupSize, this->rowSize, nowTableColSize, this->netListLookupTable);
+		TableManager nowTableManager(nowTableGroupSize, this->rowSize, nowTableColSize, this->netListLookupTable, this->costEnumList);
 
 		Group dummyGroup; // dummy group for empty place
 		for (int i = 0; i < nowTableGroupSize; ++i)

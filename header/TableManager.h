@@ -15,6 +15,8 @@ enum class CostEnum
 	routing_lengthCost,
 	mildCost,// RMST routing complexity
 	congestionCost, // trunk-based congestion metric (from cCost Part1)
+	windowSizeCost,
+	symmetryCost,
 	hierCongestionCost, // hierarchical routing congestion metric
 	hierCCost // cCost with hierarchical congestion replacing trunk-based
 };
@@ -23,7 +25,8 @@ class TableManager
 {
 public:
 	TableManager() = default;
-	TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist);
+	//TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist);
+	TableManager(int groupSize, int rowSize, int colSize, NetlistLookupTable& netlist, std::vector<CostEnum> costEnumList);
 
 	void SetNetlistLookupTable(NetlistLookupTable& netlist) { this->netlist = netlist; }
 	void SetCdlFilePath(const std::string& path) { cdlFilePath = path; }  //3/8
@@ -34,6 +37,7 @@ public:
 	int GetColSize() const { return colSize; }
 	int GetGroupSize() const { return groupSize; }
 	void SetNFin(int nfin) { this->nfin = nfin; }
+	void SetCostEnumList(std::vector<CostEnum> costEnumList) { this->costEnumList = costEnumList; }
 
 	Group GetGroup(int row, int col) const { return table[row][col]; }
 
@@ -93,6 +97,8 @@ private:
 	// check row rule(neighborhood group can link)
 	bool RowRuleCheck(int rowPlace, int colPlace, Group& group);
 
+	std::vector<CostEnum> costEnumList = { CostEnum::ccCost, CostEnum::rCost, CostEnum::cCost, CostEnum::sperationCost, CostEnum::dummyCost, CostEnum::routing_lengthCost, CostEnum::mildCost, CostEnum::congestionCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
+
 
 public:
 	// cost part
@@ -115,4 +121,6 @@ private:
 	void CalculateCongestionCost();
 	void CalculateHierCongestionCost();
 	void CalculateHierCCost();
+	void CalculateWindowSizeCost();
+	void CalculateSymmetryCost();
 };
