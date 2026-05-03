@@ -20,6 +20,8 @@
 
 using namespace std;
 
+#define CO_BEST_SOLUTION_NUM 100
+
 #ifdef _WIN32
 #include <direct.h>
 #define MKDIR(path) _mkdir(path)
@@ -215,11 +217,11 @@ int main(int argc, char* argv[]) {
 	//output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "_global_nondominated.txt");
 
 	output.SelectCoBetterSolution();
-	output.PrintCoBetterSolution(20);
-	output.WriteCSVCoBetterSolutionToFile(20, output_file_path);
-	output.WriteCoBetterSolutionToFile(20, output_file_path);
+	output.PrintCoBetterSolution(CO_BEST_SOLUTION_NUM);
+	output.WriteCSVCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+	output.WriteCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
 
-	output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(20, output_file_path);
+	output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(CO_BEST_SOLUTION_NUM, output_file_path);
 
 	cout << "All processing completed successfully.\n" << endl;
 	return 0;
