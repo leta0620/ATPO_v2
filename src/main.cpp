@@ -205,24 +205,47 @@ int main(int argc, char* argv[]) {
 		cerr << "Error removing existing data in output folder: " << e.what() << endl;
 	}
 
-	Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName());
+	if (stoi(sa_mode_str) == 2)
+	{
+		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), true);
 
-	output.WriteAllResultToFile(output_file_path + "all_results.txt");
-	//output.PrintAllResult();
+		output.WriteAllResultToFile(output_file_path + "all_results.txt");
+		//output.PrintAllResult();
 
-	//output.SelectSignificantNondominatedSolutions();
-	//output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "_significant.txt");
-	//output.PrintSignificantNondominatedSolutions();
+		//output.SelectSignificantNondominatedSolutions();
+		//output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "_significant.txt");
+		//output.PrintSignificantNondominatedSolutions();
 
-	//output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "_global_nondominated.txt");
+		//output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "_global_nondominated.txt");
 
-	output.SelectCoBetterSolution();
-	output.PrintCoBetterSolution(CO_BEST_SOLUTION_NUM);
-	output.WriteCSVCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
-	output.WriteCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+		output.SelectCoBetterSolution();
+		output.PrintCoBetterSolution(CO_BEST_SOLUTION_NUM);
+		output.WriteCSVCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+		output.WriteCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
 
-	output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+		output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(CO_BEST_SOLUTION_NUM, output_file_path);
 
+	}
+	else
+	{
+		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), false);
+
+		output.WriteAllResultToFile(output_file_path + "all_results.txt");
+		//output.PrintAllResult();
+
+		//output.SelectSignificantNondominatedSolutions();
+		//output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "_significant.txt");
+		//output.PrintSignificantNondominatedSolutions();
+
+		//output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "_global_nondominated.txt");
+
+		output.SelectCoBetterSolution();
+		output.PrintCoBetterSolution(CO_BEST_SOLUTION_NUM);
+		output.WriteCSVCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+		output.WriteCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+
+		output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+	}
 	cout << "All processing completed successfully.\n" << endl;
 	return 0;
 }

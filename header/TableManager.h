@@ -79,6 +79,8 @@ public:
 	// modify table to make it interleaving, return true if success, false if fail (if fail, the table will not be modified)
 	bool BuildInterleavingTable();
 
+	void FlipLeftHalf();
+
 private:
 	std::vector<std::vector<Group>> table;
 	int rowSize = 0;

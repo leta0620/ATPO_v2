@@ -789,3 +789,14 @@ void Output::WriteCoBetterSolutionToFile(int topN, std::string fileName)
 		index++;
 	}
 }
+
+void Output::FlipLeftHalfOfTable()
+{
+	for (auto& [round, tableList] : allNondominatedSolutions)
+	{
+		for (auto& table : tableList)
+		{
+			table.FlipLeftHalf();
+		}
+	}
+}

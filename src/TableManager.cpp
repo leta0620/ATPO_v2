@@ -2877,11 +2877,6 @@ void TableManager::CalculateSymmetryCost()
         }
     }
 
-    if (table[0][0].GetSymbolNameSequence().size() == 20)
-    {
-		cout << "stop" << endl;
-    }
-
     for (const auto& g1Main : symmetryPairCount)
     {
 		int maxCount = 0;
@@ -2978,5 +2973,16 @@ void TableManager::CalculateWindowSizeCost()
     else
     {
 		costMap[CostEnum::windowSizeCost] = 1.0 / (windowSizeCost.second * table[0][0].GetDeviceUnits().size()); // lower is better, normalized by device units
+    }
+}
+
+void TableManager::FlipLeftHalf()
+{
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize / 2; c++)
+        {
+			table[r][c].FlipGroupRotation();
+        }
     }
 }
