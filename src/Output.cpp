@@ -560,10 +560,11 @@ void Output::SelectCoBetterSolution()
 			unordered_map<CostEnum, double> costB = b.first.GetCostMap();
 
 			return (costA[CostEnum::dummyCost] < costB[CostEnum::dummyCost]) ||
-				(costA[CostEnum::dummyCost] < costB[CostEnum::dummyCost] && costA[CostEnum::cCost] < costB[CostEnum::cCost]) ||
-				(costA[CostEnum::dummyCost] < costB[CostEnum::dummyCost] && costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::hierCongestionCost] < costB[CostEnum::hierCongestionCost]) ||
-				(costA[CostEnum::dummyCost] < costB[CostEnum::dummyCost] && costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::hierCongestionCost] == costB[CostEnum::hierCongestionCost] && costA[CostEnum::sperationCost] < costB[CostEnum::sperationCost]) ||
-				(costA[CostEnum::dummyCost] < costB[CostEnum::dummyCost] && costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::hierCongestionCost] == costB[CostEnum::hierCongestionCost] && costA[CostEnum::sperationCost] == costB[CostEnum::sperationCost] && costA[CostEnum::mildCost] < costB[CostEnum::mildCost]);
+				(costA[CostEnum::dummyCost] == costB[CostEnum::dummyCost] && costA[CostEnum::symmetryCost] < costB[CostEnum::symmetryCost]) ||
+				(costA[CostEnum::dummyCost] == costB[CostEnum::dummyCost] && costA[CostEnum::symmetryCost] == costB[CostEnum::symmetryCost] && costA[CostEnum::cCost] < costB[CostEnum::cCost]) ||
+				(costA[CostEnum::dummyCost] == costB[CostEnum::dummyCost] && costA[CostEnum::symmetryCost] == costB[CostEnum::symmetryCost] && costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::hierCongestionCost] < costB[CostEnum::hierCongestionCost]) ||
+				(costA[CostEnum::dummyCost] == costB[CostEnum::dummyCost] && costA[CostEnum::symmetryCost] == costB[CostEnum::symmetryCost] && costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::hierCongestionCost] == costB[CostEnum::hierCongestionCost] && costA[CostEnum::sperationCost] < costB[CostEnum::sperationCost]) ||
+				(costA[CostEnum::dummyCost] == costB[CostEnum::dummyCost] && costA[CostEnum::symmetryCost] == costB[CostEnum::symmetryCost] && costA[CostEnum::cCost] == costB[CostEnum::cCost] && costA[CostEnum::hierCongestionCost] == costB[CostEnum::hierCongestionCost] && costA[CostEnum::sperationCost] == costB[CostEnum::sperationCost] && costA[CostEnum::mildCost] < costB[CostEnum::mildCost]);
 		}
 
 
