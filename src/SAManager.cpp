@@ -215,6 +215,34 @@ void SAManager::Perturbation(std::mt19937& gen)
 		}
 	};
 
+	auto SwapTwoColInterleaving = [](TableManager& table, mt19937& gen) {
+		// if the selected col has dummy, the other col must also have dummy, otherwise the swap will fail, so we need to check this before swap
+		int rowSize = table.GetRowSize();
+		int colSize = table.GetColSize();
+		uniform_int_distribution<> disCol(0, colSize - 1);
+
+		int col1 = disCol(gen);
+		int col2 = 0;
+
+		int selectionLimit = 1000, nowSelection = 0;
+
+		do
+		{
+			col2 = disCol(gen);
+			nowSelection++;
+			if (nowSelection > selectionLimit)
+			{
+				return;
+			}
+		} while (col1 == col2 || table.GetGroup(0, col1).HasDummyUnit() != table.GetGroup(0, col2).HasDummyUnit());
+
+		// swap col1 and col2
+		if (!table.SwapColumns(col1, col2))
+		{
+			cerr << "Swap two colume fail." << endl;
+		}
+	};
+
 	if (this->saMode == SAMode::RandomMode)
 	{
 		// generate new solutions by swapping two group unit
@@ -259,7 +287,8 @@ void SAManager::Perturbation(std::mt19937& gen)
 		TableManager newTable = this->nowUseTable;
 
 		// only use swap two column
-		SwapTwoCol(newTable, gen);
+		// SwapTwoCol(newTable, gen);
+		SwapTwoColInterleaving(newTable, gen);
 
 		this->newTableList.push_back(newTable);
 	}
