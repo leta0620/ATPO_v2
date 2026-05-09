@@ -72,6 +72,9 @@ int main(int argc, char* argv[]) {
 		// Interleaving Mode
 		costEnumList = { CostEnum::sperationCost, CostEnum::windowSizeCost, CostEnum::symmetryCost };
 		break;
+	case 3:
+		// Co Special Mode
+		break;
 	default:
 		cerr << "Unknown SA Mode, set to RandomMode by default." << endl;
 		costEnumList = { CostEnum::ccCost, CostEnum::rCost, CostEnum::cCost, CostEnum::sperationCost, CostEnum::dummyCost, CostEnum::routing_lengthCost, CostEnum::mildCost, CostEnum::congestionCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
