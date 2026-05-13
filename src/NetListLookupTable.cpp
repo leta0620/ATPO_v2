@@ -129,3 +129,14 @@ std::vector<std::string> NetlistLookupTable::GetAllSymbolNames()
 	}
 	return symbolNames;
 }
+
+std::vector<int> NetlistLookupTable::GetAllDeviceUnitNums()
+{
+	std::vector<int> deviceUnitNums;
+	deviceUnitNums.reserve(this->netlistUnitMap.size());
+	for (const auto& pair : this->netlistUnitMap)
+	{
+		deviceUnitNums.push_back(pair.second.GetDeviceUnitCount());
+	}
+	return deviceUnitNums;
+}

@@ -35,7 +35,7 @@ public:
 
 	int GetSymbolNameSequenceHash() const;
 
-	std::string GetSymbolNameSequence();
+	std::string GetSymbolNameSequence() const;
 
 	void FlipGroupRotation();
 

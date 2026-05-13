@@ -38,6 +38,8 @@ public:
 	int GetGroupSize() const { return groupSize; }
 	void SetNFin(int nfin) { this->nfin = nfin; }
 	void SetCostEnumList(std::vector<CostEnum> costEnumList) { this->costEnumList = costEnumList; }
+	void SetTable(std::vector<std::vector<Group>> table) { this->table = table; }
+	std::vector<std::vector<Group>> GetTable() { return this->table; }
 
 	Group GetGroup(int row, int col) const { return table[row][col]; }
 
@@ -80,6 +82,12 @@ public:
 	bool BuildInterleavingTable();
 
 	void FlipLeftHalf();
+
+	// 相等比較運算子 (const 版本以支援 unordered_set)
+	bool operator==(const TableManager& other) const;
+
+	// 計算 hash 值 (用於 unordered_set)
+	size_t GetHash() const;
 
 private:
 	std::vector<std::vector<Group>> table;
@@ -126,3 +134,13 @@ private:
 	void CalculateWindowSizeCost();
 	void CalculateSymmetryCost();
 };
+
+// 在 std 命名空間中特化 hash，以支援 unordered_set<TableManager>
+namespace std {
+	template<>
+	struct hash<TableManager> {
+		size_t operator()(const TableManager& tm) const {
+			return tm.GetHash();
+		}
+	};
+}

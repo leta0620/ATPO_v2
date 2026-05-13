@@ -20,6 +20,8 @@ public:
 
 	std::vector<std::string> GetAllSymbolNames();
 
+	std::vector<int> GetAllDeviceUnitNums();
+
 private:
 	std::vector<std::string> commonSourceList;
 

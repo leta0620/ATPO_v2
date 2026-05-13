@@ -36,6 +36,10 @@ SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, do
 			this->saMode = SAMode::RandomMode;
 		}
 	}
+	else if (saMode == "CoSpecialMode" || saMode == "3")
+	{
+		this->saMode = SAMode::CoSpecialMode;
+	}
 	else
 	{
 		cerr << "Unknown SA Mode, set to RandomMode by default." << endl;
@@ -142,11 +146,41 @@ void SAManager::Perturbation(std::mt19937& gen)
 		int colSize = table.GetColSize();
 		uniform_int_distribution<> disRow(0, rowSize - 1);
 		int row1 = disRow(gen);
+		bool hasDummy = false;
+		for (int col = 0; col < colSize; col++)
+		{
+			if (table.GetGroup(row1, col).HasDummyUnit())
+			{
+				hasDummy = true;
+				break;
+			}
+		}
+
 		int row2 = 0;
+		int selectionLimit = 1000, nowSelection = 0;
+		bool row2HasDummy = false;
 		do
 		{
 			row2 = disRow(gen);
-		} while (row1 == row2);
+			nowSelection++;
+			row2HasDummy = false;
+
+			
+			for (int col = 0; col < colSize; col++)
+			{
+				if (table.GetGroup(row2, col).HasDummyUnit())
+				{
+					row2HasDummy = true;
+					break;
+				}
+			}
+
+			if (nowSelection > selectionLimit)
+			{
+				return;
+			}
+		} while (row1 == row2 || hasDummy != row2HasDummy /*&& nowSelection < selectionLimit */ );
+
 		// swap row1 and row2
 		if (!table.SwapRows(row1, row2))
 		{
@@ -243,6 +277,35 @@ void SAManager::Perturbation(std::mt19937& gen)
 		}
 	};
 
+	auto SwapTwoGroupInSameRow = [](TableManager& table, mt19937& gen)
+		{
+			int rowSize = table.GetRowSize();
+			int colSize = table.GetColSize();
+			if (colSize < 2) return;
+
+			int rowIndex = uniform_int_distribution<>(0, rowSize - 1)(gen);
+			int col1 = uniform_int_distribution<>(0, colSize - 1)(gen);
+
+			int col2 = 0;
+			int selectionLimit = 50, nowSelection = 0;
+			do
+			{
+				col2 = uniform_int_distribution<>(0, colSize - 1)(gen);
+				nowSelection++;
+				if (nowSelection > selectionLimit)
+				{
+					return;
+				}
+			} while (col1 == col2 || table.GetGroup(rowIndex, col1).GetTypeHash() != table.GetGroup(rowIndex, col2).GetTypeHash());
+
+			if (!table.SwapGroups(rowIndex, col1, rowIndex, col2))
+			{
+				//cerr << "Swap two group unit fail." << endl;
+			}
+		};
+
+
+
 	if (this->saMode == SAMode::RandomMode)
 	{
 		// generate new solutions by swapping two group unit
@@ -289,6 +352,26 @@ void SAManager::Perturbation(std::mt19937& gen)
 		// only use swap two column
 		// SwapTwoCol(newTable, gen);
 		SwapTwoColInterleaving(newTable, gen);
+
+		this->newTableList.push_back(newTable);
+	}
+	else if (this->saMode == SAMode::CoSpecialMode)
+	{
+		TableManager newTable = this->nowUseTable;
+
+		vector<int> perturbationOptions = { 0, 1, 2 };
+		// 0: SwapTwoRow
+		// 1: SwapTwoCol
+		// 2: SwapTwoGroupInSameRow
+
+		uniform_int_distribution<> perOperation(0, perturbationOptions.size() - 1);
+		int op = perOperation(gen);
+		if (op == 0)
+			SwapTwoRow(newTable, gen);
+		else if (op == 1)
+			SwapTwoCol(newTable, gen);
+		else if(op == 2)
+			SwapTwoGroupInSameRow(newTable, gen);
 
 		this->newTableList.push_back(newTable);
 	}

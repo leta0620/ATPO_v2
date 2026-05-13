@@ -17,6 +17,7 @@
 #include "SAManager.h"
 #include "Test.h"
 #include "Output.h"
+#include "CoMode.h"
 
 using namespace std;
 
@@ -70,14 +71,15 @@ int main(int argc, char* argv[]) {
 		break;
 	case 2:
 		// Interleaving Mode
-		costEnumList = { CostEnum::sperationCost, CostEnum::windowSizeCost, CostEnum::symmetryCost };
+		costEnumList = { CostEnum::dummyCost, CostEnum::sperationCost, CostEnum::windowSizeCost, CostEnum::symmetryCost };
 		break;
 	case 3:
-		// Co Special Mode
+		// Co Mode
+		costEnumList = { CostEnum::ccCost,  CostEnum::hierCCost, CostEnum::dummyCost, CostEnum::windowSizeCost, CostEnum::symmetryCost };
 		break;
 	default:
 		cerr << "Unknown SA Mode, set to RandomMode by default." << endl;
-		costEnumList = { CostEnum::ccCost, CostEnum::rCost, CostEnum::cCost, CostEnum::sperationCost, CostEnum::dummyCost, CostEnum::routing_lengthCost, CostEnum::mildCost, CostEnum::congestionCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
+		costEnumList = { CostEnum::ccCost, CostEnum::rCost, CostEnum::cCost, CostEnum::dummyCost, CostEnum::routing_lengthCost, CostEnum::mildCost, CostEnum::congestionCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
 	}
 
 
@@ -112,143 +114,166 @@ int main(int argc, char* argv[]) {
 	}
 
 
-	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable(), costEnumList);
-	vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
-	for (auto& t : initialTableList)
-		t.SetCdlFilePath(cdl_input_file_path);//Add tablemanager known  parser 
 
-
-	map<int, vector<TableManager>> allNondominatedSolutions;
-	// SA
-	if (thread_num == 1)
+	if (stoi(sa_mode_str) == 3)
 	{
-		// Single thread SA
-		
-		for (int i = 0; i < initialTableList.size(); ++i)
-		{
-			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
-			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, saRoundPerTemp, true, sa_mode_str, costEnumList);
-			allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
-			
-			cout << "\r";
-			cout << "                                        ";
-			cout << "\r";
-			cout << "\b";
-		}
-		cout << endl;
+		// Co Mode: directly generate co-better solution without SA optimization
+		CoMode coMode(groupSize, row_num, parser.GetNetlistLookupTable(), costEnumList);
+		vector<TableManager> tableList = coMode.GetTableList();
+		for (auto& t : tableList)
+			t.SetCdlFilePath(cdl_input_file_path);//Add tablemanager known  parser 
 
-		
-	}
-	else
-	{
-		// Multi-threaded SA (multi-start SA)
-		const int jobCount = (int)initialTableList.size();
-		if (jobCount == 0) {
-			cerr << "Error: initialTableList is empty." << endl;
-			return 1;
-		}
-
-		// 避免 thread_num > jobCount
-		thread_num = min(thread_num, jobCount);
-		if (thread_num <= 0) thread_num = 1;
-
-		// ★ 建議把 lookup table 先存成 const ref，確保每個 thread 都只讀同一份資料
-		auto& netlistLUT = parser.GetNetlistLookupTable();
-
-		// 每個 job 的結果放在對應 index，最後再轉成 map
-		vector<vector<TableManager>> results(jobCount);
-
-		atomic<int> nextJob{ 0 };
-		//mutex coutMutex; // 只用來鎖 cout，避免多執行緒輸出互相打架
-
-		auto worker = [&]() {
-			while (true) {
-				int i = nextJob.fetch_add(1);
-				if (i >= jobCount) break;
-
-				// 跑 SA（你的參數照舊）
-				SAManager saManager(initialTableList[i], netlistLUT, 0.9, 100.0, 1.0, saRoundPerTemp, false, sa_mode_str, costEnumList);
-
-				// 每個 index 只被寫一次 -> 不需要 mutex
-				results[i] = saManager.GetNondominatedSolution();
-			}
-			};
-
-		// 開 thread_num 個 worker threads
-		vector<thread> threads;
-		threads.reserve(thread_num);
-		for (int t = 0; t < thread_num; ++t) {
-			threads.emplace_back(worker);
-		}
-		for (auto& th : threads) th.join();
-
-		// 組回你原本的 map<int, vector<TableManager>>
-		for (int i = 0; i < jobCount; ++i) {
-			allNondominatedSolutions[i] = std::move(results[i]);
-		}
-	}
-
-	// delete intermediate file
-	if (remove(intermediate_code_file_path.c_str()) != 0) {
-		cerr << "Error: Failed to delete intermediate file." << endl;
-	}
-	else {
-		//cout << "Intermediate file deleted successfully.\n" << endl;
-	}
-
-	//後處理
-	// delete exist data in output folder
-	try {
-		for (const auto& entry : std::filesystem::directory_iterator(output_file_path)) {
-			std::filesystem::remove_all(entry.path());
-		}
-		//cout << "Existing data in output folder deleted successfully.\n" << endl;
-	}
-	catch (const std::exception& e) {
-		cerr << "Error removing existing data in output folder: " << e.what() << endl;
-	}
-
-	if (stoi(sa_mode_str) == 2)
-	{
-		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), true);
-
-		output.WriteAllResultToFile(output_file_path + "all_results.txt");
-		//output.PrintAllResult();
-
-		//output.SelectSignificantNondominatedSolutions();
-		//output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "_significant.txt");
-		//output.PrintSignificantNondominatedSolutions();
-
-		//output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "_global_nondominated.txt");
-
-		output.SelectCoBetterSolution();
-		output.PrintCoBetterSolution(CO_BEST_SOLUTION_NUM);
-		output.WriteCSVCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
-		output.WriteCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
-
-		output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(CO_BEST_SOLUTION_NUM, output_file_path);
-
-	}
-	else
-	{
+		//output
+//		Output output(groupSize, row_num, { {0, bestTableList} }, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), true);
+		map<int, vector<TableManager>> allNondominatedSolutions;
+		allNondominatedSolutions[0] = tableList;
 		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), false);
 
+		output.PrintAllResult();
 		output.WriteAllResultToFile(output_file_path + "all_results.txt");
-		//output.PrintAllResult();
 
-		//output.SelectSignificantNondominatedSolutions();
-		//output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "_significant.txt");
-		//output.PrintSignificantNondominatedSolutions();
-
-		//output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "_global_nondominated.txt");
-
-		output.SelectCoBetterSolution();
-		output.PrintCoBetterSolution(CO_BEST_SOLUTION_NUM);
-		output.WriteCSVCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
-		output.WriteCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
-
-		output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+		return 0;
 	}
-	cout << "All processing completed successfully.\n" << endl;
-	return 0;
+	else
+	{
+		InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable(), costEnumList);
+		vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
+		for (auto& t : initialTableList)
+			t.SetCdlFilePath(cdl_input_file_path);//Add tablemanager known  parser 
+
+
+		map<int, vector<TableManager>> allNondominatedSolutions;
+		// SA
+		if (thread_num == 1)
+		{
+			// Single thread SA
+
+			for (int i = 0; i < initialTableList.size(); ++i)
+			{
+				cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
+				SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, saRoundPerTemp, true, sa_mode_str, costEnumList);
+				allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
+
+				cout << "\r";
+				cout << "                                        ";
+				cout << "\r";
+				cout << "\b";
+			}
+			cout << endl;
+
+
+		}
+		else
+		{
+			// Multi-threaded SA (multi-start SA)
+			const int jobCount = (int)initialTableList.size();
+			if (jobCount == 0) {
+				cerr << "Error: initialTableList is empty." << endl;
+				return 1;
+			}
+
+			// 避免 thread_num > jobCount
+			thread_num = min(thread_num, jobCount);
+			if (thread_num <= 0) thread_num = 1;
+
+			// ★ 建議把 lookup table 先存成 const ref，確保每個 thread 都只讀同一份資料
+			auto& netlistLUT = parser.GetNetlistLookupTable();
+
+			// 每個 job 的結果放在對應 index，最後再轉成 map
+			vector<vector<TableManager>> results(jobCount);
+
+			atomic<int> nextJob{ 0 };
+			//mutex coutMutex; // 只用來鎖 cout，避免多執行緒輸出互相打架
+
+			auto worker = [&]() {
+				while (true) {
+					int i = nextJob.fetch_add(1);
+					if (i >= jobCount) break;
+
+					// 跑 SA（你的參數照舊）
+					SAManager saManager(initialTableList[i], netlistLUT, 0.9, 100.0, 1.0, saRoundPerTemp, false, sa_mode_str, costEnumList);
+
+					// 每個 index 只被寫一次 -> 不需要 mutex
+					results[i] = saManager.GetNondominatedSolution();
+				}
+				};
+
+			// 開 thread_num 個 worker threads
+			vector<thread> threads;
+			threads.reserve(thread_num);
+			for (int t = 0; t < thread_num; ++t) {
+				threads.emplace_back(worker);
+			}
+			for (auto& th : threads) th.join();
+
+			// 組回你原本的 map<int, vector<TableManager>>
+			for (int i = 0; i < jobCount; ++i) {
+				allNondominatedSolutions[i] = std::move(results[i]);
+			}
+		}
+
+		// delete intermediate file
+		if (remove(intermediate_code_file_path.c_str()) != 0) {
+			cerr << "Error: Failed to delete intermediate file." << endl;
+		}
+		else {
+			//cout << "Intermediate file deleted successfully.\n" << endl;
+		}
+
+		//後處理
+		// delete exist data in output folder
+		try {
+			for (const auto& entry : std::filesystem::directory_iterator(output_file_path)) {
+				std::filesystem::remove_all(entry.path());
+			}
+			//cout << "Existing data in output folder deleted successfully.\n" << endl;
+		}
+		catch (const std::exception& e) {
+			cerr << "Error removing existing data in output folder: " << e.what() << endl;
+		}
+
+		if (stoi(sa_mode_str) == 2)
+		{
+			Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), true);
+
+			output.WriteAllResultToFile(output_file_path + "all_results.txt");
+			//output.PrintAllResult();
+
+			//output.SelectSignificantNondominatedSolutions();
+			//output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "_significant.txt");
+			//output.PrintSignificantNondominatedSolutions();
+
+			//output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "_global_nondominated.txt");
+
+			output.SelectCoBetterSolution();
+			output.PrintCoBetterSolution(CO_BEST_SOLUTION_NUM);
+			output.WriteCSVCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+			output.WriteCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+
+			output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+
+		}
+		else
+		{
+			Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), false);
+
+			output.WriteAllResultToFile(output_file_path + "all_results.txt");
+			//output.PrintAllResult();
+
+			//output.SelectSignificantNondominatedSolutions();
+			//output.WriteSignificantNondominatedSolutionsToFile(output_file_path + "_significant.txt");
+			//output.PrintSignificantNondominatedSolutions();
+
+			//output.WriteGlobalNondominatedSolutionsToFile(output_file_path + "_global_nondominated.txt");
+
+			output.SelectCoBetterSolution();
+			output.PrintCoBetterSolution(CO_BEST_SOLUTION_NUM);
+			output.WriteCSVCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+			output.WriteCoBetterSolutionToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+
+			output.WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(CO_BEST_SOLUTION_NUM, output_file_path);
+		}
+		cout << "All processing completed successfully.\n" << endl;
+		return 0;
+	}
 }

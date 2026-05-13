@@ -108,7 +108,7 @@ int Group::GetSymbolNameSequenceHash() const
 	return int(std::hash<std::string>{}(concatenatedNames));
 }
 
-std::string Group::GetSymbolNameSequence()
+std::string Group::GetSymbolNameSequence() const
 {
 	std::string concatenatedNames;
 	for (const auto& unit : this->deviceUnits)

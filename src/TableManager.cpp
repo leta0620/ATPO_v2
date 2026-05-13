@@ -1884,7 +1884,7 @@ void TableManager::CalculateDummyCost()
                     double x = i + c * nowGroupSize;
                     double y = r;
                     // Calculate distance from the center of the table
-                    double dist = sqrt((x - colMid) * (x - colMid) + (y - rowMid) * (y - rowMid));
+                    double dist = (x - colMid) * (x - colMid) + (y - rowMid) * (y - rowMid);
                     totalCost += 1 / dist;
                 }
             }
@@ -2985,4 +2985,47 @@ void TableManager::FlipLeftHalf()
 			table[r][c].FlipGroupRotation();
         }
     }
+}
+
+bool TableManager::operator==(const TableManager& other) const
+{
+    if (rowSize != other.rowSize || colSize != other.colSize || groupSize != other.groupSize)
+    {
+        return false;
+    }
+
+    for (int i = 0; i < rowSize; i++)
+    {
+        for (int j = 0; j < colSize; j++)
+        {
+            if (table[i][j].GetSymbolNameSequence() != other.table[i][j].GetSymbolNameSequence())
+            {
+                return false;
+            }   
+        }
+    }
+
+    return true;
+}
+
+size_t TableManager::GetHash() const
+{
+    size_t hash = 0;
+    
+    // 組合 table 結構的 hash
+    hash ^= std::hash<int>{}(groupSize) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    hash ^= std::hash<int>{}(rowSize) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    hash ^= std::hash<int>{}(colSize) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    
+    // 組合每個 Group 的 SymbolNameSequence hash
+    for (int i = 0; i < rowSize; i++)
+    {
+        for (int j = 0; j < colSize; j++)
+        {
+            std::string seq = table[i][j].GetSymbolNameSequence();
+            hash ^= std::hash<std::string>{}(seq) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        }
+    }
+    
+    return hash;
 }
