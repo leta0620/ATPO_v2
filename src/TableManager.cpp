@@ -71,7 +71,7 @@ TableManager::TableManager(int groupSize, int rowSize, int colSize, NetlistLooku
     this->rowSize = rowSize;
     this->colSize = colSize;
     this->netlist = netlist;
-	this->costEnumList = costEnumList;
+    this->costEnumList = costEnumList;
     InitializeTable();
 }
 
@@ -194,42 +194,46 @@ std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
     {
         switch (cItem)
         {
-            case CostEnum::ccCost:
-                this->CalculateCCCost();
-				break;
-            case CostEnum::rCost:
-                this->CalculateRCost();
-                break;
-            case CostEnum::cCost:
-                this->CalculateCCost();
-                break;
-            case CostEnum::sperationCost:
-                this->CalculateSpetationCost();
-                break;
-            case CostEnum::dummyCost:
-                this->CalculateDummyCost();
-                break;
-            case CostEnum::routing_lengthCost:
-                this->CalculateRoutinglength();
-                break;
-            case CostEnum::mildCost:
-                this->CalculateMILDCost();
-                break;
-            case CostEnum::congestionCost:
-                this->CalculateCongestionCost();
-                break;
-            case CostEnum::symmetryCost:
-                this->CalculateSymmetryCost();
-				break;
-            case CostEnum::windowSizeCost:
-                this->CalculateWindowSizeCost();
-				break;
-            case CostEnum::hierCongestionCost:
-                this->CalculateHierCongestionCost();
-                break;
-            case CostEnum::hierCCost:
-                this->CalculateHierCCost();
-				break;
+        case CostEnum::ccCost:
+            this->CalculateCCCost();
+            break;
+        case CostEnum::rCost:
+            this->CalculateRCost();
+            break;
+        case CostEnum::cCost:
+            this->CalculateCCost();
+            break;
+        case CostEnum::sperationCost:
+            this->CalculateSpetationCost();
+            break;
+        case CostEnum::dummyCost:
+            this->CalculateDummyCost();
+            break;
+        case CostEnum::routing_lengthCost:
+            this->CalculateRoutinglength();
+            break;
+        case CostEnum::mildCost:
+            this->CalculateMILDCost();
+            break;
+        case CostEnum::congestionCost:
+            this->CalculateCongestionCost();
+            break;
+        case CostEnum::symmetryCost:
+            this->CalculateSymmetryCost();
+            break;
+        case CostEnum::windowSizeCost:
+            this->CalculateWindowSizeCost();
+            break;
+        case CostEnum::hierCongestionCost:
+            // HierCongestion 暫時保留程式碼但不擾動 SA:寫 0 維持 costMap entry,
+            // 函式定義在 line ~2172 仍然完整保留(SHARED-tree 版本)。
+            // 要重啟,刪除下面 = 0 那行並還原 CalculateHierCongestionCost() 呼叫。
+            //this->CalculateHierCongestionCost();
+            costMap[CostEnum::hierCongestionCost] = 0.0;
+            break;
+        case CostEnum::hierCCost:
+            this->CalculateHierCCost();
+            break;
         default:
             break;
         }
@@ -710,20 +714,149 @@ void TableManager::CalculateSpetationCost() {
 
 void TableManager::CalculateRoutinglength()
 {
-    // Routing length = total congestion from hierarchical routing.
-    // Runs its own independent hierarchical routing algorithm (does not rely on
-    // any other cost function having been called first).
-    //
-    // Switch: routingLengthEnable (set via SetRoutingLengthEnable(0/1))
-    //   0 → this cost is disabled, always 0 (does not perturb optimizer)
-    //   1 → normally computed
+    // Routing length = SHARED-tree per-net wire estimator (GROUP LEVEL).
+    // See htree_shared_method memory note for full algorithm description.
     using std::string;
     using std::vector;
 
-    //if (routingLengthEnable == 0) {
-    //    costMap[CostEnum::routing_lengthCost] = 0.0;
-    //    return;
-    //}
+    const int R = rowSize;
+    const int C = colSize;
+    if (R <= 0 || C <= 0) { costMap[CostEnum::routing_lengthCost] = 0.0; return; }
+
+    auto is_dummy = [](const string& s) { return s.empty() || s == "d"; };
+
+    auto groupSig = [&](int r, int c) -> string {
+        std::unordered_set<string> s;
+        for (const auto& du : table[r][c].GetDeviceUnits())
+            if (!is_dummy(du.GetSymbol())) s.insert(du.GetSymbol());
+        vector<string> v(s.begin(), s.end());
+        std::sort(v.begin(), v.end());
+        string sig;
+        for (const auto& x : v) sig += x;
+        return sig;
+        };
+
+    vector<vector<string>> sig(R, vector<string>(C));
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            sig[r][c] = groupSig(r, c);
+
+    auto isAllSameSig = [&](int rS, int rE, int cS, int cE) -> bool {
+        string single; bool found = false;
+        for (int r = rS; r < rE; ++r)
+            for (int c = cS; c < cE; ++c) {
+                if (sig[r][c].empty()) continue;
+                if (!found) { single = sig[r][c]; found = true; }
+                else if (sig[r][c] != single) return false;
+            }
+        return found;
+        };
+    int cnt_h = 0, cnt_v = 0;
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c + 1 < C; ++c)
+            if (isAllSameSig(r, r + 1, c, c + 2)) cnt_h++;
+    for (int r = 0; r + 1 < R; ++r)
+        for (int c = 0; c < C; ++c)
+            if (isAllSameSig(r, r + 2, c, c + 1)) cnt_v++;
+    const bool h_init = (cnt_h >= cnt_v);
+
+    vector<std::pair<int, int>> steps;
+    {
+        int rb = 1, cb = 1; bool h = h_init;
+        while (rb < R || cb < C) {
+            if (h) cb = std::min(cb * 2, C); else rb = std::min(rb * 2, R);
+            steps.push_back({ rb, cb });
+            if (rb >= R && cb >= C) break;
+            h = !h;
+        }
+        if (steps.empty()) steps.push_back({ R, C });
+    }
+
+    auto getPartition = [](int dim) -> vector<int> {
+        if (dim <= 0) return {};
+        if (dim <= 3) return { dim };
+        if (dim % 3 == 0) return vector<int>(dim / 3, 3);
+        if (dim % 3 == 2) {
+            vector<int> p(1, 2);
+            for (int i = 0; i < (dim - 2) / 3; ++i) p.push_back(3);
+            return p;
+        }
+        vector<int> p(1, 2);
+        for (int i = 0; i < (dim - 4) / 3; ++i) p.push_back(3);
+        p.push_back(2);
+        return p;
+        };
+    auto bucketize = [&](int pos, int dim, int B) -> int {
+        if (B >= dim) return 0;
+        if (B < 2)    return pos;
+        if (dim % 2 == 0) return std::min(pos / B, std::max(dim / B - 1, 0));
+        vector<int> part = getPartition(dim);
+        int cum = 0;
+        for (int i = 0; i < (int)part.size(); ++i) {
+            cum += part[i];
+            if (pos < cum) return i;
+        }
+        return (int)part.size() - 1;
+        };
+
+    struct Node { double y, x; std::set<string> nets; };
+    vector<Node> nodes;
+    nodes.reserve((size_t)R * (size_t)C);
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            if (!sig[r][c].empty())
+                nodes.push_back({ (double)r, (double)c, { sig[r][c] } });
+
+    struct Edge { int p; int c; };
+    vector<Edge> edges;
+    vector<int> current;
+    current.reserve(nodes.size());
+    for (int i = 0; i < (int)nodes.size(); ++i) current.push_back(i);
+
+    for (auto& step : steps) {
+        const int rB = step.first; const int cB = step.second;
+        std::map<std::pair<int, int>, vector<int>> buckets;
+        for (int idx : current) {
+            int wr = bucketize((int)nodes[idx].y, R, rB);
+            int wc = bucketize((int)nodes[idx].x, C, cB);
+            buckets[{wr, wc}].push_back(idx);
+        }
+        vector<int> new_current;
+        new_current.reserve(buckets.size());
+        for (auto& kv : buckets) {
+            auto& group = kv.second;
+            if (group.size() == 1) { new_current.push_back(group[0]); continue; }
+            double cy = 0.0, cx = 0.0;
+            std::set<string> mn;
+            for (int g : group) {
+                cy += nodes[g].y; cx += nodes[g].x;
+                for (const auto& n : nodes[g].nets) mn.insert(n);
+            }
+            cy /= (double)group.size();
+            cx /= (double)group.size();
+            int parentIdx = (int)nodes.size();
+            nodes.push_back({ cy, cx, std::move(mn) });
+            for (int g : group) edges.push_back({ parentIdx, g });
+            new_current.push_back(parentIdx);
+        }
+        current = std::move(new_current);
+    }
+
+    double total = 0.0;
+    for (const auto& e : edges) {
+        const Node& parent = nodes[e.p];
+        const Node& child = nodes[e.c];
+        double dist = std::abs(parent.y - child.y) + std::abs(parent.x - child.x);
+        total += dist * (double)child.nets.size();
+    }
+    costMap[CostEnum::routing_lengthCost] = total;
+}
+
+#if 0
+void TableManager::CalculateRoutinglength_OLD_DeviceUnitLevel()
+{
+    using std::string;
+    using std::vector;
 
     const int R = rowSize;
     const int C = colSize;
@@ -1032,6 +1165,7 @@ void TableManager::CalculateRoutinglength()
 
     costMap[CostEnum::routing_lengthCost] = (double)total;
 }
+#endif // disabled old device-unit-level routing length
 
 
 void TableManager::CalculateMILDCost()
@@ -1440,6 +1574,10 @@ std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValu
     std::vector< std::pair<std::string, double>> costNameAndValue;
     for (const auto& [costEnum, costValue] : this->costMap)
     {
+        // HierCongestion 暫時停用 → 從輸出顯示中隱藏
+        // 函式定義 (line ~2172) 跟 case (line ~227) 都保留,要恢復就把這幾行 // 拿掉
+        if (costEnum == CostEnum::hierCongestionCost) continue;
+
         std::string costName;
 
         costName = GetCostName(costEnum);
@@ -1718,11 +1856,11 @@ string TableManager::GetCostName(CostEnum costEnum)
     else if (costEnum == CostEnum::windowSizeCost)
     {
         return "Window Size Cost";
-	}
+    }
     else if (costEnum == CostEnum::symmetryCost)
     {
         return "Symmetry Cost";
-	}
+    }
     else
     {
         return "Unknown Cost";
@@ -2041,6 +2179,216 @@ void TableManager::CalculateCongestionCost()
 //         -> per-TYPE sum / device unit count -> average over types
 
 void TableManager::CalculateHierCongestionCost()
+{
+    // SHARED-tree per-cell distribution + per-type aggregation.
+    using std::string;
+    using std::vector;
+
+    const int R = rowSize;
+    const int C = colSize;
+    if (R <= 0 || C <= 0) { costMap[CostEnum::hierCongestionCost] = 0.0; return; }
+
+    auto is_dummy = [](const string& s) { return s.empty() || s == "d"; };
+
+    auto groupSig = [&](int r, int c) -> string {
+        std::unordered_set<string> s;
+        for (const auto& du : table[r][c].GetDeviceUnits())
+            if (!is_dummy(du.GetSymbol())) s.insert(du.GetSymbol());
+        vector<string> v(s.begin(), s.end());
+        std::sort(v.begin(), v.end());
+        string sig;
+        for (const auto& x : v) sig += x;
+        return sig;
+        };
+
+    vector<vector<string>> sig(R, vector<string>(C));
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            sig[r][c] = groupSig(r, c);
+
+    auto isAllSameSig = [&](int rS, int rE, int cS, int cE) -> bool {
+        string single; bool found = false;
+        for (int r = rS; r < rE; ++r)
+            for (int c = cS; c < cE; ++c) {
+                if (sig[r][c].empty()) continue;
+                if (!found) { single = sig[r][c]; found = true; }
+                else if (sig[r][c] != single) return false;
+            }
+        return found;
+        };
+    int cnt_h = 0, cnt_v = 0;
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c + 1 < C; ++c)
+            if (isAllSameSig(r, r + 1, c, c + 2)) cnt_h++;
+    for (int r = 0; r + 1 < R; ++r)
+        for (int c = 0; c < C; ++c)
+            if (isAllSameSig(r, r + 2, c, c + 1)) cnt_v++;
+    const bool h_init = (cnt_h >= cnt_v);
+
+    vector<std::pair<int, int>> steps;
+    {
+        int rb = 1, cb = 1; bool h = h_init;
+        while (rb < R || cb < C) {
+            if (h) cb = std::min(cb * 2, C); else rb = std::min(rb * 2, R);
+            steps.push_back({ rb, cb });
+            if (rb >= R && cb >= C) break;
+            h = !h;
+        }
+        if (steps.empty()) steps.push_back({ R, C });
+    }
+
+    auto getPartition = [](int dim) -> vector<int> {
+        if (dim <= 0) return {};
+        if (dim <= 3) return { dim };
+        if (dim % 3 == 0) return vector<int>(dim / 3, 3);
+        if (dim % 3 == 2) {
+            vector<int> p(1, 2);
+            for (int i = 0; i < (dim - 2) / 3; ++i) p.push_back(3);
+            return p;
+        }
+        vector<int> p(1, 2);
+        for (int i = 0; i < (dim - 4) / 3; ++i) p.push_back(3);
+        p.push_back(2);
+        return p;
+        };
+    auto bucketize = [&](int pos, int dim, int B) -> int {
+        if (B >= dim) return 0;
+        if (B < 2)    return pos;
+        if (dim % 2 == 0) return std::min(pos / B, std::max(dim / B - 1, 0));
+        vector<int> part = getPartition(dim);
+        int cum = 0;
+        for (int i = 0; i < (int)part.size(); ++i) {
+            cum += part[i];
+            if (pos < cum) return i;
+        }
+        return (int)part.size() - 1;
+        };
+
+    struct Node { double y, x; std::set<string> nets; };
+    vector<Node> nodes;
+    nodes.reserve((size_t)R * (size_t)C);
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            if (!sig[r][c].empty())
+                nodes.push_back({ (double)r, (double)c, { sig[r][c] } });
+
+    struct Edge { int p; int c; };
+    vector<Edge> edges;
+    vector<int> current;
+    current.reserve(nodes.size());
+    for (int i = 0; i < (int)nodes.size(); ++i) current.push_back(i);
+
+    for (auto& step : steps) {
+        const int rB = step.first; const int cB = step.second;
+        std::map<std::pair<int, int>, vector<int>> buckets;
+        for (int idx : current) {
+            int wr = bucketize((int)nodes[idx].y, R, rB);
+            int wc = bucketize((int)nodes[idx].x, C, cB);
+            buckets[{wr, wc}].push_back(idx);
+        }
+        vector<int> new_current;
+        new_current.reserve(buckets.size());
+        for (auto& kv : buckets) {
+            auto& group = kv.second;
+            if (group.size() == 1) { new_current.push_back(group[0]); continue; }
+            double cy = 0.0, cx = 0.0;
+            std::set<string> mn;
+            for (int g : group) {
+                cy += nodes[g].y; cx += nodes[g].x;
+                for (const auto& n : nodes[g].nets) mn.insert(n);
+            }
+            cy /= (double)group.size();
+            cx /= (double)group.size();
+            int parentIdx = (int)nodes.size();
+            nodes.push_back({ cy, cx, std::move(mn) });
+            for (int g : group) edges.push_back({ parentIdx, g });
+            new_current.push_back(parentIdx);
+        }
+        current = std::move(new_current);
+    }
+
+    vector<vector<double>> cellMetric(R, vector<double>(C, 0.0));
+
+    auto distributeH = [&](double y, double xa, double xb, double weight) {
+        double r_round = std::round(y);
+        vector<std::pair<int, double>> rows;
+        if (std::abs(y - r_round) < 1e-6) {
+            int r = (int)r_round;
+            if (r >= 0 && r < R) rows.push_back({ r, 1.0 });
+        }
+        else {
+            int r_low = (int)std::floor(y);
+            if (r_low >= 0 && r_low < R) rows.push_back({ r_low,     0.5 });
+            if (r_low + 1 >= 0 && r_low + 1 < R) rows.push_back({ r_low + 1, 0.5 });
+        }
+        double xs = std::min(xa, xb), xe = std::max(xa, xb);
+        for (int c = 0; c < C; ++c) {
+            double lo = c - 0.5, hi = c + 0.5;
+            double ov = std::min(hi, xe) - std::max(lo, xs);
+            if (ov > 0.0)
+                for (auto& rp : rows) cellMetric[rp.first][c] += ov * rp.second * weight;
+        }
+        };
+    auto distributeV = [&](double x, double ya, double yb, double weight) {
+        double c_round = std::round(x);
+        vector<std::pair<int, double>> cols;
+        if (std::abs(x - c_round) < 1e-6) {
+            int c = (int)c_round;
+            if (c >= 0 && c < C) cols.push_back({ c, 1.0 });
+        }
+        else {
+            int c_low = (int)std::floor(x);
+            if (c_low >= 0 && c_low < C) cols.push_back({ c_low,     0.5 });
+            if (c_low + 1 >= 0 && c_low + 1 < C) cols.push_back({ c_low + 1, 0.5 });
+        }
+        double ys = std::min(ya, yb), ye = std::max(ya, yb);
+        for (int r = 0; r < R; ++r) {
+            double lo = r - 0.5, hi = r + 0.5;
+            double ov = std::min(hi, ye) - std::max(lo, ys);
+            if (ov > 0.0)
+                for (auto& cp : cols) cellMetric[r][cp.first] += ov * cp.second * weight;
+        }
+        };
+
+    for (const auto& e : edges) {
+        const Node& parent = nodes[e.p];
+        const Node& child = nodes[e.c];
+        double weight = (double)child.nets.size();
+        if (std::abs(parent.x - child.x) > 1e-9)
+            distributeH(child.y, child.x, parent.x, weight);
+        if (std::abs(parent.y - child.y) > 1e-9)
+            distributeV(parent.x, child.y, parent.y, weight);
+    }
+
+    std::unordered_map<string, double> typeSum;
+    std::unordered_map<string, int>    typeCount;
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c) {
+            double m = cellMetric[r][c];
+            std::unordered_map<string, int> cnt;
+            for (const auto& du : table[r][c].GetDeviceUnits()) {
+                const string& sym = du.GetSymbol();
+                if (!is_dummy(sym)) cnt[sym]++;
+            }
+            for (auto& kv : cnt) {
+                typeSum[kv.first] += kv.second * m;
+                typeCount[kv.first] += kv.second;
+            }
+        }
+
+    double sumTypeMetric = 0.0;
+    int nTypes = 0;
+    for (auto& kv : typeSum) {
+        if (typeCount[kv.first] > 0) {
+            sumTypeMetric += kv.second / typeCount[kv.first];
+            nTypes++;
+        }
+    }
+    costMap[CostEnum::hierCongestionCost] = nTypes > 0 ? sumTypeMetric / nTypes : 0.0;
+}
+
+#if 0
+void TableManager::CalculateHierCongestionCost_OLD_DeviceUnitLevel()
 {
     const int R = rowSize;
     const int C = colSize;
@@ -2376,7 +2724,7 @@ void TableManager::CalculateHierCongestionCost()
         if (hasV) addLayer(Lv);
         if (hasH) addLayer(Lh);
     }
-     
+
     // ================================================= ===========
     // Metric calculation
     // ============================================================
@@ -2430,6 +2778,7 @@ void TableManager::CalculateHierCongestionCost()
 
     costMap[CostEnum::hierCongestionCost] = nTypes > 0 ? sumTypeMetric / nTypes : 0.0;
 }
+#endif // disabled old device-unit-level HierCongestion
 
 // =======================
 // Hierarchical cCost (cCost with hierarchical congestion replacing trunk-based)
@@ -2448,15 +2797,185 @@ void TableManager::CalculateHierCCost()
     if (R <= 0 || C <= 0) { costMap[CostEnum::hierCCost] = 0.0; return; }
 
     auto is_dummy = [](const string& s) { return s.empty() || s == "d"; };
+
+    // ============================================================
+    // [Part 1] SHARED-tree per-cell distribution -> cellCongest
+    // ============================================================
+    auto groupSig = [&](int r, int c) -> string {
+        std::unordered_set<string> s;
+        for (const auto& du : table[r][c].GetDeviceUnits())
+            if (!is_dummy(du.GetSymbol())) s.insert(du.GetSymbol());
+        vector<string> v(s.begin(), s.end());
+        std::sort(v.begin(), v.end());
+        string sig;
+        for (const auto& x : v) sig += x;
+        return sig;
+        };
+
+    vector<vector<string>> sig(R, vector<string>(C));
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            sig[r][c] = groupSig(r, c);
+
+    auto isAllSameSig = [&](int rS, int rE, int cS, int cE) -> bool {
+        string single; bool found = false;
+        for (int r = rS; r < rE; ++r)
+            for (int c = cS; c < cE; ++c) {
+                if (sig[r][c].empty()) continue;
+                if (!found) { single = sig[r][c]; found = true; }
+                else if (sig[r][c] != single) return false;
+            }
+        return found;
+        };
+    int cnt_h = 0, cnt_v = 0;
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c + 1 < C; ++c)
+            if (isAllSameSig(r, r + 1, c, c + 2)) cnt_h++;
+    for (int r = 0; r + 1 < R; ++r)
+        for (int c = 0; c < C; ++c)
+            if (isAllSameSig(r, r + 2, c, c + 1)) cnt_v++;
+    const bool h_init = (cnt_h >= cnt_v);
+
+    vector<std::pair<int, int>> steps;
+    {
+        int rb = 1, cb = 1; bool h = h_init;
+        while (rb < R || cb < C) {
+            if (h) cb = std::min(cb * 2, C); else rb = std::min(rb * 2, R);
+            steps.push_back({ rb, cb });
+            if (rb >= R && cb >= C) break;
+            h = !h;
+        }
+        if (steps.empty()) steps.push_back({ R, C });
+    }
+
+    auto getPartition = [](int dim) -> vector<int> {
+        if (dim <= 0) return {};
+        if (dim <= 3) return { dim };
+        if (dim % 3 == 0) return vector<int>(dim / 3, 3);
+        if (dim % 3 == 2) {
+            vector<int> p(1, 2);
+            for (int i = 0; i < (dim - 2) / 3; ++i) p.push_back(3);
+            return p;
+        }
+        vector<int> p(1, 2);
+        for (int i = 0; i < (dim - 4) / 3; ++i) p.push_back(3);
+        p.push_back(2);
+        return p;
+        };
+    auto bucketize = [&](int pos, int dim, int B) -> int {
+        if (B >= dim) return 0;
+        if (B < 2)    return pos;
+        if (dim % 2 == 0) return std::min(pos / B, std::max(dim / B - 1, 0));
+        vector<int> part = getPartition(dim);
+        int cum = 0;
+        for (int i = 0; i < (int)part.size(); ++i) {
+            cum += part[i];
+            if (pos < cum) return i;
+        }
+        return (int)part.size() - 1;
+        };
+
+    struct Node { double y, x; std::set<string> nets; };
+    vector<Node> nodes;
+    nodes.reserve((size_t)R * (size_t)C);
+    for (int r = 0; r < R; ++r)
+        for (int c = 0; c < C; ++c)
+            if (!sig[r][c].empty())
+                nodes.push_back({ (double)r, (double)c, { sig[r][c] } });
+
+    struct Edge { int p; int c; };
+    vector<Edge> edges;
+    vector<int> current;
+    current.reserve(nodes.size());
+    for (int i = 0; i < (int)nodes.size(); ++i) current.push_back(i);
+
+    for (auto& step : steps) {
+        const int rB = step.first; const int cB = step.second;
+        std::map<std::pair<int, int>, vector<int>> buckets;
+        for (int idx : current) {
+            int wr = bucketize((int)nodes[idx].y, R, rB);
+            int wc = bucketize((int)nodes[idx].x, C, cB);
+            buckets[{wr, wc}].push_back(idx);
+        }
+        vector<int> new_current;
+        new_current.reserve(buckets.size());
+        for (auto& kv : buckets) {
+            auto& group = kv.second;
+            if (group.size() == 1) { new_current.push_back(group[0]); continue; }
+            double cy = 0.0, cx = 0.0;
+            std::set<string> mn;
+            for (int g : group) {
+                cy += nodes[g].y; cx += nodes[g].x;
+                for (const auto& n : nodes[g].nets) mn.insert(n);
+            }
+            cy /= (double)group.size();
+            cx /= (double)group.size();
+            int parentIdx = (int)nodes.size();
+            nodes.push_back({ cy, cx, std::move(mn) });
+            for (int g : group) edges.push_back({ parentIdx, g });
+            new_current.push_back(parentIdx);
+        }
+        current = std::move(new_current);
+    }
+
+    vector<vector<double>> cellCongest(R, vector<double>(C, 0.0));
+
+    auto distributeH = [&](double y, double xa, double xb, double weight) {
+        double r_round = std::round(y);
+        vector<std::pair<int, double>> rows;
+        if (std::abs(y - r_round) < 1e-6) {
+            int r = (int)r_round;
+            if (r >= 0 && r < R) rows.push_back({ r, 1.0 });
+        }
+        else {
+            int r_low = (int)std::floor(y);
+            if (r_low >= 0 && r_low < R) rows.push_back({ r_low,     0.5 });
+            if (r_low + 1 >= 0 && r_low + 1 < R) rows.push_back({ r_low + 1, 0.5 });
+        }
+        double xs = std::min(xa, xb), xe = std::max(xa, xb);
+        for (int c = 0; c < C; ++c) {
+            double lo = c - 0.5, hi = c + 0.5;
+            double ov = std::min(hi, xe) - std::max(lo, xs);
+            if (ov > 0.0)
+                for (auto& rp : rows) cellCongest[rp.first][c] += ov * rp.second * weight;
+        }
+        };
+    auto distributeV = [&](double x, double ya, double yb, double weight) {
+        double c_round = std::round(x);
+        vector<std::pair<int, double>> cols;
+        if (std::abs(x - c_round) < 1e-6) {
+            int c = (int)c_round;
+            if (c >= 0 && c < C) cols.push_back({ c, 1.0 });
+        }
+        else {
+            int c_low = (int)std::floor(x);
+            if (c_low >= 0 && c_low < C) cols.push_back({ c_low,     0.5 });
+            if (c_low + 1 >= 0 && c_low + 1 < C) cols.push_back({ c_low + 1, 0.5 });
+        }
+        double ys = std::min(ya, yb), ye = std::max(ya, yb);
+        for (int r = 0; r < R; ++r) {
+            double lo = r - 0.5, hi = r + 0.5;
+            double ov = std::min(hi, ye) - std::max(lo, ys);
+            if (ov > 0.0)
+                for (auto& cp : cols) cellCongest[r][cp.first] += ov * cp.second * weight;
+        }
+        };
+
+    for (const auto& e : edges) {
+        const Node& parent = nodes[e.p];
+        const Node& child = nodes[e.c];
+        double weight = (double)child.nets.size();
+        if (std::abs(parent.x - child.x) > 1e-9)
+            distributeH(child.y, child.x, parent.x, weight);
+        if (std::abs(parent.y - child.y) > 1e-9)
+            distributeV(parent.x, child.y, parent.y, weight);
+    }
+
+#if 0
     auto normPairFn = [](char a, char b) -> string { return { std::min(a,b), std::max(a,b) }; };
 
     static const int NUM_SUB = 4;
 
-    // ============================================================
-    // [Part 1] Hierarchical routing -> per-cell congestion
-    // ============================================================
-
-    // Build pattern strings per cell
     vector<vector<string>> cellPat(R, vector<string>(C));
     for (int r = 0; r < R; r++)
         for (int c = 0; c < C; c++) {
@@ -2757,9 +3276,9 @@ void TableManager::CalculateHierCCost()
         if (hasH) addLayer(Lh);
     }
 
-    // Per-cell congestion
+    // Old per-cell aggregation (disabled; cellCongest produced by SHARED-tree above)
     int cellGridCount = NUM_SUB * gapsPerCell;
-    vector<vector<double>> cellCongest(R, vector<double>(C, 0.0));
+    vector<vector<double>> cellCongest_OLD(R, vector<double>(C, 0.0));
     for (int r = 0; r < R; r++)
         for (int c = 0; c < C; c++) {
             int s = 0;
@@ -2768,8 +3287,9 @@ void TableManager::CalculateHierCCost()
                 for (int gi = 0; gi < gapsPerCell; gi++)
                     s += congestion[gr][c * gapsPerCell + gi];
             }
-            cellCongest[r][c] = (double)s / cellGridCount;
+            cellCongest_OLD[r][c] = (double)s / cellGridCount;
         }
+#endif // disabled old device-unit-level HierCCost Part 1
 
     // ============================================================
     // [Part 2] Lateral x congestion (same as original cCost)
@@ -2857,7 +3377,7 @@ void TableManager::CalculateSymmetryCost()
         }
     }
 
-	costMap[CostEnum::symmetryCost] = noSymmetryScore; // lower is better
+    costMap[CostEnum::symmetryCost] = noSymmetryScore; // lower is better
 }
 
 pair<double, double> CalEachWindowSizeCost(TableManager table, int rowSize, int colSize, int rowWindowSize, int colWindowSize)
@@ -2926,7 +3446,7 @@ pair<double, double> CalEachWindowSizeCost(TableManager table, int rowSize, int 
         }
     }
 
-	return { coverageRate, (double)(bestRowWindowSize * bestColWindowSize) / (rowSize * colSize) };
+    return { coverageRate, (double)(bestRowWindowSize * bestColWindowSize) / (rowSize * colSize) };
 }
 
 void TableManager::CalculateWindowSizeCost()
@@ -2940,6 +3460,6 @@ void TableManager::CalculateWindowSizeCost()
     }
     else
     {
-		costMap[CostEnum::windowSizeCost] = 1.0 / (windowSizeCost.second * table[0][0].GetDeviceUnits().size()); // lower is better, normalized by device units
+        costMap[CostEnum::windowSizeCost] = 1.0 / (windowSizeCost.second * table[0][0].GetDeviceUnits().size()); // lower is better, normalized by device units
     }
 }
