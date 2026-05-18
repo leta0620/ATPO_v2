@@ -3364,17 +3364,49 @@ void TableManager::CalculateHierCCost()
 
 void TableManager::CalculateSymmetryCost()
 {
+ //   double noSymmetryScore = 0.0;
+ //   for (int r = 0; r < rowSize / 2; r++)
+ //   {
+ //       for (int c = 0; c < colSize / 2; c++)
+ //       {
+ //           Group g = table[r][c];
+ //           Group gSym = table[rowSize - 1 - r][colSize - 1 - c];
+
+ //           if (g == gSym) continue;
+ //           else noSymmetryScore += 1.0;
+ //       }
+ //   }
+
+	//costMap[CostEnum::symmetryCost] = noSymmetryScore; // lower is better
+
     double noSymmetryScore = 0.0;
-    for (int r = 0; r < rowSize / 2; r++)
+	unordered_map<int, unordered_map<int, int>> symmetryPairCount;
+	unordered_map<int, int> groupCount;
+    for (int r = 0; r < rowSize; r++)
     {
         for (int c = 0; c < colSize / 2; c++)
         {
-            Group g = table[r][c];
-            Group gSym = table[rowSize - 1 - r][colSize - 1 - c];
+			auto g1Hash = table[r][c].GetSymbolNameSequenceHash();
+            auto g2Hash = table[r][colSize - 1 - c].GetSymbolNameSequenceHash();
 
-            if (g == gSym) continue;
-            else noSymmetryScore += 1.0;
+			symmetryPairCount[g1Hash][g2Hash]++;
+			symmetryPairCount[g2Hash][g1Hash]++;
+
+			groupCount[g1Hash]++;
+			groupCount[g2Hash]++;
         }
+    }
+
+    for (const auto& g1Main : symmetryPairCount)
+    {
+		int maxCount = 0;
+        for (const auto& g2Slave : g1Main.second)
+        {
+			maxCount = std::max(maxCount, g2Slave.second);
+		}
+
+		double pairNoSymmetryScore = 1.0 - (double)maxCount / groupCount[g1Main.first];
+		noSymmetryScore += pairNoSymmetryScore;
     }
 
     costMap[CostEnum::symmetryCost] = noSymmetryScore; // lower is better
@@ -3461,5 +3493,16 @@ void TableManager::CalculateWindowSizeCost()
     else
     {
         costMap[CostEnum::windowSizeCost] = 1.0 / (windowSizeCost.second * table[0][0].GetDeviceUnits().size()); // lower is better, normalized by device units
+    }
+}
+
+void TableManager::FlipLeftHalf()
+{
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize / 2; c++)
+        {
+			table[r][c].FlipGroupRotation();
+        }
     }
 }
