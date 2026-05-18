@@ -21,6 +21,64 @@ int gcd(int a, int b) {
 }
 
 
+namespace {
+Group TakeNextGroupOrDummy(std::vector<Group>& groupsInCurrentTable, const Group& dummyGroup)
+{
+	if (!groupsInCurrentTable.empty()) {
+		Group nowGroup = groupsInCurrentTable.back();
+		groupsInCurrentTable.pop_back();
+		return nowGroup;
+	}
+	return dummyGroup;
+}
+
+void PlaceNextGroup(TableManager& tableManager, std::vector<Group>& groupsInCurrentTable, const Group& dummyGroup, int placeRow, int placeCol, bool flip)
+{
+	Group nowGroup = TakeNextGroupOrDummy(groupsInCurrentTable, dummyGroup);
+	if (flip) {
+		nowGroup.FlipGroupRotation();
+	}
+	tableManager.PlaceGroup(nowGroup, placeRow, placeCol);
+}
+
+void PlaceGroupsFromCenter(TableManager& tableManager, std::vector<Group>& groupsInCurrentTable, const Group& dummyGroup, int rowSize, int colSize)
+{
+	for (int i = 0; i < colSize / 2; ++i)
+	{
+		const int rightCol = (colSize / 2) + i;
+		const int leftCol = (colSize / 2) - 1 - i;
+
+		if (rowSize % 2 == 1)
+		{
+			const int centerRow = rowSize / 2;
+			PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, centerRow, rightCol, false);
+			PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, centerRow, leftCol, true);
+
+			for (int j = 1; j <= rowSize / 2; ++j)
+			{
+				const int lowerRow = centerRow + j;
+				const int upperRow = centerRow - j;
+				PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, lowerRow, rightCol, false);
+				PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, upperRow, leftCol, true);
+				PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, upperRow, rightCol, false);
+				PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, lowerRow, leftCol, true);
+			}
+		}
+		else
+		{
+			for (int j = 0; j < rowSize / 2; ++j)
+			{
+				const int lowerRow = (rowSize / 2) + j;
+				const int upperRow = (rowSize / 2) - 1 - j;
+				PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, lowerRow, rightCol, false);
+				PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, upperRow, leftCol, true);
+				PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, upperRow, rightCol, false);
+				PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, lowerRow, leftCol, true);
+			}
+		}
+	}
+}
+}
 void InitialPlacement::regularGroupAllocation()
 {
 	// Implementation for group allocation
@@ -516,138 +574,7 @@ void InitialPlacement::CalculateInitialTableList()
 
 		std::vector<Group> groupsInCurrentTable = groupsInATable;
 		// Place groups into the table
-		for (int i = 0; i < nowTableColSize / 2; ++i)
-		{
-			for (int j = 0; j < this->rowSize / 2; ++j)
-			{
-				int placeRow;
-				int placeCol;
-				Group nowGroup;
-				if (rowSize % 2 == 1)
-				{
-					if (j == 0) 
-					{
-						placeRow = (this->rowSize / 2) + j;
-						placeCol = (nowTableColSize / 2) + i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeCol = (nowTableColSize / 2) - 1 - i ;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowGroup.FlipGroupRotation();
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-					}
-					else
-					{
-						placeRow = (this->rowSize / 2) + j;
-						placeCol = (nowTableColSize / 2) + i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeRow = (this->rowSize / 2) - j;
-						placeCol = (nowTableColSize / 2) - 1 - i ;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowGroup.FlipGroupRotation();
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeRow = (this->rowSize / 2) - j;
-						placeCol = (nowTableColSize / 2) + i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeRow = (this->rowSize / 2) + j;
-						placeCol = (nowTableColSize / 2) - 1 - i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowGroup.FlipGroupRotation();
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-					}
-				}
-				else
-				{
-					placeRow = (this->rowSize / 2) + j;
-					placeCol = (nowTableColSize / 2) + i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-					placeRow = (this->rowSize / 2) - 1 - j;
-					placeCol = (nowTableColSize / 2) - 1 - i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowGroup.FlipGroupRotation();
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-					placeRow = (this->rowSize / 2) - 1 - j;
-					placeCol = (nowTableColSize / 2) + i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-					placeRow = (this->rowSize / 2) + j;
-					placeCol = (nowTableColSize / 2) - 1 - i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowGroup.FlipGroupRotation();
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-				}
-			}
-		}
+		PlaceGroupsFromCenter(nowTableManager, groupsInCurrentTable, dummyGroup, this->rowSize, nowTableColSize);
 		this->InitialTableList.push_back(std::move(nowTableManager));
 	}
 }
@@ -1124,138 +1051,7 @@ void InitialPlacement::CalculateOddTableList()
 
 		std::vector<Group> groupsInCurrentTable = groupsInATable;
 		// Place groups into the table
-		for (int i = 0; i < nowTableColSize / 2; ++i)
-		{
-			for (int j = 0; j < this->rowSize / 2; ++j)
-			{
-				int placeRow;
-				int placeCol;
-				Group nowGroup;
-				if (rowSize % 2 == 1)
-				{
-					if (j == 0)
-					{
-						placeRow = (this->rowSize / 2) + j;
-						placeCol = (nowTableColSize / 2) + i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeCol = (nowTableColSize / 2) - 1 - i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowGroup.FlipGroupRotation();
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-					}
-					else
-					{
-						placeRow = (this->rowSize / 2) + j;
-						placeCol = (nowTableColSize / 2) + i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeRow = (this->rowSize / 2) - j;
-						placeCol = (nowTableColSize / 2) - 1 - i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowGroup.FlipGroupRotation();
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeRow = (this->rowSize / 2) - j;
-						placeCol = (nowTableColSize / 2) + i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeRow = (this->rowSize / 2) + j;
-						placeCol = (nowTableColSize / 2) - 1 - i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowGroup.FlipGroupRotation();
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-					}
-				}
-				else
-				{
-					placeRow = (this->rowSize / 2) + j;
-					placeCol = (nowTableColSize / 2) + i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-					placeRow = (this->rowSize / 2) - 1 - j;
-					placeCol = (nowTableColSize / 2) - 1 - i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowGroup.FlipGroupRotation();
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-					placeRow = (this->rowSize / 2) - 1 - j;
-					placeCol = (nowTableColSize / 2) + i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-					placeRow = (this->rowSize / 2) + j;
-					placeCol = (nowTableColSize / 2) - 1 - i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowGroup.FlipGroupRotation();
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-				}
-			}
-		}
+		PlaceGroupsFromCenter(nowTableManager, groupsInCurrentTable, dummyGroup, this->rowSize, nowTableColSize);
 		oddFirstGroupTableList.push_back(std::move(nowTableManager));
 	}
 
@@ -1292,138 +1088,7 @@ void InitialPlacement::CalculateOddTableList()
 
 		std::vector<Group> groupsInCurrentTable = groupsInATable;
 		// Place groups into the table
-		for (int i = 0; i < nowTableColSize / 2; ++i)
-		{
-			for (int j = 0; j < this->rowSize / 2; ++j)
-			{
-				int placeRow;
-				int placeCol;
-				Group nowGroup;
-				if (rowSize % 2 == 1)
-				{
-					if (j == 0)
-					{
-						placeRow = (this->rowSize / 2) + j;
-						placeCol = (nowTableColSize / 2) + i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeCol = (nowTableColSize / 2) - 1 - i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowGroup.FlipGroupRotation();
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-					}
-					else
-					{
-						placeRow = (this->rowSize / 2) + j;
-						placeCol = (nowTableColSize / 2) + i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeRow = (this->rowSize / 2) - j;
-						placeCol = (nowTableColSize / 2) - 1 - i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowGroup.FlipGroupRotation();
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeRow = (this->rowSize / 2) - j;
-						placeCol = (nowTableColSize / 2) + i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-						placeRow = (this->rowSize / 2) + j;
-						placeCol = (nowTableColSize / 2) - 1 - i;
-						if (!groupsInCurrentTable.empty()) {
-							nowGroup = groupsInCurrentTable.back();
-							groupsInCurrentTable.pop_back();
-						}
-						else {
-							nowGroup = dummyGroup;   // dummy group（用預設建構）
-						}
-						nowGroup.FlipGroupRotation();
-						nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-					}
-				}
-				else
-				{
-					placeRow = (this->rowSize / 2) + j;
-					placeCol = (nowTableColSize / 2) + i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-					placeRow = (this->rowSize / 2) - 1 - j;
-					placeCol = (nowTableColSize / 2) - 1 - i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowGroup.FlipGroupRotation();
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-					placeRow = (this->rowSize / 2) - 1 - j;
-					placeCol = (nowTableColSize / 2) + i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-
-					placeRow = (this->rowSize / 2) + j;
-					placeCol = (nowTableColSize / 2) - 1 - i;
-					if (!groupsInCurrentTable.empty()) {
-						nowGroup = groupsInCurrentTable.back();
-						groupsInCurrentTable.pop_back();
-					}
-					else {
-						nowGroup = dummyGroup;   // dummy group（用預設建構）
-					}
-					nowGroup.FlipGroupRotation();
-					nowTableManager.PlaceGroup(nowGroup, placeRow, placeCol);
-				}
-			}
-		}
+		PlaceGroupsFromCenter(nowTableManager, groupsInCurrentTable, dummyGroup, this->rowSize, nowTableColSize);
 		oddSecondGroupTableList.push_back(std::move(nowTableManager));
 	}
 	for (int i = 0; i < (int)oddFirstGroupTableList.size(); ++i)
