@@ -22,6 +22,8 @@ private:
 	std::vector<TableManager> InitialTableList;
 	std::vector<std::vector<DeviceUnit>> pathOrder;
 	std::vector<std::vector<Group>> allConfigurationGroupForTables;
+	std::vector<std::vector<Group>> allOddFirstGroupForTables;
+	std::vector<std::vector<Group>> allOddSecondGroupForTables;
 	int groupSize;
 	int rowSize;
 	int colSize; // to be determined
@@ -29,12 +31,14 @@ private:
 
 	// Calculate initial placement tables list
 	void CalculateInitialTableList();
+	void CalculateOddTableList();
 
 	//void CalculateColSize();
 
 	//void InitialPathOrder();
 
 	void GroupAllocation();
+	void oddGroupAllocation();
 	void regularGroupAllocation();
 
 };
