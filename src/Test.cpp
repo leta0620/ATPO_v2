@@ -9,7 +9,7 @@ Test::Test()
 	// Add your test functions here, and call them in the constructor
 	//this->TestParsing()
 	std::vector<CostEnum> costEnumList = { CostEnum::ccCost, CostEnum::hierCCost }; // Example cost enum list
-	this->TestInitialPlacement(8, 10, costEnumList);
+	this->TestInitialPlacement(8, 3, costEnumList);
 	//this->TestInitialPlacement(6, 6);
 
 	//this->TestOuterInputParsing();

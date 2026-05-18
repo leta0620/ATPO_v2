@@ -1863,7 +1863,7 @@ bool TableManager::BuildInterleavingTable()
     //    }
     //    std::cout << std::endl;
     //}
-
+    this->colSize = colNum;
     return true;
 }
 
