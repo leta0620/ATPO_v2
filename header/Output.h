@@ -8,13 +8,18 @@
 class Output
 {
 public:
-	Output(int group, int rowSize, std::map<int, std::vector<TableManager>>& allNondominatedSolutions, std::string sOrD, std::unordered_map<std::string, std::string> labelNameMapInstName, std::unordered_map<std::string, std::string> instNameMapLabelName) :
-		group(group), rowSize(rowSize), allNondominatedSolutions(allNondominatedSolutions), labelNameMapInstName(labelNameMapInstName), instNameMapLabelName(instNameMapLabelName)
+	Output(int group, int rowSize, std::map<int, std::vector<TableManager>>& allNondominatedSolutions, std::string sOrD, std::unordered_map<std::string, std::string> labelNameMapInstName, std::unordered_map<std::string, std::string> instNameMapLabelName, bool flipLeftHalf) :
+		group(group), rowSize(rowSize), allNondominatedSolutions(allNondominatedSolutions), labelNameMapInstName(labelNameMapInstName), instNameMapLabelName(instNameMapLabelName), flipLeftHalf(flipLeftHalf)
 	{  
 		if (sOrD == "S" || sOrD == "s")
 			leftS = true;
 		else
 			leftS = false;
+
+		if (flipLeftHalf)
+		{
+			FlipLeftHalfOfTable();
+		}
 	}
 
 	//void AddResultSingle(int round, TableManager& cTable);
@@ -55,6 +60,9 @@ private:
 	int group;
 	int rowSize;
 	bool leftS = true;
+	bool flipLeftHalf = false;
+
+	void FlipLeftHalfOfTable();
 
 	std::vector<std::pair<TableManager, std::pair<int, int>>> coTableScoreList;
 
