@@ -1659,6 +1659,10 @@ bool TableManager::CheckAndFixDummyWidth()
                 break;
             }
         }
+        if (dummyWidthTable.size() < (size_t)(c + 1))
+        {
+            dummyWidthTable.push_back(dummyWidthsInCol);
+        }
     }
 
     // fix dummy width
@@ -1672,7 +1676,10 @@ bool TableManager::CheckAndFixDummyWidth()
             {
                 if (deviceUnits[d].GetSymbol() == "d")
                 {
-                    deviceUnits[d].SetWidth(dummyWidthTable[c][d]);
+                    // Bounds guard for odd-R case: dummyWidthsInCol is sized from
+                    // table[0][c]; row r > 0 may have more device units.
+                    if (d < (int)dummyWidthTable[c].size())
+                        deviceUnits[d].SetWidth(dummyWidthTable[c][d]);
                 }
             }
             g.SetDeviceUnits(deviceUnits);
@@ -2001,7 +2008,7 @@ bool TableManager::BuildInterleavingTable()
     //    }
     //    std::cout << std::endl;
     //}
-
+    this->colSize = colNum;
     return true;
 }
 
