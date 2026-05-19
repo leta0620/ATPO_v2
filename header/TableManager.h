@@ -59,6 +59,7 @@ public:
 	std::vector<std::string> GetTableRotationPattern(bool leftS = true);
 
 	//****** need to modify pattern output to real dummy unit ******
+	std::vector<std::string> GetTableStringPatternInRealDummyLengthUseStartDummy();
 	std::vector<std::string> GetTableStringPatternInRealDummyLength();
 	std::vector<std::string> GetTableRotationPatternInRealDummyLength(bool leftS = true);
 
