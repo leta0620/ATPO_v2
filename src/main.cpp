@@ -20,7 +20,7 @@
 
 using namespace std;
 
-#define CO_BEST_SOLUTION_NUM 100
+#define CO_BEST_SOLUTION_NUM 1000
 
 #ifdef _WIN32
 #include <direct.h>

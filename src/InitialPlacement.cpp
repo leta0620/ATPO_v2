@@ -561,7 +561,7 @@ void InitialPlacement::CalculateInitialTableList()
 		TableManager nowTableManager(nowTableGroupSize, this->rowSize, nowTableColSize, this->netListLookupTable, this->costEnumList);
 
 		Group dummyGroup; // dummy group for empty place
-		for (int i = 0; i < nowTableGroupSize; ++i)
+		/*for (int i = 0; i < nowTableGroupSize; ++i)
 		{
 			DeviceUnit dummyUnit;
 			dummyUnit.SetSymbol("d");
@@ -570,7 +570,8 @@ void InitialPlacement::CalculateInitialTableList()
 			dummyUnit.SetInstName("d");
 			dummyUnit.SetRotation(CellRotation::MY);
 			dummyGroup.AddDeviceUnit(dummyUnit);
-		}
+		}*/
+		dummyGroup.BuildAllDummyGroup(nowTableGroupSize);
 
 		std::vector<Group> groupsInCurrentTable = groupsInATable;
 		// Place groups into the table
@@ -1038,7 +1039,7 @@ void InitialPlacement::CalculateOddTableList()
 		TableManager nowTableManager(nowTableGroupSize, this->rowSize, nowTableColSize, this->netListLookupTable, this->costEnumList);
 
 		Group dummyGroup; // dummy group for empty place
-		for (int i = 0; i < nowTableGroupSize; ++i)
+		/*for (int i = 0; i < nowTableGroupSize; ++i)
 		{
 			DeviceUnit dummyUnit;
 			dummyUnit.SetSymbol("d");
@@ -1047,7 +1048,8 @@ void InitialPlacement::CalculateOddTableList()
 			dummyUnit.SetInstName("d");
 			dummyUnit.SetRotation(CellRotation::MY);
 			dummyGroup.AddDeviceUnit(dummyUnit);
-		}
+		}*/
+		dummyGroup.BuildAllDummyGroup(nowTableGroupSize);
 
 		std::vector<Group> groupsInCurrentTable = groupsInATable;
 		// Place groups into the table
@@ -1075,7 +1077,7 @@ void InitialPlacement::CalculateOddTableList()
 		TableManager nowTableManager(nowTableGroupSize, this->rowSize, nowTableColSize, this->netListLookupTable, this->costEnumList);
 
 		Group dummyGroup; // dummy group for empty place
-		for (int i = 0; i < nowTableGroupSize; ++i)
+		/*for (int i = 0; i < nowTableGroupSize; ++i)
 		{
 			DeviceUnit dummyUnit;
 			dummyUnit.SetSymbol("d");
@@ -1084,7 +1086,8 @@ void InitialPlacement::CalculateOddTableList()
 			dummyUnit.SetInstName("d");
 			dummyUnit.SetRotation(CellRotation::MY);
 			dummyGroup.AddDeviceUnit(dummyUnit);
-		}
+		}*/
+		dummyGroup.BuildAllDummyGroup(nowTableGroupSize);
 
 		std::vector<Group> groupsInCurrentTable = groupsInATable;
 		// Place groups into the table

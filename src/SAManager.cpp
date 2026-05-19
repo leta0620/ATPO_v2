@@ -234,7 +234,7 @@ void SAManager::Perturbation(std::mt19937& gen)
 			{
 				return;
 			}
-		} while (col1 == col2 || table.GetGroup(0, col1).HasDummyUnit() != table.GetGroup(0, col2).HasDummyUnit());
+		} while (col1 == col2 || (table.GetGroup(0, col1).HasDummyUnit() != table.GetGroup(0, col2).HasDummyUnit()) || (table.GetGroup(table.GetRowSize() - 1, col1).HasDummyUnit() != table.GetGroup(table.GetRowSize() - 1, col2).HasDummyUnit()));
 
 		// swap col1 and col2
 		if (!table.SwapColumns(col1, col2))
