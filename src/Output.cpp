@@ -641,7 +641,7 @@ void Output::WriteCSVCoBetterSolutionToFile(int topN, std::string fileName)
 			return;
 		}
 
-		vector<string> pattern = tableScore.first.GetTableStringPatternInRealDummyLength();
+		vector<string> pattern = tableScore.first.GetTableStringPatternInRealDummyLengthUseStartDummy();
 		vector<string> rotationPattern = tableScore.first.GetTableRotationPatternInRealDummyLength(leftS);
 
 		ofstream patternOutFile(patternFileName);

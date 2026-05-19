@@ -1755,6 +1755,23 @@ vector<string> TableManager::GetTableStringPatternInRealDummyLength()
     return tableStrings;
 }
 
+vector<string> TableManager::GetTableStringPatternInRealDummyLengthUseStartDummy()
+{
+    vector<string> tableStrings;
+    tableStrings = GetTableStringPatternInRealDummyLength();
+    for (size_t rowIndex = 0; rowIndex < tableStrings.size(); rowIndex++)
+    {
+        for (int col = 0; col < tableStrings[rowIndex].size(); col++)
+        {
+            if (tableStrings[rowIndex][col] == 'd')
+            {
+                tableStrings[rowIndex][col] = '*';
+            }
+        }
+    }
+    return tableStrings;
+}
+
 vector<string> TableManager::GetTableRotationPatternInRealDummyLength(bool leftS)
 {
     std::vector<std::string> tableRotations;
