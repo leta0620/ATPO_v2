@@ -20,7 +20,7 @@ private:
 	NetlistLookupTable netListLookupTable;
 
 	std::vector<TableManager> InitialTableList;
-	std::vector<std::vector<DeviceUnit>> pathOrder;
+	//std::vector<std::vector<DeviceUnit>> pathOrder;
 	std::vector<std::vector<Group>> allConfigurationGroupForTables;
 	std::vector<std::vector<Group>> allOddFirstGroupForTables;
 	std::vector<std::vector<Group>> allOddSecondGroupForTables;
@@ -38,6 +38,7 @@ private:
 	//void InitialPathOrder();
 
 	void GroupAllocation();
+	void BusGroupAllocation();
 	void oddGroupAllocation();
 	void regularGroupAllocation();
 

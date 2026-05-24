@@ -1,14 +1,15 @@
 #include "InitialPlacement.h"
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 
 InitialPlacement::InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist, std::vector<CostEnum> costEnumList) : groupSize(groupSize), rowSize(rowSize), colSize(0), netListLookupTable(netlist), costEnumList(costEnumList)
 {
 	//InitialTableList.resize(rowSize, TableManager(groupSize, rowSize, colSize, netListLookupTable));
 	this->GroupAllocation(); //floorplan
 	this->CalculateInitialTableList(); //placement
-	this->oddGroupAllocation(); //floorplan
-	this->CalculateOddTableList(); //placement
+	//this->oddGroupAllocation(); //floorplan
+	//this->CalculateOddTableList(); //placement
 }
 
 int gcd(int a, int b) {
@@ -76,6 +77,59 @@ void PlaceGroupsFromCenter(TableManager& tableManager, std::vector<Group>& group
 				PlaceNextGroup(tableManager, groupsInCurrentTable, dummyGroup, lowerRow, leftCol, true);
 			}
 		}
+	}
+}
+DeviceUnit BuildDeviceUnit(const NetlistUnit& unit, CellRotation rotation)
+{
+	DeviceUnit deviceUnit;
+	deviceUnit.SetSymbol(unit.GetSynbolName());
+	deviceUnit.SetAnalogCellType(unit.GetAnalogType());
+	deviceUnit.SetWidth(unit.GetDeviceWidth());
+	deviceUnit.SetInstName(unit.GetInstName());
+	deviceUnit.SetRotation(rotation);
+	return deviceUnit;
+}
+
+std::vector<std::string> BuildDrainBranch(NetlistLookupTable& netlistLookupTable, const std::string& startSymbol)
+{
+	std::vector<std::string> branch;
+	std::unordered_set<std::string> visited;
+	std::string currentSymbol = startSymbol;
+
+	while (!currentSymbol.empty())
+	{
+		if (visited.find(currentSymbol) != visited.end())
+		{
+			break;
+		}
+
+		branch.push_back(currentSymbol);
+		visited.insert(currentSymbol);
+
+		auto next = netlistLookupTable.GetPinDLinkWho(currentSymbol);
+		if (next.first.empty() || next.second.empty())
+		{
+			break;
+		}
+
+		currentSymbol = next.first;
+	}
+
+	return branch;
+}
+
+void AppendMirrorBranchPath(NetlistLookupTable& netlistLookupTable, const std::vector<std::string>& branch, std::vector<DeviceUnit>& currentPath)
+{
+	for (const std::string& symbol : branch)
+	{
+		NetlistUnit unit = netlistLookupTable.GetNetlistUnit(symbol);
+		currentPath.push_back(BuildDeviceUnit(unit, CellRotation::MY));
+	}
+
+	for (auto it = branch.rbegin(); it != branch.rend(); ++it)
+	{
+		NetlistUnit unit = netlistLookupTable.GetNetlistUnit(*it);
+		currentPath.push_back(BuildDeviceUnit(unit, CellRotation::R0));
 	}
 }
 }
@@ -340,14 +394,25 @@ void InitialPlacement::GroupAllocation()
 		});
 	// 先從基數最小做起
 	// 先抓當前元件節點，然後依元件節點迭代，進而分配完一個group元件配置
+	int commonSourceGcdValue = netListLookupTable.GetNetlistUnit(commonSourceOrder[0]).GetDeviceUnitCount();
+	for (size_t i = 1; i < commonSourceOrder.size(); ++i)
+	{
+		int commonSourceUnitCount = netListLookupTable.GetNetlistUnit(commonSourceOrder[i]).GetDeviceUnitCount();
+		commonSourceGcdValue = gcd(commonSourceGcdValue, commonSourceUnitCount);
+	}
+
+	int minSourceUnitCount = netListLookupTable.GetNetlistUnit(commonSourceOrder[0]).GetDeviceUnitCount();
+	int baseScale = minSourceUnitCount / commonSourceGcdValue;
+
 	std::string nowSourceSymbol = commonSourceOrder[0];
 	std::vector<int> deviceUnitCountList;
 	while (nowSourceSymbol != "")
 	{
 		NetlistUnit unit = netListLookupTable.GetNetlistUnit(nowSourceSymbol);
-		deviceUnitCountList.push_back(unit.GetDeviceUnitCount());
+		deviceUnitCountList.push_back(unit.GetDeviceUnitCount() / baseScale);
 		nowSourceSymbol = netListLookupTable.GetPinDLinkWho(nowSourceSymbol).first;
 	}
+
 	int gcdValue = deviceUnitCountList[0];
 	for (size_t i = 1; i < deviceUnitCountList.size(); ++i)
 	{
@@ -461,7 +526,7 @@ void InitialPlacement::GroupAllocation()
 
 			std::string nowNode = commonSourceOrder[j];
 			std::vector<std::string> currentGroupSymbolList;
-			int mutiNumber = netListLookupTable.GetNetlistUnit(nowNode).GetDeviceUnitCount() / netListLookupTable.GetNetlistUnit(commonSourceOrder[0]).GetDeviceUnitCount();
+			int mutiNumber = netListLookupTable.GetNetlistUnit(nowNode).GetDeviceUnitCount() / commonSourceGcdValue;
 			
 
 
@@ -582,74 +647,83 @@ void InitialPlacement::CalculateInitialTableList()
 
 
 
-//void InitialPlacement::InitialPathOrder()
-//{
-//	// Implementation for initial path order
-//	std::vector<std::string> commonSourceOrder = netListLookupTable.GetCommonSourceList();
-//	std::stable_sort(commonSourceOrder.begin(), commonSourceOrder.end(),
-//		[this](const std::string& a, const std::string& b) -> bool
-//		{
-//			int countA = netListLookupTable.GetNetlistUnit(a).GetDeviceUnitCount();
-//			int countB = netListLookupTable.GetNetlistUnit(b).GetDeviceUnitCount();
-//			if (countA != countB)
-//				return countA < countB; // 升冪排序（數量小的在前）
-//			return a < b; // 次要鍵：字典序
-//		});
-//
-//	for (int i = 0; i < (int)commonSourceOrder.size(); ++i)
-//	{
-//		std::vector<DeviceUnit> currentPath;
-//		for (int j = 0; j < (int)commonSourceOrder.size(); ++j)
-//		{
-//			NetlistUnit unit = netListLookupTable.GetNetlistUnit(commonSourceOrder[j]);
-//			int unitCount = unit.GetDeviceUnitCount();
-//			while (unitCount > 0)
-//			{
-//				DeviceUnit deviceUnit;
-//				deviceUnit.SetSymbol(unit.GetSynbolName());
-//				deviceUnit.SetAnalogCellType(unit.GetAnalogType());
-//				deviceUnit.SetRotation(CellRotation::MY);
-//
-//
-//
-//				currentPath.push_back(deviceUnit);
-//				--unitCount;
-//
-//
-//				if (netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).second != "")
-//				{
-//					NetlistUnit shareDeviceUnit = netListLookupTable.GetNetlistUnit(netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).first);
-//					deviceUnit.SetSymbol(shareDeviceUnit.GetSynbolName());
-//					deviceUnit.SetAnalogCellType(shareDeviceUnit.GetAnalogType());
-//					deviceUnit.SetRotation(CellRotation::MY);
-//
-//					deviceUnit.SetWidth(shareDeviceUnit.GetDeviceWidth());
-//					deviceUnit.SetInstName(shareDeviceUnit.GetInstName());
-//
-//					currentPath.push_back(deviceUnit);
-//
-//					deviceUnit.SetRotation(CellRotation::R0);
-//					currentPath.push_back(deviceUnit);
-//				}
-//
-//
-//				deviceUnit.SetSymbol(unit.GetSynbolName());
-//				deviceUnit.SetAnalogCellType(unit.GetAnalogType());
-//				deviceUnit.SetRotation(CellRotation::R0);
-//
-//				deviceUnit.SetWidth(unit.GetDeviceWidth());
-//				deviceUnit.SetInstName(unit.GetInstName());
-//
-//				currentPath.push_back(deviceUnit);
-//				--unitCount;
-//			}
-//		}
-//		auto last = commonSourceOrder.back();
-//		commonSourceOrder.pop_back();
-//		commonSourceOrder.insert(commonSourceOrder.begin(), last);
-//		this->pathOrder.push_back(currentPath);
-//	}
-//}
+void InitialPlacement::BusGroupAllocation()
+{
+	// Keep only the path that starts from the common-source device with the fewest units.
+	std::vector<std::string> commonSourceOrder = netListLookupTable.GetCommonSourceList();
+	std::stable_sort(commonSourceOrder.begin(), commonSourceOrder.end(),
+		[this](const std::string& a, const std::string& b) -> bool
+		{
+			int countA = netListLookupTable.GetNetlistUnit(a).GetDeviceUnitCount();
+			int countB = netListLookupTable.GetNetlistUnit(b).GetDeviceUnitCount();
+			if (countA != countB)
+				return countA < countB;
+			return a < b;
+		});
+
+	std::vector<DeviceUnit> currentPath;
+	for (const std::string& commonSourceSymbol : commonSourceOrder)
+	{
+		NetlistUnit commonSourceUnit = netListLookupTable.GetNetlistUnit(commonSourceSymbol);
+		int unitCount = commonSourceUnit.GetDeviceUnitCount();
+		std::vector<std::string> branch = BuildDrainBranch(netListLookupTable, commonSourceSymbol);
+
+		while (unitCount > 0)
+		{
+			AppendMirrorBranchPath(netListLookupTable, branch, currentPath);
+			unitCount -= 2;
+		}
+	}
+
+	//this->pathOrder.clear();
+	//this->pathOrder.push_back(currentPath);
+
+	int commonBranchRepeatCount = 0;
+	for (const std::string& commonSourceSymbol : commonSourceOrder)
+	{
+		int branchRepeatCount = netListLookupTable.GetNetlistUnit(commonSourceSymbol).GetDeviceUnitCount() / 2;
+		commonBranchRepeatCount = (commonBranchRepeatCount == 0) ? branchRepeatCount : gcd(commonBranchRepeatCount, branchRepeatCount);
+	}
+
+	this->allConfigurationGroupForTables.clear();
+	std::vector<std::string> minBranch = BuildDrainBranch(netListLookupTable, commonSourceOrder[0]);
+	int branchPatternSize = (int)minBranch.size() * 2;
+	for (int config = 1; config <= commonBranchRepeatCount; ++config)
+	{
+		if (commonBranchRepeatCount % config != 0)
+		{
+			continue;
+		}
+
+		int groupDeviceCount = branchPatternSize * config;
+		if (groupDeviceCount <= 0 || currentPath.size() % groupDeviceCount != 0)
+		{
+			continue;
+		}
+
+		std::vector<Group> allGroupsInATable;
+		for (int startIndex = 0; startIndex < (int)currentPath.size(); startIndex += groupDeviceCount)
+		{
+			std::vector<DeviceUnit> groupDeviceUnits(
+				currentPath.begin() + startIndex,
+				currentPath.begin() + startIndex + groupDeviceCount);
+
+			Group group;
+			group.SetDeviceUnits(groupDeviceUnits);
+			allGroupsInATable.push_back(group);
+		}
+
+		std::vector<Group> reverseAllGroupsInATable;
+		int totalGroups = (int)allGroupsInATable.size();
+		for (int i = 0; i < totalGroups; ++i)
+		{
+			Group nowGroup = allGroupsInATable.back();
+			allGroupsInATable.pop_back();
+			reverseAllGroupsInATable.push_back(nowGroup);
+		}
+		this->allConfigurationGroupForTables.push_back(reverseAllGroupsInATable);
+	}
+}
 //
 //
 //
