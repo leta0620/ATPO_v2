@@ -3982,60 +3982,167 @@ vector<vector<Group>> GenerateCCGroupTable(int rowSize, int colSize, int groupSi
         };
 
     // ==========================================================
-    // 1. 建立 middle slots
+    // 1. 建立奇數中線的 pair slots
     //
-    // 奇數 row / col 的中線不做 CC。
-    // 但中線要優先放 real group，避免 dummy 在中間。
+    // rowSize 是奇數：middle row 做左右對稱 pair
+    // colSize 是奇數：middle col 做上下對稱 pair
+    //
+    // 如果 rowSize 和 colSize 都是奇數，正中央格另外處理。
     // ==========================================================
-    vector<CellSlot> middleSlots;
+    vector<PairSlot> middlePairSlots;
 
-    for (int r = 0; r < rowSize; r++)
+    bool hasCenterCell = (rowSize % 2 == 1 && colSize % 2 == 1);
+    int midRow = rowSize / 2;
+    int midCol = colSize / 2;
+
+    // ----------------------------------------------------------
+    // 1-1. 如果 rowSize 是奇數，middle row 做左右 mirror pair
+    //
+    // (midRow, c) <-> (midRow, colSize - 1 - c)
+    // ----------------------------------------------------------
+    if (rowSize % 2 == 1)
     {
-        for (int c = 0; c < colSize; c++)
+        for (int c = 0; c < colSize / 2; c++)
         {
-            if (IsMiddleRow(r) || IsMiddleCol(c))
-            {
-                CellSlot slot;
-                slot.r = r;
-                slot.c = c;
-                slot.dist2 = CalcDist2(r, c);
+            int leftC = c;
+            int rightC = colSize - 1 - c;
 
-                middleSlots.push_back(slot);
-            }
+            PairSlot slot;
+            slot.r1 = midRow;
+            slot.c1 = leftC;
+            slot.r2 = midRow;
+            slot.c2 = rightC;
+            slot.dist2 = CalcDist2(midRow, leftC);
+
+            middlePairSlots.push_back(slot);
         }
     }
 
-    sort(middleSlots.begin(), middleSlots.end(), [](const CellSlot& a, const CellSlot& b) {
+    // ----------------------------------------------------------
+    // 1-2. 如果 colSize 是奇數，middle col 做上下 mirror pair
+    //
+    // (r, midCol) <-> (rowSize - 1 - r, midCol)
+    // ----------------------------------------------------------
+    if (colSize % 2 == 1)
+    {
+        for (int r = 0; r < rowSize / 2; r++)
+        {
+            int topR = r;
+            int bottomR = rowSize - 1 - r;
+
+            PairSlot slot;
+            slot.r1 = topR;
+            slot.c1 = midCol;
+            slot.r2 = bottomR;
+            slot.c2 = midCol;
+            slot.dist2 = CalcDist2(topR, midCol);
+
+            middlePairSlots.push_back(slot);
+        }
+    }
+
+    // ==========================================================
+    // 2. 中線 pair 由中心往外排序
+    //
+    // 越靠近中心越早放 real group。
+    // 如果中線真的不得不放 dummy，dummy 會比較靠外。
+    // ==========================================================
+    sort(middlePairSlots.begin(), middlePairSlots.end(), [](const PairSlot& a, const PairSlot& b) {
         if (a.dist2 != b.dist2)
         {
             return a.dist2 < b.dist2;
         }
 
-        if (a.r != b.r)
+        if (a.r1 != b.r1)
         {
-            return a.r < b.r;
+            return a.r1 < b.r1;
         }
 
-        return a.c < b.c;
+        return a.c1 < b.c1;
         });
 
     // ==========================================================
-    // 2. 填 middle slots
+    // 3. 如果有正中央格，先處理正中央
     //
-    // 這裡開始會避開上下左右相同 group。
+    // 正中央沒有 mirror pair，只能單放。
+    // 優先放 odd count group，讓剩下數量變偶數。
     // ==========================================================
-    for (const CellSlot& slot : middleSlots)
+    if (hasCenterCell)
     {
-        int groupIndex = ChooseBestMiddleGroup(slot.r, slot.c);
+        int centerGroup = -1;
 
-        if (groupIndex >= 0)
+        for (int i = 0; i < static_cast<int>(groupSeq.size()); i++)
         {
-            PutGroup(slot.r, slot.c, groupIndex);
-            ConsumeGroup(groupIndex, 1);
+            if (GetRemain(i) > 0 && GetRemain(i) % 2 == 1)
+            {
+                centerGroup = i;
+                break;
+            }
+        }
+
+        if (centerGroup == -1)
+        {
+            centerGroup = ChooseBestMiddleGroup(midRow, midCol);
+        }
+
+        if (centerGroup >= 0)
+        {
+            PutGroup(midRow, midCol, centerGroup);
+            ConsumeGroup(centerGroup, 1);
         }
         else
         {
-            PutGroup(slot.r, slot.c, -1);
+            PutGroup(midRow, midCol, -1);
+        }
+    }
+
+    // ==========================================================
+    // 4. 實際填奇數中線 pair
+    //
+    // 優先放 A-A，讓中線也盡可能 CC。
+    // 沒有 pair group 時，才退成 A-B 或 A-dummy。
+    // ==========================================================
+    for (const PairSlot& slot : middlePairSlots)
+    {
+        if (TotalRemain() <= 0)
+        {
+            PutGroup(slot.r1, slot.c1, -1);
+            PutGroup(slot.r2, slot.c2, -1);
+            continue;
+        }
+
+        int pairGroup = ChooseBestPairGroup(slot);
+
+        if (pairGroup >= 0)
+        {
+            PutGroup(slot.r1, slot.c1, pairGroup);
+            PutGroup(slot.r2, slot.c2, pairGroup);
+            ConsumeGroup(pairGroup, 2);
+            continue;
+        }
+
+        int groupA = ChooseBestSingleGroup(slot.r1, slot.c1);
+
+        if (groupA >= 0)
+        {
+            PutGroup(slot.r1, slot.c1, groupA);
+            ConsumeGroup(groupA, 1);
+        }
+        else
+        {
+            PutGroup(slot.r1, slot.c1, -1);
+        }
+
+        int groupB = ChooseBestSingleGroup(slot.r2, slot.c2);
+
+        if (groupB >= 0)
+        {
+            PutGroup(slot.r2, slot.c2, groupB);
+            ConsumeGroup(groupB, 1);
+        }
+        else
+        {
+            PutGroup(slot.r2, slot.c2, -1);
         }
     }
 
