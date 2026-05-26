@@ -36,20 +36,77 @@ SAManager::SAManager(TableManager& initialTable, NetlistLookupTable& netlist, do
 			this->saMode = SAMode::RandomMode;
 		}
 	}
+	else if (saMode == "CoSpecial" || saMode == "3")
+	{
+		this->saMode = SAMode::CoSpecial;
+		this->currentTemp = 0; // no SA, only perturbation once
+	}
+	else if (saMode == "CCModeNoSA" || saMode == "4")
+	{
+		this->saMode = SAMode::CCModeNoSA;
+		
+	}
+	else if (saMode == "InterleavingModeNoSA" || saMode == "5")
+	{
+		this->saMode = SAMode::InterleavingModeNoSA;
+		if (!this->initialTable.BuildInterleavingTable())
+		{
+			cerr << "Build interleaving table fail, set to RandomMode by default." << endl;
+			this->saMode = SAMode::RandomMode;
+		}
+	}
 	else
 	{
 		cerr << "Unknown SA Mode, set to RandomMode by default." << endl;
 		this->saMode = SAMode::RandomMode;
 	}
 
+
 	// 計算成本並初始化 nondominatedSolution
 	this->initialTable.CheckAndFixDummyWidth();
 	this->initialTable.CalculateTableCost();
 	this->nowUseTable = this->initialTable;
 	this->nondominatedSolution.push_back(this->initialTable);
-	
-	// 開始 SA 流程
-	this->SAProcess();
+
+	if (this->saMode == SAMode::CCModeNoSA || this->saMode == SAMode::InterleavingModeNoSA)
+	{
+		if (this->saMode == SAMode::CCModeNoSA)
+		{
+			// 生成所有可能的 CC 模式解
+			vector<TableManager> ccTables = this->initialTable.BuildAllCCTable();
+
+			// 遍歷每個 CC 模式解，計算成本並更新非支配解集
+			////for (auto& ccTable : ccTables)
+			//{
+			//	ccTable.CheckAndFixDummyWidth();
+			//	ccTable.CalculateTableCost();
+			//	this->newTableList.clear();
+			//	this->newTableList.push_back(ccTable);
+			//	this->UpdateNondominatedSolution();
+			//}
+		}
+		else if (this->saMode == SAMode::InterleavingModeNoSA)
+		{
+			// 生成所有可能的交錯模式解
+
+			vector<TableManager> interleavingTables = this->initialTable.BuildAllInterleavingTable();
+
+			//// 遍歷每個交錯模式解，計算成本並更新非支配解集
+			//for (auto& interleavingTable : interleavingTables)
+			//{
+			//	interleavingTable.CheckAndFixDummyWidth();
+			//	interleavingTable.CalculateTableCost();
+			//	this->newTableList.clear();
+			//	this->newTableList.push_back(interleavingTable);
+			//	this->UpdateNondominatedSolution();
+			//}
+		}
+	}
+	else
+	{
+		// 開始 SA 流程
+		this->SAProcess();
+	}
 }
 
 void SAManager::SAProcess()

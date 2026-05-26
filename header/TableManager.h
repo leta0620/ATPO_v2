@@ -79,6 +79,8 @@ public:
 
 	// modify table to make it interleaving, return true if success, false if fail (if fail, the table will not be modified)
 	bool BuildInterleavingTable();
+	std::vector<TableManager> BuildAllInterleavingTable();
+	std::vector<TableManager> BuildAllCCTable();
 
 	void FlipLeftHalf();
 

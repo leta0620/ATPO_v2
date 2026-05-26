@@ -11,7 +11,10 @@ enum SAMode
 	// random mode, CC mode
 	RandomMode,
 	CCMode,
-	InterleavingMode
+	InterleavingMode,
+	CoSpecial,
+	CCModeNoSA,
+	InterleavingModeNoSA
 };
 
 class SAManager
