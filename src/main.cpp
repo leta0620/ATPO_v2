@@ -38,9 +38,9 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 	
-	if (argc != 9) {
+	if (argc != 10) {
 		Test test; // Run tests
-		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D> <mode> <sa_round_per_temp>" << endl;
+		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D> <mode> <sa_round_per_temp> <intput_is_bus>" << endl;
 		return 1;
 	}
 
@@ -55,6 +55,7 @@ int main(int argc, char* argv[]) {
 	string left_is_S_or_D = argv[6];
 	string sa_mode_str = argv[7];
 	int saRoundPerTemp = stoi(argv[8]);
+	int input_is_bus = stoi(argv[9]);
 
 	vector<CostEnum> costEnumList;
 
@@ -119,7 +120,15 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
+
 	bool busFlag = false;
+	if (input_is_bus == 0) busFlag = false;
+	else if (input_is_bus == 1) busFlag = true;
+	else {
+		cerr << "Unknown input_is_bus value, set to 0 (odd-even group allocation) by default." << endl;
+		busFlag = false;
+	}
+
 	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable(), costEnumList, busFlag);
 	vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
 	for (auto& t : initialTableList)
