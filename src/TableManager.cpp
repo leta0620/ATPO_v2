@@ -3530,3 +3530,687 @@ void TableManager::FlipLeftHalf()
         }
     }
 }
+
+vector<TableManager> TableManager::BuildAllInterleavingTable()
+{
+	//cout << "original table: \n";
+ //   cout << "\n" << groupSize << endl;
+	//PrintTableToConsole();
+
+	vector<TableManager> ret;
+
+	unordered_map<Group, int> groupColMap;
+    for (int c = 0; c < colSize; c++)
+    {
+		bool findNoDummyGroup = false;
+        for (int r = 0; r < rowSize; r++)
+		{
+            if (table[r][c].HasDummyUnit())
+            {
+                continue;
+			}
+
+            findNoDummyGroup = true;
+            groupColMap[table[r][c]]++;
+			break; // 只考慮每行第一個非 dummy 的 group
+        }
+    }
+
+	// sort col numbers by group count
+	vector<pair<Group, int>> groupColVec(groupColMap.begin(), groupColMap.end());
+    sort(groupColVec.begin(), groupColVec.end(), [](const pair<Group, int>& a, const pair<Group, int>& b) {
+        return a.second > b.second; // sort in descending order
+		});
+
+	vector<vector<Group>> colSequences;
+	int gapCount = 0;
+    for (const auto& groupCol : groupColVec)
+    {
+        if (colSequences.size() == 0)
+        {
+			colSequences.resize(groupCol.second + 1);
+            for (int i = 0; i < groupCol.second; i++)
+            {
+                colSequences[i + 1].push_back(groupCol.first);
+            }
+    
+    
+			//colSequences.resize(groupCol.second);
+   //         for (int i = 0; i < groupCol.second; i++)
+   //         {
+   //             colSequences[i].push_back(groupCol.first);
+   //         }
+
+
+
+            gapCount = colSequences.size();
+        }
+        else
+        {
+			int currentSize = groupCol.second;
+            // Calaulate insert position
+			for (int i = 0; i < currentSize; i++)
+            {
+				int insertGap = (i) * (gapCount / currentSize); // Calculate the ideal insert position
+                if (insertGap >= gapCount) insertGap = gapCount - 1; // Ensure the insert position is within bounds
+				colSequences[insertGap].push_back(groupCol.first);
+            }
+        }
+	}
+
+    for (int i = 0; i < 2; i++)
+    {
+        vector<Group> interleavedGroups;
+
+        if (i % 2 == 0)
+        {
+            for (auto& g : colSequences)
+            {
+                for (auto& group : g)
+                {
+                    interleavedGroups.push_back(group);
+                }
+            }
+        }
+        else
+        {
+            for (auto it = colSequences.rbegin(); it != colSequences.rend(); ++it)
+            {
+                for (auto itG = it->rbegin(); itG != it->rend(); ++itG)
+                {
+                    interleavedGroups.push_back(*itG);
+                }
+			}
+        }
+        
+
+        // Build new tables based on interleaved groups
+        vector<vector<Group>> newTable;
+        for (int r = 0; r < rowSize; r++)
+        {
+            newTable.push_back(interleavedGroups);
+        }
+
+        // fix dummy
+        unordered_map<Group, vector<int>> originDummyCols;
+        for (int c = 0; c < colSize; c++)
+        {
+            Group currentGroup;
+
+            for (int r = 0; r < rowSize; r++)
+            {
+                if (!table[r][c].HasDummyUnit())
+                {
+                    currentGroup = table[r][c];
+                    break;
+                }
+            }
+
+            for (int r = 0; r < rowSize; r++)
+            {
+                if (table[r][c].HasDummyUnit())
+                {
+                    originDummyCols[currentGroup].push_back(c);
+                    break;
+                }
+            }
+        }
+
+        for (auto& g : originDummyCols)
+        {
+            Group targetGroup = g.first;
+            int hasFixCounter = 0;
+            for (int dummyCol : g.second)
+            {
+                for (int c = 0; c < colSize / 2; c++)
+                {
+                    if (newTable[0][c] == targetGroup)
+                    {
+                        // replace col from origin dummy col to current col
+                        for (int r = 0; r < rowSize; r++)
+                        {
+                            newTable[r][c] = table[r][dummyCol];
+                        }
+                        hasFixCounter++;
+                    }
+                    else if (newTable[0][colSize - 1 - c] == targetGroup)
+                    {
+                        // replace col from origin dummy col to current col
+                        for (int r = 0; r < rowSize; r++)
+                        {
+                            newTable[r][colSize - 1 - c] = table[r][dummyCol];
+                        }
+                        hasFixCounter++;
+                    }
+
+                    if (hasFixCounter >= g.second.size()) break; // 已經修正完所有 dummy col，跳出循環
+                }
+            }
+        }
+
+		// check id too many dummy group in table, if > 40%, then skip this table
+		int dummyGroupCount = 0;
+        for (int r = 0; r < rowSize; r++)
+        {
+            for (int c = 0; c < colSize; c++)
+            {
+                if (newTable[r][c].HasDummyUnit())
+                {
+                    dummyGroupCount++;
+                }
+            }
+		}
+        if ((double)dummyGroupCount / (rowSize * colSize) > 0.4)
+        {
+            continue; // skip this table
+		}
+
+        TableManager newTableManager(*this);
+        newTableManager.table = newTable;
+		newTableManager.GetCostMap();
+        ret.push_back(newTableManager);
+
+        // print table
+        //cout << endl;
+        //newTableManager.PrintTableToConsole();
+        //cout << "\n-----------------------------\n";
+
+    }
+
+	return ret;
+}
+
+
+void GenerateCCGroupSequences(vector<Group> unSelectG, vector<Group> hsaSelectG, vector<vector<Group>>* ret)
+{
+    if (unSelectG.size() == 0)
+    {
+        ret->push_back(hsaSelectG);
+		return;
+    }
+
+    for (auto& g : unSelectG)
+    {
+        vector<Group> newHasSelectG = hsaSelectG;
+		newHasSelectG.push_back(g);
+		vector<Group> newUnSelectG;
+        for (auto& g2 : unSelectG)
+        {
+            if (g2.GetSymbolNameSequenceHash() != g.GetSymbolNameSequenceHash())
+            {
+                newUnSelectG.push_back(g2);
+            }
+		}
+		GenerateCCGroupSequences(newUnSelectG, newHasSelectG, ret);
+	}
+
+    
+}
+
+vector<vector<Group>> GenerateCCGroupTable(int rowSize, int colSize, int groupSize, vector<Group> groupSeq, unordered_map<Group, int> groupNumMap)
+{
+    Group dummyG = Group();
+    dummyG.BuildAllDummyGroup(groupSize);
+
+    vector<vector<Group>> newTable(rowSize, vector<Group>(colSize, dummyG));
+
+    if (groupSeq.empty())
+    {
+        return newTable;
+    }
+
+    struct CellSlot
+    {
+        int r;
+        int c;
+        int dist2;
+    };
+
+    struct PairSlot
+    {
+        int r1;
+        int c1;
+        int r2;
+        int c2;
+        int dist2;
+    };
+
+    auto GetRemain = [&](int groupIndex) -> int {
+        if (groupIndex < 0 || groupIndex >= static_cast<int>(groupSeq.size()))
+        {
+            return 0;
+        }
+
+        auto it = groupNumMap.find(groupSeq[groupIndex]);
+
+        if (it == groupNumMap.end())
+        {
+            return 0;
+        }
+
+        return it->second;
+        };
+
+    auto SetRemain = [&](int groupIndex, int value) {
+        if (groupIndex < 0 || groupIndex >= static_cast<int>(groupSeq.size()))
+        {
+            return;
+        }
+
+        if (value < 0)
+        {
+            value = 0;
+        }
+
+        groupNumMap[groupSeq[groupIndex]] = value;
+        };
+
+    auto ConsumeGroup = [&](int groupIndex, int count) {
+        int remain = GetRemain(groupIndex);
+        SetRemain(groupIndex, remain - count);
+        };
+
+    auto CalcDist2 = [&](int r, int c) -> int {
+        int dr = 2 * r - (rowSize - 1);
+        int dc = 2 * c - (colSize - 1);
+
+        return dr * dr + dc * dc;
+        };
+
+    auto IsMiddleRow = [&](int r) -> bool {
+        return rowSize % 2 == 1 && r == rowSize / 2;
+        };
+
+    auto IsMiddleCol = [&](int c) -> bool {
+        return colSize % 2 == 1 && c == colSize / 2;
+        };
+
+    auto PutGroup = [&](int r, int c, int groupIndex) {
+        if (groupIndex < 0)
+        {
+            newTable[r][c] = dummyG;
+        }
+        else
+        {
+            newTable[r][c] = groupSeq[groupIndex];
+        }
+        };
+
+    auto TotalRemain = [&]() -> int {
+        int total = 0;
+
+        for (int i = 0; i < static_cast<int>(groupSeq.size()); i++)
+        {
+            total += GetRemain(i);
+        }
+
+        return total;
+        };
+
+    auto CountSameNeighbor = [&](int r, int c, int groupIndex) -> int {
+        if (groupIndex < 0)
+        {
+            return 0;
+        }
+
+        int count = 0;
+
+        const int dr[4] = { -1, 1, 0, 0 };
+        const int dc[4] = { 0, 0, -1, 1 };
+
+        for (int k = 0; k < 4; k++)
+        {
+            int nr = r + dr[k];
+            int nc = c + dc[k];
+
+            if (nr < 0 || nr >= rowSize || nc < 0 || nc >= colSize)
+            {
+                continue;
+            }
+
+            if (newTable[nr][nc] == groupSeq[groupIndex])
+            {
+                count++;
+            }
+        }
+
+        return count;
+        };
+
+    auto ChooseBestMiddleGroup = [&](int r, int c) -> int {
+        int bestIndex = -1;
+        int bestScore = 1000000000;
+
+        for (int i = 0; i < static_cast<int>(groupSeq.size()); i++)
+        {
+            int remain = GetRemain(i);
+
+            if (remain <= 0)
+            {
+                continue;
+            }
+
+            int sameNeighborPenalty = CountSameNeighbor(r, c, i) * 10000;
+
+            // 中線不做 CC，所以優先消耗奇數 group。
+            // 這樣剩下的非中線區域比較容易成對放。
+            int parityPenalty = 0;
+
+            if (remain % 2 == 1)
+            {
+                parityPenalty -= 100;
+            }
+            else
+            {
+                parityPenalty += 100;
+            }
+
+            // 數量多的 group 稍微優先，避免它被留到最後集中在外圈。
+            int remainPenalty = -remain;
+
+            int score = sameNeighborPenalty + parityPenalty + remainPenalty;
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
+        };
+
+    auto ChooseBestPairGroup = [&](const PairSlot& slot) -> int {
+        int bestIndex = -1;
+        int bestScore = 1000000000;
+
+        for (int i = 0; i < static_cast<int>(groupSeq.size()); i++)
+        {
+            int remain = GetRemain(i);
+
+            if (remain < 2)
+            {
+                continue;
+            }
+
+            int sameNeighborPenalty = 0;
+            sameNeighborPenalty += CountSameNeighbor(slot.r1, slot.c1, i);
+            sameNeighborPenalty += CountSameNeighbor(slot.r2, slot.c2, i);
+            sameNeighborPenalty *= 10000;
+
+            // 數量多的 group 稍微優先，但不能壓過相鄰懲罰。
+            int remainPenalty = -remain;
+
+            int score = sameNeighborPenalty + remainPenalty;
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
+        };
+
+    auto ChooseBestSingleGroup = [&](int r, int c) -> int {
+        int bestIndex = -1;
+        int bestScore = 1000000000;
+
+        for (int i = 0; i < static_cast<int>(groupSeq.size()); i++)
+        {
+            int remain = GetRemain(i);
+
+            if (remain <= 0)
+            {
+                continue;
+            }
+
+            int sameNeighborPenalty = CountSameNeighbor(r, c, i) * 10000;
+            int remainPenalty = -remain;
+
+            int score = sameNeighborPenalty + remainPenalty;
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
+        };
+
+    // ==========================================================
+    // 1. 建立 middle slots
+    //
+    // 奇數 row / col 的中線不做 CC。
+    // 但中線要優先放 real group，避免 dummy 在中間。
+    // ==========================================================
+    vector<CellSlot> middleSlots;
+
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize; c++)
+        {
+            if (IsMiddleRow(r) || IsMiddleCol(c))
+            {
+                CellSlot slot;
+                slot.r = r;
+                slot.c = c;
+                slot.dist2 = CalcDist2(r, c);
+
+                middleSlots.push_back(slot);
+            }
+        }
+    }
+
+    sort(middleSlots.begin(), middleSlots.end(), [](const CellSlot& a, const CellSlot& b) {
+        if (a.dist2 != b.dist2)
+        {
+            return a.dist2 < b.dist2;
+        }
+
+        if (a.r != b.r)
+        {
+            return a.r < b.r;
+        }
+
+        return a.c < b.c;
+        });
+
+    // ==========================================================
+    // 2. 填 middle slots
+    //
+    // 這裡開始會避開上下左右相同 group。
+    // ==========================================================
+    for (const CellSlot& slot : middleSlots)
+    {
+        int groupIndex = ChooseBestMiddleGroup(slot.r, slot.c);
+
+        if (groupIndex >= 0)
+        {
+            PutGroup(slot.r, slot.c, groupIndex);
+            ConsumeGroup(groupIndex, 1);
+        }
+        else
+        {
+            PutGroup(slot.r, slot.c, -1);
+        }
+    }
+
+    // ==========================================================
+    // 3. 建立非中線區域的 CC pair slots
+    // ==========================================================
+    vector<PairSlot> pairSlots;
+
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize; c++)
+        {
+            if (IsMiddleRow(r) || IsMiddleCol(c))
+            {
+                continue;
+            }
+
+            int mr = rowSize - 1 - r;
+            int mc = colSize - 1 - c;
+
+            if (IsMiddleRow(mr) || IsMiddleCol(mc))
+            {
+                continue;
+            }
+
+            if (r > mr || (r == mr && c > mc))
+            {
+                continue;
+            }
+
+            PairSlot slot;
+            slot.r1 = r;
+            slot.c1 = c;
+            slot.r2 = mr;
+            slot.c2 = mc;
+            slot.dist2 = CalcDist2(r, c);
+
+            pairSlots.push_back(slot);
+        }
+    }
+
+    sort(pairSlots.begin(), pairSlots.end(), [](const PairSlot& a, const PairSlot& b) {
+        if (a.dist2 != b.dist2)
+        {
+            return a.dist2 < b.dist2;
+        }
+
+        if (a.r1 != b.r1)
+        {
+            return a.r1 < b.r1;
+        }
+
+        return a.c1 < b.c1;
+        });
+
+    // ==========================================================
+    // 4. 填非中線 pair slots
+    //
+    // 優先放 AA pair，保持 CC。
+    // 如果已經沒有任何 group 可以成對放，再放 A/B 或 A/dummy。
+    // 因為 pairSlots 是中心往外排，所以 dummy 會盡量在外面。
+    // ==========================================================
+    for (const PairSlot& slot : pairSlots)
+    {
+        if (TotalRemain() <= 0)
+        {
+            PutGroup(slot.r1, slot.c1, -1);
+            PutGroup(slot.r2, slot.c2, -1);
+            continue;
+        }
+
+        int pairGroup = ChooseBestPairGroup(slot);
+
+        if (pairGroup >= 0)
+        {
+            PutGroup(slot.r1, slot.c1, pairGroup);
+            PutGroup(slot.r2, slot.c2, pairGroup);
+            ConsumeGroup(pairGroup, 2);
+            continue;
+        }
+
+        // 如果沒有 group 可以成對放，代表剩下都是 single。
+        // 這時盡量選周圍不撞的 group。
+        int groupA = ChooseBestSingleGroup(slot.r1, slot.c1);
+
+        if (groupA >= 0)
+        {
+            PutGroup(slot.r1, slot.c1, groupA);
+            ConsumeGroup(groupA, 1);
+        }
+        else
+        {
+            PutGroup(slot.r1, slot.c1, -1);
+        }
+
+        int groupB = ChooseBestSingleGroup(slot.r2, slot.c2);
+
+        if (groupB >= 0)
+        {
+            PutGroup(slot.r2, slot.c2, groupB);
+            ConsumeGroup(groupB, 1);
+        }
+        else
+        {
+            PutGroup(slot.r2, slot.c2, -1);
+        }
+    }
+
+    return newTable;
+}
+
+vector<TableManager> TableManager::BuildAllCCTable()
+{
+    vector<TableManager> ret;
+
+	// Calculate group num map and group sequences
+    unordered_map<Group, int> groupNumMap;
+    vector<Group> groupSeq;
+    for (int c = 0; c < colSize; c++)
+    {
+        for (int r = 0; r < rowSize; r++)
+        {
+            Group g = table[r][c];
+            if (groupNumMap.find(g) == groupNumMap.end())
+            {
+                groupNumMap[g] = 1;
+				if (!g.HasDummyUnit())  groupSeq.push_back(g);
+            }
+            else
+            {
+                groupNumMap[g]++;
+            }
+        }
+	}
+
+    // 窮舉Seq的順序
+    vector<vector<Group>> groupSeqPermutations;
+	GenerateCCGroupSequences(groupSeq, {}, &groupSeqPermutations);
+
+    for (auto& gSeq : groupSeqPermutations)
+    {
+		vector<vector<Group>> newTable = GenerateCCGroupTable(rowSize, colSize, groupSize, gSeq, groupNumMap);
+        // Build new table manager
+        TableManager newTableManager(*this);
+
+		newTableManager.table = newTable;
+        newTableManager.GetCostMap();
+
+		// skip if too many dummy group in table, if > 40%, then skip this table
+        int dummyGroupCount = 0;
+        for (int r = 0; r < rowSize; r++)
+        {
+            for (int c = 0; c < colSize; c++)
+            {
+                if (newTable[r][c].HasDummyUnit())
+                {
+                    dummyGroupCount++;
+                }
+            }
+        }
+
+        // print table
+        //cout << endl;
+        //newTableManager.PrintTableToConsole();
+        //cout << "\n-----------------------------\n";
+
+        if ((double)dummyGroupCount / (rowSize * colSize) > 0.4)
+        {
+            continue; // skip this table
+		}
+
+		ret.push_back(newTableManager);
+
+        
+    }
+
+	return ret;
+}
