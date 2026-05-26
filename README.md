@@ -75,10 +75,10 @@ e.g. class SAManager{};
 *合併遠端(github)主幹請使用github網頁提交merge request，若發生衝突無法提交合併申請，請先在本地端將main分支pull下來到最新版，並且將目前main分支的內容合併到自己的分支中，解決完衝突後，重新將自己的分支推上去，再從網頁提交合併。
 
 ## command example
-sa_mode: 0 = random mode / 1 = CC mode / 2 = Interleaving mode
+sa_mode: 0 = random mode / 1 = CC mode / 2 = Interleaving mode / 3 = Co Special mode(no implement) / 4 = CC Mode(no SA) / 5 = Interleaving Mode(no SA)
 ```
-<groupSize> <rowSize> <CDL_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D> <mode> <sa_round_per_temp>
+<groupSize> <rowSize> <CDL_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D> <mode> <sa_round_per_temp> <intput_is_bus>
 
-4 4 ./cdl_test.txt ./output/ 1 S 1 100
+4 4 ./cdl_test.txt ./output/ 1 S 1 100 ㄢ
 ```
 
