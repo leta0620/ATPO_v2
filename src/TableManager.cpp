@@ -3533,9 +3533,9 @@ void TableManager::FlipLeftHalf()
 
 vector<TableManager> TableManager::BuildAllInterleavingTable()
 {
-	cout << "original table: \n";
-    cout << "\n" << groupSize << endl;
-	PrintTableToConsole();
+	//cout << "original table: \n";
+ //   cout << "\n" << groupSize << endl;
+	//PrintTableToConsole();
 
 	vector<TableManager> ret;
 
@@ -3711,9 +3711,9 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
         ret.push_back(newTableManager);
 
         // print table
-        cout << endl;
-        newTableManager.PrintTableToConsole();
-        cout << "\n-----------------------------\n";
+        //cout << endl;
+        //newTableManager.PrintTableToConsole();
+        //cout << "\n-----------------------------\n";
 
     }
 
@@ -4198,9 +4198,9 @@ vector<TableManager> TableManager::BuildAllCCTable()
         }
 
         // print table
-        cout << endl;
-        newTableManager.PrintTableToConsole();
-        cout << "\n-----------------------------\n";
+        //cout << endl;
+        //newTableManager.PrintTableToConsole();
+        //cout << "\n-----------------------------\n";
 
         if ((double)dummyGroupCount / (rowSize * colSize) > 0.4)
         {
