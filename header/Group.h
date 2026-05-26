@@ -78,3 +78,15 @@ private:
 	// Recalculates the type hash based on the current device units, called whenever device units are modified
 	void CalculateTypeHash();
 };
+
+namespace std
+{
+	template <>
+	struct hash<Group>
+	{
+		size_t operator()(const Group& g) const noexcept
+		{
+			return static_cast<size_t>(g.GetSymbolNameSequenceHash());
+		}
+	};
+}

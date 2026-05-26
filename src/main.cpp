@@ -74,6 +74,14 @@ int main(int argc, char* argv[]) {
 		break;
 	case 3:
 		// Co Special Mode
+		costEnumList = { CostEnum::sperationCost, CostEnum::mildCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
+		break;
+	case 4:
+		// CC Mode(no SA)
+		costEnumList = { CostEnum::sperationCost, CostEnum::windowSizeCost, CostEnum::symmetryCost };
+		break;
+	case 5:
+		// Interleaving Mode(no SA)
 		break;
 	default:
 		cerr << "Unknown SA Mode, set to RandomMode by default." << endl;
@@ -119,72 +127,116 @@ int main(int argc, char* argv[]) {
 
 
 	map<int, vector<TableManager>> allNondominatedSolutions;
-	// SA
-	if (thread_num == 1)
+	
+	// Calculate non-dominated solutions for each round
+	if (stoi(sa_mode_str) == 4)
 	{
-		// Single thread SA
-		
+		// CC Mode(no SA)
 		for (int i = 0; i < initialTableList.size(); ++i)
 		{
+			initialTableList[i].SetCostEnumList(costEnumList);
 			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
-			SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, saRoundPerTemp, true, sa_mode_str, costEnumList);
-			allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
-			
+			vector<TableManager> ccTables = initialTableList[i].BuildAllCCTable();
+			if (ccTables.empty()) {
+				continue;
+			}
+			allNondominatedSolutions[i] = ccTables;
 			cout << "\r";
 			cout << "                                        ";
 			cout << "\r";
 			cout << "\b";
 		}
 		cout << endl;
+	}
+	else if (stoi(sa_mode_str) == 5)
+	{
+		// Interleaving Mode(no SA)
+		for (int i = 0; i < initialTableList.size(); ++i)
+		{
+			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
+			initialTableList[i].SetCostEnumList(costEnumList);
+			initialTableList[i].BuildInterleavingTable();
+			vector<TableManager> interleavingTables = initialTableList[i].BuildAllInterleavingTable();
+			if (interleavingTables.empty()) {
+				continue;
+			}
+			allNondominatedSolutions[i] = interleavingTables;
 
-		
+			cout << "\r";
+			cout << "                                        ";
+			cout << "\r";
+			cout << "\b";
+		}
+		cout << endl;
 	}
 	else
 	{
-		// Multi-threaded SA (multi-start SA)
-		const int jobCount = (int)initialTableList.size();
-		if (jobCount == 0) {
-			cerr << "Error: initialTableList is empty." << endl;
-			return 1;
-		}
+		if (thread_num == 1)
+		{
+			// Single thread SA
 
-		// 避免 thread_num > jobCount
-		thread_num = min(thread_num, jobCount);
-		if (thread_num <= 0) thread_num = 1;
+			for (int i = 0; i < initialTableList.size(); ++i)
+			{
+				cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
+				SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, saRoundPerTemp, true, sa_mode_str, costEnumList);
+				allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
 
-		// ★ 建議把 lookup table 先存成 const ref，確保每個 thread 都只讀同一份資料
-		auto& netlistLUT = parser.GetNetlistLookupTable();
-
-		// 每個 job 的結果放在對應 index，最後再轉成 map
-		vector<vector<TableManager>> results(jobCount);
-
-		atomic<int> nextJob{ 0 };
-		//mutex coutMutex; // 只用來鎖 cout，避免多執行緒輸出互相打架
-
-		auto worker = [&]() {
-			while (true) {
-				int i = nextJob.fetch_add(1);
-				if (i >= jobCount) break;
-
-				// 跑 SA（你的參數照舊）
-				SAManager saManager(initialTableList[i], netlistLUT, 0.9, 100.0, 1.0, saRoundPerTemp, false, sa_mode_str, costEnumList);
-
-				// 每個 index 只被寫一次 -> 不需要 mutex
-				results[i] = saManager.GetNondominatedSolution();
+				cout << "\r";
+				cout << "                                        ";
+				cout << "\r";
+				cout << "\b";
 			}
-			};
+			cout << endl;
 
-		// 開 thread_num 個 worker threads
-		vector<thread> threads;
-		threads.reserve(thread_num);
-		for (int t = 0; t < thread_num; ++t) {
-			threads.emplace_back(worker);
+
 		}
-		for (auto& th : threads) th.join();
+		else
+		{
+			// Multi-threaded SA (multi-start SA)
+			const int jobCount = (int)initialTableList.size();
+			if (jobCount == 0) {
+				cerr << "Error: initialTableList is empty." << endl;
+				return 1;
+			}
 
-		// 組回你原本的 map<int, vector<TableManager>>
-		for (int i = 0; i < jobCount; ++i) {
-			allNondominatedSolutions[i] = std::move(results[i]);
+			// 避免 thread_num > jobCount
+			thread_num = min(thread_num, jobCount);
+			if (thread_num <= 0) thread_num = 1;
+
+			// ★ 建議把 lookup table 先存成 const ref，確保每個 thread 都只讀同一份資料
+			auto& netlistLUT = parser.GetNetlistLookupTable();
+
+			// 每個 job 的結果放在對應 index，最後再轉成 map
+			vector<vector<TableManager>> results(jobCount);
+
+			atomic<int> nextJob{ 0 };
+			//mutex coutMutex; // 只用來鎖 cout，避免多執行緒輸出互相打架
+
+			auto worker = [&]() {
+				while (true) {
+					int i = nextJob.fetch_add(1);
+					if (i >= jobCount) break;
+
+					// 跑 SA（你的參數照舊）
+					SAManager saManager(initialTableList[i], netlistLUT, 0.9, 100.0, 1.0, saRoundPerTemp, false, sa_mode_str, costEnumList);
+
+					// 每個 index 只被寫一次 -> 不需要 mutex
+					results[i] = saManager.GetNondominatedSolution();
+				}
+				};
+
+			// 開 thread_num 個 worker threads
+			vector<thread> threads;
+			threads.reserve(thread_num);
+			for (int t = 0; t < thread_num; ++t) {
+				threads.emplace_back(worker);
+			}
+			for (auto& th : threads) th.join();
+
+			// 組回你原本的 map<int, vector<TableManager>>
+			for (int i = 0; i < jobCount; ++i) {
+				allNondominatedSolutions[i] = std::move(results[i]);
+			}
 		}
 	}
 

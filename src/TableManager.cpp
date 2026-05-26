@@ -3530,3 +3530,579 @@ void TableManager::FlipLeftHalf()
         }
     }
 }
+
+vector<TableManager> TableManager::BuildAllInterleavingTable()
+{
+	cout << "original table: \n";
+    cout << "\n" << groupSize << endl;
+	PrintTableToConsole();
+
+	vector<TableManager> ret;
+
+	unordered_map<Group, int> groupColMap;
+    for (int c = 0; c < colSize; c++)
+    {
+		bool findNoDummyGroup = false;
+        for (int r = 0; r < rowSize; r++)
+		{
+            if (table[r][c].HasDummyUnit())
+            {
+                continue;
+			}
+
+            findNoDummyGroup = true;
+            groupColMap[table[r][c]]++;
+			break; // 只考慮每行第一個非 dummy 的 group
+        }
+    }
+
+	// sort col numbers by group count
+	vector<pair<Group, int>> groupColVec(groupColMap.begin(), groupColMap.end());
+    sort(groupColVec.begin(), groupColVec.end(), [](const pair<Group, int>& a, const pair<Group, int>& b) {
+        return a.second > b.second; // sort in descending order
+		});
+
+	vector<vector<Group>> colSequences;
+	int gapCount = 0;
+    for (const auto& groupCol : groupColVec)
+    {
+        if (colSequences.size() == 0)
+        {
+			colSequences.resize(groupCol.second + 1);
+            for (int i = 0; i < groupCol.second; i++)
+            {
+                colSequences[i + 1].push_back(groupCol.first);
+            }
+    
+    
+			//colSequences.resize(groupCol.second);
+   //         for (int i = 0; i < groupCol.second; i++)
+   //         {
+   //             colSequences[i].push_back(groupCol.first);
+   //         }
+
+
+
+            gapCount = colSequences.size();
+        }
+        else
+        {
+			int currentSize = groupCol.second;
+            // Calaulate insert position
+			for (int i = 0; i < currentSize; i++)
+            {
+				int insertGap = (i) * (gapCount / currentSize); // Calculate the ideal insert position
+                if (insertGap >= gapCount) insertGap = gapCount - 1; // Ensure the insert position is within bounds
+				colSequences[insertGap].push_back(groupCol.first);
+            }
+        }
+	}
+
+    for (int i = 0; i < 2; i++)
+    {
+        vector<Group> interleavedGroups;
+
+        if (i % 2 == 0)
+        {
+            for (auto& g : colSequences)
+            {
+                for (auto& group : g)
+                {
+                    interleavedGroups.push_back(group);
+                }
+            }
+        }
+        else
+        {
+            for (auto it = colSequences.rbegin(); it != colSequences.rend(); ++it)
+            {
+                for (auto itG = it->rbegin(); itG != it->rend(); ++itG)
+                {
+                    interleavedGroups.push_back(*itG);
+                }
+			}
+        }
+        
+
+        // Build new tables based on interleaved groups
+        vector<vector<Group>> newTable;
+        for (int r = 0; r < rowSize; r++)
+        {
+            newTable.push_back(interleavedGroups);
+        }
+
+        // fix dummy
+        unordered_map<Group, vector<int>> originDummyCols;
+        for (int c = 0; c < colSize; c++)
+        {
+            Group currentGroup;
+
+            for (int r = 0; r < rowSize; r++)
+            {
+                if (!table[r][c].HasDummyUnit())
+                {
+                    currentGroup = table[r][c];
+                    break;
+                }
+            }
+
+            for (int r = 0; r < rowSize; r++)
+            {
+                if (table[r][c].HasDummyUnit())
+                {
+                    originDummyCols[currentGroup].push_back(c);
+                    break;
+                }
+            }
+        }
+
+        for (auto& g : originDummyCols)
+        {
+            Group targetGroup = g.first;
+            int hasFixCounter = 0;
+            for (int dummyCol : g.second)
+            {
+                for (int c = 0; c < colSize / 2; c++)
+                {
+                    if (newTable[0][c] == targetGroup)
+                    {
+                        // replace col from origin dummy col to current col
+                        for (int r = 0; r < rowSize; r++)
+                        {
+                            newTable[r][c] = table[r][dummyCol];
+                        }
+                        hasFixCounter++;
+                    }
+                    else if (newTable[0][colSize - 1 - c] == targetGroup)
+                    {
+                        // replace col from origin dummy col to current col
+                        for (int r = 0; r < rowSize; r++)
+                        {
+                            newTable[r][colSize - 1 - c] = table[r][dummyCol];
+                        }
+                        hasFixCounter++;
+                    }
+
+                    if (hasFixCounter >= g.second.size()) break; // 已經修正完所有 dummy col，跳出循環
+                }
+            }
+        }
+
+		// check id too many dummy group in table, if > 40%, then skip this table
+		int dummyGroupCount = 0;
+        for (int r = 0; r < rowSize; r++)
+        {
+            for (int c = 0; c < colSize; c++)
+            {
+                if (newTable[r][c].HasDummyUnit())
+                {
+                    dummyGroupCount++;
+                }
+            }
+		}
+        if ((double)dummyGroupCount / (rowSize * colSize) > 0.4)
+        {
+            continue; // skip this table
+		}
+
+        TableManager newTableManager(*this);
+        newTableManager.table = newTable;
+		newTableManager.GetCostMap();
+        ret.push_back(newTableManager);
+
+        // print table
+        cout << endl;
+        newTableManager.PrintTableToConsole();
+        cout << "\n-----------------------------\n";
+
+    }
+
+	return ret;
+}
+
+
+void GenerateCCGroupSequences(vector<Group> unSelectG, vector<Group> hsaSelectG, vector<vector<Group>>* ret)
+{
+    if (hsaSelectG.size() == 0)
+    {
+        ret->push_back(unSelectG);
+		return;
+    }
+
+    for (auto& g : unSelectG)
+    {
+        vector<Group> newHasSelectG = hsaSelectG;
+		newHasSelectG.push_back(g);
+		vector<Group> newUnSelectG;
+        for (auto& g2 : unSelectG)
+        {
+            if (g2.GetSymbolNameSequenceHash() != g.GetSymbolNameSequenceHash())
+            {
+                newUnSelectG.push_back(g2);
+            }
+		}
+		GenerateCCGroupSequences(newUnSelectG, newHasSelectG, ret);
+	}
+
+    
+}
+
+vector<vector<Group>> GenerateCCGroupTable(int rowSize, int colSize, int groupSize, vector<Group> groupSeq, unordered_map<Group, int> groupNumMap)
+{
+    Group dummyG = Group();
+    dummyG.BuildAllDummyGroup(groupSize);
+
+    // 先全部填 dummy，避免奇數中線或沒處理到的位置留下空 Group()
+    vector<vector<Group>> newTable(rowSize, vector<Group>(colSize, dummyG));
+
+    if (groupSeq.empty())
+    {
+        return newTable;
+    }
+
+    auto GetRemain = [&](const Group& g) -> int {
+        auto it = groupNumMap.find(g);
+        if (it == groupNumMap.end())
+        {
+            return 0;
+        }
+        return it->second;
+        };
+
+    auto SetRemain = [&](const Group& g, int value) {
+        if (value < 0)
+        {
+            value = 0;
+        }
+        groupNumMap[g] = value;
+        };
+
+    int nextIndex = 0;
+
+    auto GetNextGroupIndex = [&]() -> int {
+        while (nextIndex < static_cast<int>(groupSeq.size()))
+        {
+            if (GetRemain(groupSeq[nextIndex]) > 0)
+            {
+                int retIndex = nextIndex;
+                nextIndex++;
+                return retIndex;
+            }
+
+            nextIndex++;
+        }
+
+        return -1;
+        };
+
+    int xIndex = GetNextGroupIndex();
+    int yIndex = GetNextGroupIndex();
+
+    auto PutPair = [&](int& groupIndex, int r1, int c1, int r2, int c2) {
+        while (true)
+        {
+            if (groupIndex == -1)
+            {
+                newTable[r1][c1] = dummyG;
+                newTable[r2][c2] = dummyG;
+                return;
+            }
+
+            const Group& currentGroup = groupSeq[groupIndex];
+            int remain = GetRemain(currentGroup);
+
+            if (remain <= 0)
+            {
+                groupIndex = GetNextGroupIndex();
+                continue;
+            }
+
+            if (remain == 1)
+            {
+                newTable[r1][c1] = currentGroup;
+                newTable[r2][c2] = dummyG;
+
+                SetRemain(currentGroup, 0);
+                groupIndex = GetNextGroupIndex();
+                return;
+            }
+
+            newTable[r1][c1] = currentGroup;
+            newTable[r2][c2] = currentGroup;
+
+            SetRemain(currentGroup, remain - 2);
+
+            if (remain - 2 == 0)
+            {
+                groupIndex = GetNextGroupIndex();
+            }
+
+            return;
+        }
+        };
+
+    auto PutSingle = [&](int& groupIndex, int r, int c) {
+        while (true)
+        {
+            if (groupIndex == -1)
+            {
+                newTable[r][c] = dummyG;
+                return;
+            }
+
+            const Group& currentGroup = groupSeq[groupIndex];
+            int remain = GetRemain(currentGroup);
+
+            if (remain <= 0)
+            {
+                groupIndex = GetNextGroupIndex();
+                continue;
+            }
+
+            newTable[r][c] = currentGroup;
+            SetRemain(currentGroup, remain - 1);
+
+            if (remain - 1 == 0)
+            {
+                groupIndex = GetNextGroupIndex();
+            }
+
+            return;
+        }
+        };
+
+    int halfRow = rowSize / 2;
+    int halfCol = colSize / 2;
+
+    // ==========================================================
+    // 1. 先處理四象限的 2x2 對稱區塊
+    // ==========================================================
+    for (int c = halfCol - 1; c >= 0; c--)
+    {
+        for (int r = halfRow - 1; r >= 0; r--)
+        {
+            int topR = r;
+            int bottomR = rowSize - 1 - r;
+
+            int leftC = c;
+            int rightC = colSize - 1 - c;
+
+            if ((r + c) % 2 == 0)
+            {
+                // X 放主對角：左上 ↔ 右下
+                PutPair(
+                    xIndex,
+                    topR,
+                    leftC,
+                    bottomR,
+                    rightC
+                );
+
+                // Y 放副對角：右上 ↔ 左下
+                PutPair(
+                    yIndex,
+                    topR,
+                    rightC,
+                    bottomR,
+                    leftC
+                );
+            }
+            else
+            {
+                // 交錯一下，避免整體圖案太規則
+                PutPair(
+                    yIndex,
+                    topR,
+                    leftC,
+                    bottomR,
+                    rightC
+                );
+
+                PutPair(
+                    xIndex,
+                    topR,
+                    rightC,
+                    bottomR,
+                    leftC
+                );
+            }
+        }
+    }
+
+    // ==========================================================
+    // 2. 如果 colSize 是奇數，補中間那一欄
+    //
+    // 例如 5 欄：
+    // c = 0 1 [2] 3 4
+    //
+    // 中間欄要做上下對稱：
+    // (top, midCol) ↔ (bottom, midCol)
+    // ==========================================================
+    if (colSize % 2 == 1)
+    {
+        int midCol = colSize / 2;
+
+        for (int r = halfRow - 1; r >= 0; r--)
+        {
+            int topR = r;
+            int bottomR = rowSize - 1 - r;
+
+            if ((r + midCol) % 2 == 0)
+            {
+                PutPair(
+                    xIndex,
+                    topR,
+                    midCol,
+                    bottomR,
+                    midCol
+                );
+            }
+            else
+            {
+                PutPair(
+                    yIndex,
+                    topR,
+                    midCol,
+                    bottomR,
+                    midCol
+                );
+            }
+        }
+    }
+
+    // ==========================================================
+    // 3. 如果 rowSize 是奇數，補中間那一列
+    //
+    // 例如 5 列：
+    // r = 0
+    // r = 1
+    // r = [2]
+    // r = 3
+    // r = 4
+    //
+    // 中間列要做左右對稱：
+    // (midRow, left) ↔ (midRow, right)
+    // ==========================================================
+    if (rowSize % 2 == 1)
+    {
+        int midRow = rowSize / 2;
+
+        for (int c = halfCol - 1; c >= 0; c--)
+        {
+            int leftC = c;
+            int rightC = colSize - 1 - c;
+
+            if ((midRow + c) % 2 == 0)
+            {
+                PutPair(
+                    xIndex,
+                    midRow,
+                    leftC,
+                    midRow,
+                    rightC
+                );
+            }
+            else
+            {
+                PutPair(
+                    yIndex,
+                    midRow,
+                    leftC,
+                    midRow,
+                    rightC
+                );
+            }
+        }
+    }
+
+    // ==========================================================
+    // 4. 如果 rowSize 和 colSize 都是奇數，最後補正中央那一格
+    //
+    // 正中央是唯一自己對稱自己的位置：
+    // (midRow, midCol)
+    // ==========================================================
+    if (rowSize % 2 == 1 && colSize % 2 == 1)
+    {
+        int midRow = rowSize / 2;
+        int midCol = colSize / 2;
+
+        if ((midRow + midCol) % 2 == 0)
+        {
+            PutSingle(xIndex, midRow, midCol);
+        }
+        else
+        {
+            PutSingle(yIndex, midRow, midCol);
+        }
+    }
+
+    return newTable;
+}
+
+vector<TableManager> TableManager::BuildAllCCTable()
+{
+    vector<TableManager> ret;
+
+	// Calculate group num map and group sequences
+    unordered_map<Group, int> groupNumMap;
+    vector<Group> groupSeq;
+    for (int c = 0; c < colSize; c++)
+    {
+        for (int r = 0; r < rowSize; r++)
+        {
+            Group g = table[r][c];
+            if (groupNumMap.find(g) == groupNumMap.end())
+            {
+                groupNumMap[g] = 1;
+                groupSeq.push_back(g);
+            }
+            else
+            {
+                groupNumMap[g]++;
+            }
+        }
+	}
+
+    // 窮舉Seq的順序
+    vector<vector<Group>> groupSeqPermutations;
+	GenerateCCGroupSequences(groupSeq, {}, &groupSeqPermutations);
+
+    for (auto& gSeq : groupSeqPermutations)
+    {
+		vector<vector<Group>> newTable = GenerateCCGroupTable(rowSize, colSize, groupSize, gSeq, groupNumMap);
+        // Build new table manager
+        TableManager newTableManager(*this);
+
+		newTableManager.table = newTable;
+        newTableManager.GetCostMap();
+
+		// skip if too many dummy group in table, if > 40%, then skip this table
+        int dummyGroupCount = 0;
+        for (int r = 0; r < rowSize; r++)
+        {
+            for (int c = 0; c < colSize; c++)
+            {
+                if (newTable[r][c].HasDummyUnit())
+                {
+                    dummyGroupCount++;
+                }
+            }
+        }
+
+        // print table
+        cout << endl;
+        newTableManager.PrintTableToConsole();
+        cout << "\n-----------------------------\n";
+
+        if ((double)dummyGroupCount / (rowSize * colSize) > 0.4)
+        {
+            continue; // skip this table
+		}
+
+		ret.push_back(newTableManager);
+
+        
+    }
+
+	return ret;
+}
