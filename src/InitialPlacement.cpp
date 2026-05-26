@@ -3,10 +3,14 @@
 #include <unordered_map>
 #include <unordered_set>
 
-InitialPlacement::InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist, std::vector<CostEnum> costEnumList) : groupSize(groupSize), rowSize(rowSize), colSize(0), netListLookupTable(netlist), costEnumList(costEnumList)
+InitialPlacement::InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist, std::vector<CostEnum> costEnumList, bool busFlag) : groupSize(groupSize), rowSize(rowSize), colSize(0), netListLookupTable(netlist), costEnumList(costEnumList), busFlag(busFlag)
 {
 	//InitialTableList.resize(rowSize, TableManager(groupSize, rowSize, colSize, netListLookupTable));
 	this->GroupAllocation(); //floorplan
+	if (busFlag)
+	{
+		this->BusGroupAllocation();
+	}
 	this->CalculateInitialTableList(); //placement
 	//this->oddGroupAllocation(); //floorplan
 	//this->CalculateOddTableList(); //placement
