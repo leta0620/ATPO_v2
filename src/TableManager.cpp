@@ -3723,9 +3723,9 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
 
 void GenerateCCGroupSequences(vector<Group> unSelectG, vector<Group> hsaSelectG, vector<vector<Group>>* ret)
 {
-    if (hsaSelectG.size() == 0)
+    if (unSelectG.size() == 0)
     {
-        ret->push_back(unSelectG);
+        ret->push_back(hsaSelectG);
 		return;
     }
 
@@ -3752,7 +3752,6 @@ vector<vector<Group>> GenerateCCGroupTable(int rowSize, int colSize, int groupSi
     Group dummyG = Group();
     dummyG.BuildAllDummyGroup(groupSize);
 
-    // 先全部填 dummy，避免奇數中線或沒處理到的位置留下空 Group()
     vector<vector<Group>> newTable(rowSize, vector<Group>(colSize, dummyG));
 
     if (groupSeq.empty())
@@ -3760,279 +3759,388 @@ vector<vector<Group>> GenerateCCGroupTable(int rowSize, int colSize, int groupSi
         return newTable;
     }
 
-    auto GetRemain = [&](const Group& g) -> int {
-        auto it = groupNumMap.find(g);
+    struct CellSlot
+    {
+        int r;
+        int c;
+        int dist2;
+    };
+
+    struct PairSlot
+    {
+        int r1;
+        int c1;
+        int r2;
+        int c2;
+        int dist2;
+    };
+
+    auto GetRemain = [&](int groupIndex) -> int {
+        if (groupIndex < 0 || groupIndex >= static_cast<int>(groupSeq.size()))
+        {
+            return 0;
+        }
+
+        auto it = groupNumMap.find(groupSeq[groupIndex]);
+
         if (it == groupNumMap.end())
         {
             return 0;
         }
+
         return it->second;
         };
 
-    auto SetRemain = [&](const Group& g, int value) {
+    auto SetRemain = [&](int groupIndex, int value) {
+        if (groupIndex < 0 || groupIndex >= static_cast<int>(groupSeq.size()))
+        {
+            return;
+        }
+
         if (value < 0)
         {
             value = 0;
         }
-        groupNumMap[g] = value;
+
+        groupNumMap[groupSeq[groupIndex]] = value;
         };
 
-    int nextIndex = 0;
-
-    auto GetNextGroupIndex = [&]() -> int {
-        while (nextIndex < static_cast<int>(groupSeq.size()))
-        {
-            if (GetRemain(groupSeq[nextIndex]) > 0)
-            {
-                int retIndex = nextIndex;
-                nextIndex++;
-                return retIndex;
-            }
-
-            nextIndex++;
-        }
-
-        return -1;
+    auto ConsumeGroup = [&](int groupIndex, int count) {
+        int remain = GetRemain(groupIndex);
+        SetRemain(groupIndex, remain - count);
         };
 
-    int xIndex = GetNextGroupIndex();
-    int yIndex = GetNextGroupIndex();
+    auto CalcDist2 = [&](int r, int c) -> int {
+        int dr = 2 * r - (rowSize - 1);
+        int dc = 2 * c - (colSize - 1);
 
-    auto PutPair = [&](int& groupIndex, int r1, int c1, int r2, int c2) {
-        while (true)
-        {
-            if (groupIndex == -1)
-            {
-                newTable[r1][c1] = dummyG;
-                newTable[r2][c2] = dummyG;
-                return;
-            }
-
-            const Group& currentGroup = groupSeq[groupIndex];
-            int remain = GetRemain(currentGroup);
-
-            if (remain <= 0)
-            {
-                groupIndex = GetNextGroupIndex();
-                continue;
-            }
-
-            if (remain == 1)
-            {
-                newTable[r1][c1] = currentGroup;
-                newTable[r2][c2] = dummyG;
-
-                SetRemain(currentGroup, 0);
-                groupIndex = GetNextGroupIndex();
-                return;
-            }
-
-            newTable[r1][c1] = currentGroup;
-            newTable[r2][c2] = currentGroup;
-
-            SetRemain(currentGroup, remain - 2);
-
-            if (remain - 2 == 0)
-            {
-                groupIndex = GetNextGroupIndex();
-            }
-
-            return;
-        }
+        return dr * dr + dc * dc;
         };
 
-    auto PutSingle = [&](int& groupIndex, int r, int c) {
-        while (true)
-        {
-            if (groupIndex == -1)
-            {
-                newTable[r][c] = dummyG;
-                return;
-            }
-
-            const Group& currentGroup = groupSeq[groupIndex];
-            int remain = GetRemain(currentGroup);
-
-            if (remain <= 0)
-            {
-                groupIndex = GetNextGroupIndex();
-                continue;
-            }
-
-            newTable[r][c] = currentGroup;
-            SetRemain(currentGroup, remain - 1);
-
-            if (remain - 1 == 0)
-            {
-                groupIndex = GetNextGroupIndex();
-            }
-
-            return;
-        }
+    auto IsMiddleRow = [&](int r) -> bool {
+        return rowSize % 2 == 1 && r == rowSize / 2;
         };
 
-    int halfRow = rowSize / 2;
-    int halfCol = colSize / 2;
+    auto IsMiddleCol = [&](int c) -> bool {
+        return colSize % 2 == 1 && c == colSize / 2;
+        };
 
-    // ==========================================================
-    // 1. 先處理四象限的 2x2 對稱區塊
-    // ==========================================================
-    for (int c = halfCol - 1; c >= 0; c--)
-    {
-        for (int r = halfRow - 1; r >= 0; r--)
+    auto PutGroup = [&](int r, int c, int groupIndex) {
+        if (groupIndex < 0)
         {
-            int topR = r;
-            int bottomR = rowSize - 1 - r;
-
-            int leftC = c;
-            int rightC = colSize - 1 - c;
-
-            if ((r + c) % 2 == 0)
-            {
-                // X 放主對角：左上 ↔ 右下
-                PutPair(
-                    xIndex,
-                    topR,
-                    leftC,
-                    bottomR,
-                    rightC
-                );
-
-                // Y 放副對角：右上 ↔ 左下
-                PutPair(
-                    yIndex,
-                    topR,
-                    rightC,
-                    bottomR,
-                    leftC
-                );
-            }
-            else
-            {
-                // 交錯一下，避免整體圖案太規則
-                PutPair(
-                    yIndex,
-                    topR,
-                    leftC,
-                    bottomR,
-                    rightC
-                );
-
-                PutPair(
-                    xIndex,
-                    topR,
-                    rightC,
-                    bottomR,
-                    leftC
-                );
-            }
-        }
-    }
-
-    // ==========================================================
-    // 2. 如果 colSize 是奇數，補中間那一欄
-    //
-    // 例如 5 欄：
-    // c = 0 1 [2] 3 4
-    //
-    // 中間欄要做上下對稱：
-    // (top, midCol) ↔ (bottom, midCol)
-    // ==========================================================
-    if (colSize % 2 == 1)
-    {
-        int midCol = colSize / 2;
-
-        for (int r = halfRow - 1; r >= 0; r--)
-        {
-            int topR = r;
-            int bottomR = rowSize - 1 - r;
-
-            if ((r + midCol) % 2 == 0)
-            {
-                PutPair(
-                    xIndex,
-                    topR,
-                    midCol,
-                    bottomR,
-                    midCol
-                );
-            }
-            else
-            {
-                PutPair(
-                    yIndex,
-                    topR,
-                    midCol,
-                    bottomR,
-                    midCol
-                );
-            }
-        }
-    }
-
-    // ==========================================================
-    // 3. 如果 rowSize 是奇數，補中間那一列
-    //
-    // 例如 5 列：
-    // r = 0
-    // r = 1
-    // r = [2]
-    // r = 3
-    // r = 4
-    //
-    // 中間列要做左右對稱：
-    // (midRow, left) ↔ (midRow, right)
-    // ==========================================================
-    if (rowSize % 2 == 1)
-    {
-        int midRow = rowSize / 2;
-
-        for (int c = halfCol - 1; c >= 0; c--)
-        {
-            int leftC = c;
-            int rightC = colSize - 1 - c;
-
-            if ((midRow + c) % 2 == 0)
-            {
-                PutPair(
-                    xIndex,
-                    midRow,
-                    leftC,
-                    midRow,
-                    rightC
-                );
-            }
-            else
-            {
-                PutPair(
-                    yIndex,
-                    midRow,
-                    leftC,
-                    midRow,
-                    rightC
-                );
-            }
-        }
-    }
-
-    // ==========================================================
-    // 4. 如果 rowSize 和 colSize 都是奇數，最後補正中央那一格
-    //
-    // 正中央是唯一自己對稱自己的位置：
-    // (midRow, midCol)
-    // ==========================================================
-    if (rowSize % 2 == 1 && colSize % 2 == 1)
-    {
-        int midRow = rowSize / 2;
-        int midCol = colSize / 2;
-
-        if ((midRow + midCol) % 2 == 0)
-        {
-            PutSingle(xIndex, midRow, midCol);
+            newTable[r][c] = dummyG;
         }
         else
         {
-            PutSingle(yIndex, midRow, midCol);
+            newTable[r][c] = groupSeq[groupIndex];
+        }
+        };
+
+    auto TotalRemain = [&]() -> int {
+        int total = 0;
+
+        for (int i = 0; i < static_cast<int>(groupSeq.size()); i++)
+        {
+            total += GetRemain(i);
+        }
+
+        return total;
+        };
+
+    auto CountSameNeighbor = [&](int r, int c, int groupIndex) -> int {
+        if (groupIndex < 0)
+        {
+            return 0;
+        }
+
+        int count = 0;
+
+        const int dr[4] = { -1, 1, 0, 0 };
+        const int dc[4] = { 0, 0, -1, 1 };
+
+        for (int k = 0; k < 4; k++)
+        {
+            int nr = r + dr[k];
+            int nc = c + dc[k];
+
+            if (nr < 0 || nr >= rowSize || nc < 0 || nc >= colSize)
+            {
+                continue;
+            }
+
+            if (newTable[nr][nc] == groupSeq[groupIndex])
+            {
+                count++;
+            }
+        }
+
+        return count;
+        };
+
+    auto ChooseBestMiddleGroup = [&](int r, int c) -> int {
+        int bestIndex = -1;
+        int bestScore = 1000000000;
+
+        for (int i = 0; i < static_cast<int>(groupSeq.size()); i++)
+        {
+            int remain = GetRemain(i);
+
+            if (remain <= 0)
+            {
+                continue;
+            }
+
+            int sameNeighborPenalty = CountSameNeighbor(r, c, i) * 10000;
+
+            // 中線不做 CC，所以優先消耗奇數 group。
+            // 這樣剩下的非中線區域比較容易成對放。
+            int parityPenalty = 0;
+
+            if (remain % 2 == 1)
+            {
+                parityPenalty -= 100;
+            }
+            else
+            {
+                parityPenalty += 100;
+            }
+
+            // 數量多的 group 稍微優先，避免它被留到最後集中在外圈。
+            int remainPenalty = -remain;
+
+            int score = sameNeighborPenalty + parityPenalty + remainPenalty;
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
+        };
+
+    auto ChooseBestPairGroup = [&](const PairSlot& slot) -> int {
+        int bestIndex = -1;
+        int bestScore = 1000000000;
+
+        for (int i = 0; i < static_cast<int>(groupSeq.size()); i++)
+        {
+            int remain = GetRemain(i);
+
+            if (remain < 2)
+            {
+                continue;
+            }
+
+            int sameNeighborPenalty = 0;
+            sameNeighborPenalty += CountSameNeighbor(slot.r1, slot.c1, i);
+            sameNeighborPenalty += CountSameNeighbor(slot.r2, slot.c2, i);
+            sameNeighborPenalty *= 10000;
+
+            // 數量多的 group 稍微優先，但不能壓過相鄰懲罰。
+            int remainPenalty = -remain;
+
+            int score = sameNeighborPenalty + remainPenalty;
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
+        };
+
+    auto ChooseBestSingleGroup = [&](int r, int c) -> int {
+        int bestIndex = -1;
+        int bestScore = 1000000000;
+
+        for (int i = 0; i < static_cast<int>(groupSeq.size()); i++)
+        {
+            int remain = GetRemain(i);
+
+            if (remain <= 0)
+            {
+                continue;
+            }
+
+            int sameNeighborPenalty = CountSameNeighbor(r, c, i) * 10000;
+            int remainPenalty = -remain;
+
+            int score = sameNeighborPenalty + remainPenalty;
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
+        };
+
+    // ==========================================================
+    // 1. 建立 middle slots
+    //
+    // 奇數 row / col 的中線不做 CC。
+    // 但中線要優先放 real group，避免 dummy 在中間。
+    // ==========================================================
+    vector<CellSlot> middleSlots;
+
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize; c++)
+        {
+            if (IsMiddleRow(r) || IsMiddleCol(c))
+            {
+                CellSlot slot;
+                slot.r = r;
+                slot.c = c;
+                slot.dist2 = CalcDist2(r, c);
+
+                middleSlots.push_back(slot);
+            }
+        }
+    }
+
+    sort(middleSlots.begin(), middleSlots.end(), [](const CellSlot& a, const CellSlot& b) {
+        if (a.dist2 != b.dist2)
+        {
+            return a.dist2 < b.dist2;
+        }
+
+        if (a.r != b.r)
+        {
+            return a.r < b.r;
+        }
+
+        return a.c < b.c;
+        });
+
+    // ==========================================================
+    // 2. 填 middle slots
+    //
+    // 這裡開始會避開上下左右相同 group。
+    // ==========================================================
+    for (const CellSlot& slot : middleSlots)
+    {
+        int groupIndex = ChooseBestMiddleGroup(slot.r, slot.c);
+
+        if (groupIndex >= 0)
+        {
+            PutGroup(slot.r, slot.c, groupIndex);
+            ConsumeGroup(groupIndex, 1);
+        }
+        else
+        {
+            PutGroup(slot.r, slot.c, -1);
+        }
+    }
+
+    // ==========================================================
+    // 3. 建立非中線區域的 CC pair slots
+    // ==========================================================
+    vector<PairSlot> pairSlots;
+
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize; c++)
+        {
+            if (IsMiddleRow(r) || IsMiddleCol(c))
+            {
+                continue;
+            }
+
+            int mr = rowSize - 1 - r;
+            int mc = colSize - 1 - c;
+
+            if (IsMiddleRow(mr) || IsMiddleCol(mc))
+            {
+                continue;
+            }
+
+            if (r > mr || (r == mr && c > mc))
+            {
+                continue;
+            }
+
+            PairSlot slot;
+            slot.r1 = r;
+            slot.c1 = c;
+            slot.r2 = mr;
+            slot.c2 = mc;
+            slot.dist2 = CalcDist2(r, c);
+
+            pairSlots.push_back(slot);
+        }
+    }
+
+    sort(pairSlots.begin(), pairSlots.end(), [](const PairSlot& a, const PairSlot& b) {
+        if (a.dist2 != b.dist2)
+        {
+            return a.dist2 < b.dist2;
+        }
+
+        if (a.r1 != b.r1)
+        {
+            return a.r1 < b.r1;
+        }
+
+        return a.c1 < b.c1;
+        });
+
+    // ==========================================================
+    // 4. 填非中線 pair slots
+    //
+    // 優先放 AA pair，保持 CC。
+    // 如果已經沒有任何 group 可以成對放，再放 A/B 或 A/dummy。
+    // 因為 pairSlots 是中心往外排，所以 dummy 會盡量在外面。
+    // ==========================================================
+    for (const PairSlot& slot : pairSlots)
+    {
+        if (TotalRemain() <= 0)
+        {
+            PutGroup(slot.r1, slot.c1, -1);
+            PutGroup(slot.r2, slot.c2, -1);
+            continue;
+        }
+
+        int pairGroup = ChooseBestPairGroup(slot);
+
+        if (pairGroup >= 0)
+        {
+            PutGroup(slot.r1, slot.c1, pairGroup);
+            PutGroup(slot.r2, slot.c2, pairGroup);
+            ConsumeGroup(pairGroup, 2);
+            continue;
+        }
+
+        // 如果沒有 group 可以成對放，代表剩下都是 single。
+        // 這時盡量選周圍不撞的 group。
+        int groupA = ChooseBestSingleGroup(slot.r1, slot.c1);
+
+        if (groupA >= 0)
+        {
+            PutGroup(slot.r1, slot.c1, groupA);
+            ConsumeGroup(groupA, 1);
+        }
+        else
+        {
+            PutGroup(slot.r1, slot.c1, -1);
+        }
+
+        int groupB = ChooseBestSingleGroup(slot.r2, slot.c2);
+
+        if (groupB >= 0)
+        {
+            PutGroup(slot.r2, slot.c2, groupB);
+            ConsumeGroup(groupB, 1);
+        }
+        else
+        {
+            PutGroup(slot.r2, slot.c2, -1);
         }
     }
 
@@ -4054,7 +4162,7 @@ vector<TableManager> TableManager::BuildAllCCTable()
             if (groupNumMap.find(g) == groupNumMap.end())
             {
                 groupNumMap[g] = 1;
-                groupSeq.push_back(g);
+				if (!g.HasDummyUnit())  groupSeq.push_back(g);
             }
             else
             {
