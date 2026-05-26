@@ -9,7 +9,7 @@ Test::Test()
 	// Add your test functions here, and call them in the constructor
 	//this->TestParsing()
 	std::vector<CostEnum> costEnumList = { CostEnum::ccCost, CostEnum::hierCCost }; // Example cost enum list
-	this->TestInitialPlacement(8, 3, costEnumList);
+	this->TestInitialPlacement(8, 4, costEnumList, true);
 	//this->TestInitialPlacement(6, 6);
 
 	//this->TestOuterInputParsing();
@@ -36,7 +36,7 @@ void Test::TestParsing()
 	return;
 }
 
-void Test::TestInitialPlacement(int groupSize, int rowNum, std::vector<CostEnum> costEnumList)
+void Test::TestInitialPlacement(int groupSize, int rowNum, std::vector<CostEnum> costEnumList, bool busFlag)
 {
 	IntermidiateParser parser("test.txt");
 	if (!parser.Parse()) {
@@ -63,7 +63,7 @@ void Test::TestInitialPlacement(int groupSize, int rowNum, std::vector<CostEnum>
 			<< ", Device Unit Count: " << netlistUnit.GetDeviceUnitCount()
 			<< std::endl;
 	}
-	InitialPlacement initialPlacement(groupSize, rowNum, parser.GetNetlistLookupTable(), costEnumList);
+	InitialPlacement initialPlacement(groupSize, rowNum, parser.GetNetlistLookupTable(), costEnumList, busFlag);
 	std::vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
 	// Check if initialTableList is not empty
 	if (initialTableList.empty()) {

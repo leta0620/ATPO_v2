@@ -119,8 +119,8 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-
-	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable(), costEnumList);
+	bool busFlag = false;
+	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable(), costEnumList, busFlag);
 	vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
 	for (auto& t : initialTableList)
 		t.SetCdlFilePath(cdl_input_file_path);//Add tablemanager known  parser 
