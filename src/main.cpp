@@ -169,6 +169,12 @@ int main(int argc, char* argv[]) {
 			if (interleavingTables.empty()) {
 				continue;
 			}
+
+			for (auto& table : interleavingTables)
+			{
+				table.FlipLeftHalf();
+			}
+
 			allNondominatedSolutions[i] = interleavingTables;
 
 			cout << "\r";
