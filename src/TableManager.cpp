@@ -3531,6 +3531,17 @@ void TableManager::FlipLeftHalf()
     }
 }
 
+void TableManager::FlipRightHalf()
+{
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = colSize / 2; c < colSize; c++)
+        {
+            table[r][c].FlipGroupRotation();
+        }
+    }
+}
+
 vector<TableManager> TableManager::BuildAllInterleavingTable()
 {
 	//cout << "original table: \n";
@@ -3562,28 +3573,45 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
         return a.second > b.second; // sort in descending order
 		});
 
-	vector<vector<Group>> colSequences;
-	int gapCount = 0;
-    for (const auto& groupCol : groupColVec)
+	// 求groupColVec的最小比值，例如40:30:20:20，最簡的比值是4:3:2:2，用這個做colSequences，再重複插入group到colSequences，這樣可以讓group平均分佈在table中，增加interleaving的效果
+	vector< pair<Group, int>> simplifiedGroupColVec;
+    int muitiplier = 0;
+    for (int m = (groupColVec.end()-1)->second; m >= 1 ; m--)
     {
-        if (colSequences.size() == 0)
+		bool canDivide = true;
+        for (const auto& groupCol : groupColVec)
         {
-			colSequences.resize(groupCol.second + 1);
+            if (groupCol.second % m != 0)
+            {
+                canDivide = false;
+                break;
+            }
+        }
+        if (canDivide)
+        {
+            muitiplier = m;
+            for (const auto& groupCol : groupColVec)
+            {
+                simplifiedGroupColVec.push_back({ groupCol.first, groupCol.second / muitiplier });
+			}
+            break;
+        }
+    }
+
+
+	vector<vector<Group>> colSequencesTemplate;
+	int gapCount = 0;
+    for (const auto& groupCol : simplifiedGroupColVec)
+    {
+        if (colSequencesTemplate.size() == 0)
+        {
+            colSequencesTemplate.resize(groupCol.second + 1);
             for (int i = 0; i < groupCol.second; i++)
             {
-                colSequences[i + 1].push_back(groupCol.first);
+                colSequencesTemplate[i + 1].push_back(groupCol.first);
             }
     
-    
-			//colSequences.resize(groupCol.second);
-   //         for (int i = 0; i < groupCol.second; i++)
-   //         {
-   //             colSequences[i].push_back(groupCol.first);
-   //         }
-
-
-
-            gapCount = colSequences.size();
+            gapCount = colSequencesTemplate.size();
         }
         else
         {
@@ -3593,10 +3621,35 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
             {
 				int insertGap = (i) * (gapCount / currentSize); // Calculate the ideal insert position
                 if (insertGap >= gapCount) insertGap = gapCount - 1; // Ensure the insert position is within bounds
-				colSequences[insertGap].push_back(groupCol.first);
+                colSequencesTemplate[insertGap].push_back(groupCol.first);
             }
         }
 	}
+
+	// print colSequencesTemplate
+ //   cout << "colSequencesTemplate: \n";
+ //   for (int i = 0; i < colSequencesTemplate.size(); i++)
+ //   {
+ //       cout << "Gap " << i << ": ";
+ //       for (auto& g : colSequencesTemplate[i])
+ //       {
+ //           cout << g.GetSymbolNameSequence() << " ";
+ //       }
+ //       cout << "\n";
+	//}
+	//cout << "multiplier: " << muitiplier << "\n";
+
+	// copy small template to all colSequences
+	vector<vector<Group>> colSequences;
+    for (int i = 0; i < muitiplier; i++)
+    {
+        for (const auto& colSequenceTemplate : colSequencesTemplate)
+        {
+            colSequences.push_back(colSequenceTemplate);
+        }
+    }
+
+
 
     for (int i = 0; i < 2; i++)
     {
@@ -4470,8 +4523,6 @@ vector<TableManager> TableManager::BuildAllCCTable()
 
         // ==========================================================
         // 2. 找出原本有 dummy 的 column pattern
-        //
-        // 這段保留你的邏輯，但修正 currentGroup 未初始化的問題。
         // ==========================================================
         unordered_map<Group, vector<int>> originDummyCols;
 
@@ -4775,3 +4826,4 @@ vector<TableManager> TableManager::BuildAllCCTable()
 
 	return ret;
 }
+

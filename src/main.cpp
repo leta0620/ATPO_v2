@@ -143,12 +143,24 @@ int main(int argc, char* argv[]) {
 		// CC Mode(no SA)
 		for (int i = 0; i < initialTableList.size(); ++i)
 		{
+			initialTableList[i].FlipRightHalf();
+			initialTableList[i].PrintTableToConsole();
+			cout << endl;
+			
+
+
 			initialTableList[i].SetCostEnumList(costEnumList);
 			cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
 			vector<TableManager> ccTables = initialTableList[i].BuildAllCCTable();
 			if (ccTables.empty()) {
 				continue;
 			}
+
+			for (auto& table : ccTables)
+			{
+				table.FlipLeftHalf();
+			}
+
 			allNondominatedSolutions[i] = ccTables;
 			cout << "\r";
 			cout << "                                        ";
