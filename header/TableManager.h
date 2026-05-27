@@ -83,6 +83,7 @@ public:
 	std::vector<TableManager> BuildAllCCTable();
 
 	void FlipLeftHalf();
+	void FlipRightHalf();
 
 private:
 	std::vector<std::vector<Group>> table;

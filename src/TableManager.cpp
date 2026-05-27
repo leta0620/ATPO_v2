@@ -3531,6 +3531,17 @@ void TableManager::FlipLeftHalf()
     }
 }
 
+void TableManager::FlipRightHalf()
+{
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = colSize / 2; c < colSize; c++)
+        {
+            table[r][c].FlipGroupRotation();
+        }
+    }
+}
+
 vector<TableManager> TableManager::BuildAllInterleavingTable()
 {
 	//cout << "original table: \n";
@@ -3562,28 +3573,45 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
         return a.second > b.second; // sort in descending order
 		});
 
-	vector<vector<Group>> colSequences;
-	int gapCount = 0;
-    for (const auto& groupCol : groupColVec)
+	// 求groupColVec的最小比值，例如40:30:20:20，最簡的比值是4:3:2:2，用這個做colSequences，再重複插入group到colSequences，這樣可以讓group平均分佈在table中，增加interleaving的效果
+	vector< pair<Group, int>> simplifiedGroupColVec;
+    int muitiplier = 0;
+    for (int m = (groupColVec.end()-1)->second; m >= 1 ; m--)
     {
-        if (colSequences.size() == 0)
+		bool canDivide = true;
+        for (const auto& groupCol : groupColVec)
         {
-			colSequences.resize(groupCol.second + 1);
+            if (groupCol.second % m != 0)
+            {
+                canDivide = false;
+                break;
+            }
+        }
+        if (canDivide)
+        {
+            muitiplier = m;
+            for (const auto& groupCol : groupColVec)
+            {
+                simplifiedGroupColVec.push_back({ groupCol.first, groupCol.second / muitiplier });
+			}
+            break;
+        }
+    }
+
+
+	vector<vector<Group>> colSequencesTemplate;
+	int gapCount = 0;
+    for (const auto& groupCol : simplifiedGroupColVec)
+    {
+        if (colSequencesTemplate.size() == 0)
+        {
+            colSequencesTemplate.resize(groupCol.second + 1);
             for (int i = 0; i < groupCol.second; i++)
             {
-                colSequences[i + 1].push_back(groupCol.first);
+                colSequencesTemplate[i + 1].push_back(groupCol.first);
             }
     
-    
-			//colSequences.resize(groupCol.second);
-   //         for (int i = 0; i < groupCol.second; i++)
-   //         {
-   //             colSequences[i].push_back(groupCol.first);
-   //         }
-
-
-
-            gapCount = colSequences.size();
+            gapCount = colSequencesTemplate.size();
         }
         else
         {
@@ -3593,10 +3621,35 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
             {
 				int insertGap = (i) * (gapCount / currentSize); // Calculate the ideal insert position
                 if (insertGap >= gapCount) insertGap = gapCount - 1; // Ensure the insert position is within bounds
-				colSequences[insertGap].push_back(groupCol.first);
+                colSequencesTemplate[insertGap].push_back(groupCol.first);
             }
         }
 	}
+
+	// print colSequencesTemplate
+ //   cout << "colSequencesTemplate: \n";
+ //   for (int i = 0; i < colSequencesTemplate.size(); i++)
+ //   {
+ //       cout << "Gap " << i << ": ";
+ //       for (auto& g : colSequencesTemplate[i])
+ //       {
+ //           cout << g.GetSymbolNameSequence() << " ";
+ //       }
+ //       cout << "\n";
+	//}
+	//cout << "multiplier: " << muitiplier << "\n";
+
+	// copy small template to all colSequences
+	vector<vector<Group>> colSequences;
+    for (int i = 0; i < muitiplier; i++)
+    {
+        for (const auto& colSequenceTemplate : colSequencesTemplate)
+        {
+            colSequences.push_back(colSequenceTemplate);
+        }
+    }
+
+
 
     for (int i = 0; i < 2; i++)
     {
@@ -3709,6 +3762,23 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
         newTableManager.table = newTable;
 		newTableManager.GetCostMap();
         ret.push_back(newTableManager);
+
+		// 上下翻轉table
+		vector<vector<Group>> flippedTable = newTable;
+        for (int r = 0; r < rowSize / 2; r++)
+        {
+            for (int c = 0; c < colSize; c++)
+            {
+                swap(flippedTable[r][c], flippedTable[rowSize - 1 - r][c]);
+			}
+        }
+        if (flippedTable != newTable)
+        {
+            TableManager flippedTableManager(*this);
+			flippedTableManager.table = flippedTable;
+            flippedTableManager.GetCostMap();
+			ret.push_back(flippedTableManager);
+		}
 
         // print table
         //cout << endl;
@@ -4282,42 +4352,478 @@ vector<TableManager> TableManager::BuildAllCCTable()
     vector<vector<Group>> groupSeqPermutations;
 	GenerateCCGroupSequences(groupSeq, {}, &groupSeqPermutations);
 
-    for (auto& gSeq : groupSeqPermutations)
+    if (rowSize % 2 == 0)
     {
-		vector<vector<Group>> newTable = GenerateCCGroupTable(rowSize, colSize, groupSize, gSeq, groupNumMap);
-        // Build new table manager
-        TableManager newTableManager(*this);
-
-		newTableManager.table = newTable;
-        newTableManager.GetCostMap();
-
-		// skip if too many dummy group in table, if > 40%, then skip this table
-        int dummyGroupCount = 0;
-        for (int r = 0; r < rowSize; r++)
+        for (auto& gSeq : groupSeqPermutations)
         {
-            for (int c = 0; c < colSize; c++)
+            vector<vector<Group>> newTable = GenerateCCGroupTable(rowSize, colSize, groupSize, gSeq, groupNumMap);
+            // Build new table manager
+            TableManager newTableManager(*this);
+
+            newTableManager.table = newTable;
+            newTableManager.GetCostMap();
+
+            // skip if too many dummy group in table, if > 40%, then skip this table
+            int dummyGroupCount = 0;
+            for (int r = 0; r < rowSize; r++)
             {
-                if (newTable[r][c].HasDummyUnit())
+                for (int c = 0; c < colSize; c++)
                 {
-                    dummyGroupCount++;
+                    if (newTable[r][c].HasDummyUnit())
+                    {
+                        dummyGroupCount++;
+                    }
+                }
+            }
+
+            // print table
+            //cout << endl;
+            //newTableManager.PrintTableToConsole();
+            //cout << "\n-----------------------------\n";
+
+            if ((double)dummyGroupCount / (rowSize * colSize) > 0.4)
+            {
+                continue; // skip this table
+            }
+
+            ret.push_back(newTableManager);
+
+
+            // 上下翻轉table
+            vector<vector<Group>> flippedTable = newTable;
+            for (int r = 0; r < rowSize / 2; r++)
+            {
+                for (int c = 0; c < colSize; c++)
+                {
+                    swap(flippedTable[r][c], flippedTable[rowSize - 1 - r][c]);
+                }
+            }
+            if (flippedTable != newTable)
+            {
+                TableManager flippedTableManager(*this);
+                flippedTableManager.table = flippedTable;
+                flippedTableManager.GetCostMap();
+                ret.push_back(flippedTableManager);
+            }
+        }
+    }
+    else if (rowSize % 2 == 1)
+    {
+        // use interleaving cc
+        BuildInterleavingTable();
+
+        Group dummyG = Group();
+        dummyG.BuildAllDummyGroup(groupSize);
+
+        unordered_map<Group, int> groupColMap;
+
+        for (int c = 0; c < colSize; c++)
+        {
+            for (int r = 0; r < rowSize; r++)
+            {
+                if (table[r][c].HasDummyUnit())
+                {
+                    continue;
+                }
+
+                groupColMap[table[r][c]]++;
+                break; // 只考慮每個 column 的第一個非 dummy group
+            }
+        }
+
+        vector<pair<Group, int>> groupColVec(groupColMap.begin(), groupColMap.end());
+
+        sort(groupColVec.begin(), groupColVec.end(), [](const pair<Group, int>& a, const pair<Group, int>& b) {
+            return a.second > b.second;
+            });
+
+        // ==========================================================
+        // 1. 建立 left half sequence
+        //
+        // 例如最後想要：
+        // B A C D D C A B
+        //
+        // 那 leftHalf 就是：
+        // B A C D
+        //
+        // 然後右半邊用 reverse(leftHalf) 產生。
+        // ==========================================================
+        vector<pair<Group, int>> halfGroupColVec;
+        vector<Group> singleGroups;
+
+        for (const auto& groupCol : groupColVec)
+        {
+            Group currentGroup = groupCol.first;
+            int currentCount = groupCol.second;
+
+            int pairCount = currentCount / 2;
+
+            if (pairCount > 0)
+            {
+                halfGroupColVec.push_back({ currentGroup, pairCount });
+            }
+
+            if (currentCount % 2 == 1)
+            {
+                singleGroups.push_back(currentGroup);
+            }
+        }
+
+        vector<vector<Group>> colSequences;
+
+        for (const auto& groupCol : halfGroupColVec)
+        {
+            Group currentGroup = groupCol.first;
+            int currentCount = groupCol.second;
+
+            if (colSequences.empty())
+            {
+                // 多開一格 gap，讓最大量的 group 不會全部擠在最左邊
+                colSequences.resize(currentCount + 1);
+
+                for (int i = 0; i < currentCount; i++)
+                {
+                    colSequences[i + 1].push_back(currentGroup);
+                }
+            }
+            else
+            {
+                int gapCount = static_cast<int>(colSequences.size());
+
+                for (int i = 0; i < currentCount; i++)
+                {
+                    int insertGap = i * gapCount / currentCount;
+
+                    if (insertGap >= gapCount)
+                    {
+                        insertGap = gapCount - 1;
+                    }
+
+                    colSequences[insertGap].push_back(currentGroup);
                 }
             }
         }
 
-        // print table
-        //cout << endl;
-        //newTableManager.PrintTableToConsole();
-        //cout << "\n-----------------------------\n";
+        vector<Group> leftHalf;
 
-        if ((double)dummyGroupCount / (rowSize * colSize) > 0.4)
+        for (auto& seq : colSequences)
         {
-            continue; // skip this table
-		}
+            for (auto& group : seq)
+            {
+                leftHalf.push_back(group);
+            }
+        }
 
-		ret.push_back(newTableManager);
+        // 如果 leftHalf 太長，代表統計出來的 column 數量已經超過可用半邊。
+        // 正常情況不應該發生，但保護一下。
+        if (static_cast<int>(leftHalf.size()) > colSize / 2)
+        {
+            leftHalf.resize(colSize / 2);
+        }
 
-        
+        // ==========================================================
+        // 2. 找出原本有 dummy 的 column pattern
+        // ==========================================================
+        unordered_map<Group, vector<int>> originDummyCols;
+
+        for (int c = 0; c < colSize; c++)
+        {
+            Group currentGroup;
+            bool hasRealGroup = false;
+            bool hasDummyGroup = false;
+
+            for (int r = 0; r < rowSize; r++)
+            {
+                if (!table[r][c].HasDummyUnit())
+                {
+                    currentGroup = table[r][c];
+                    hasRealGroup = true;
+                    break;
+                }
+            }
+
+            for (int r = 0; r < rowSize; r++)
+            {
+                if (table[r][c].HasDummyUnit())
+                {
+                    hasDummyGroup = true;
+                    break;
+                }
+            }
+
+            if (hasRealGroup && hasDummyGroup)
+            {
+                originDummyCols[currentGroup].push_back(c);
+            }
+        }
+
+        // ==========================================================
+        // 3. 產生兩種方向：
+        //    dir = 0：leftHalf 正向
+        //    dir = 1：leftHalf 反向
+        //
+        // 例如：
+        // leftHalf = B A C D
+        //
+        // dir = 0 -> B A C D D C A B
+        // dir = 1 -> D C A B B A C D
+        // ==========================================================
+        for (int dir = 0; dir < 2; dir++)
+        {
+            vector<Group> currentLeftHalf = leftHalf;
+
+            if (dir == 1)
+            {
+                reverse(currentLeftHalf.begin(), currentLeftHalf.end());
+            }
+
+            vector<Group> rowPattern(colSize, dummyG);
+
+            int halfCol = colSize / 2;
+
+            // ------------------------------------------------------
+            // 3-1. 把 leftHalf 放在左半邊靠近中心的位置
+            //
+            // 如果有 dummy，dummy 會留在外側。
+            // ------------------------------------------------------
+            int startLeftCol = halfCol - static_cast<int>(currentLeftHalf.size());
+
+            if (startLeftCol < 0)
+            {
+                startLeftCol = 0;
+            }
+
+            for (int i = 0; i < static_cast<int>(currentLeftHalf.size()); i++)
+            {
+                int leftCol = startLeftCol + i;
+                int rightCol = colSize - 1 - leftCol;
+
+                if (leftCol < 0 || leftCol >= colSize)
+                {
+                    continue;
+                }
+
+                if (rightCol < 0 || rightCol >= colSize)
+                {
+                    continue;
+                }
+
+                rowPattern[leftCol] = currentLeftHalf[i];
+                rowPattern[rightCol] = currentLeftHalf[i];
+            }
+
+            // ------------------------------------------------------
+            // 3-2. 如果 colSize 是奇數，處理正中央 column
+            //
+            // 優先放 single group，避免 dummy 在正中央。
+            // ------------------------------------------------------
+            vector<Group> remainSingles = singleGroups;
+
+            if (colSize % 2 == 1)
+            {
+                int midCol = colSize / 2;
+
+                if (!remainSingles.empty())
+                {
+                    rowPattern[midCol] = remainSingles.front();
+                    remainSingles.erase(remainSingles.begin());
+                }
+            }
+
+            // ------------------------------------------------------
+            // 3-3. 如果還有 single group，代表無法完美左右 CC。
+            //      這時把它們塞到外側 dummy 位置，讓破壞 CC 的地方盡量在外面。
+            // ------------------------------------------------------
+            int leftOuter = 0;
+            int rightOuter = colSize - 1;
+
+            while (!remainSingles.empty() && leftOuter <= rightOuter)
+            {
+                while (leftOuter < colSize && !rowPattern[leftOuter].HasDummyUnit())
+                {
+                    leftOuter++;
+                }
+
+                while (rightOuter >= 0 && !rowPattern[rightOuter].HasDummyUnit())
+                {
+                    rightOuter--;
+                }
+
+                if (leftOuter > rightOuter)
+                {
+                    break;
+                }
+
+                rowPattern[leftOuter] = remainSingles.front();
+                remainSingles.erase(remainSingles.begin());
+
+                if (remainSingles.empty())
+                {
+                    break;
+                }
+
+                if (leftOuter != rightOuter)
+                {
+                    rowPattern[rightOuter] = remainSingles.front();
+                    remainSingles.erase(remainSingles.begin());
+                }
+
+                leftOuter++;
+                rightOuter--;
+            }
+
+            // ======================================================
+            // 4. 建立 newTable
+            //
+            // 重點：
+            // row 0 和 row rowSize-1 要左右鏡射
+            // row 1 和 row rowSize-2 要左右鏡射
+            // middle row 使用 rowPattern，盡可能自己左右 CC
+            // ======================================================
+            vector<Group> reversedRowPattern = rowPattern;
+            reverse(reversedRowPattern.begin(), reversedRowPattern.end());
+
+            vector<vector<Group>> newTable(rowSize, vector<Group>(colSize, dummyG));
+
+            int midRow = rowSize / 2;
+
+            for (int r = 0; r < midRow; r++)
+            {
+                if (r % 2 == 0)
+                {
+                    newTable[r] = rowPattern;
+                    newTable[rowSize - 1 - r] = reversedRowPattern;
+                }
+                else
+                {
+                    newTable[r] = reversedRowPattern;
+                    newTable[rowSize - 1 - r] = rowPattern;
+                }
+            }
+
+            // middle row 單獨放，盡量左右 CC
+            newTable[midRow] = rowPattern;
+
+            // ======================================================
+            // 5. fix dummy column pattern
+            //
+            // 保留你的原本邏輯，但修正：
+            // 1. 同一個 column 不重複修
+            // 2. 修完一個 dummyCol 後要 break
+            // 3. 從外側往內找，讓 dummy 盡量在外面
+            // ======================================================
+            vector<bool> usedCol(colSize, false);
+
+            for (auto& dummyInfo : originDummyCols)
+            {
+                Group targetGroup = dummyInfo.first;
+                int hasFixCounter = 0;
+
+                for (int dummyCol : dummyInfo.second)
+                {
+                    bool fixedThisDummyCol = false;
+
+                    for (int offset = 0; offset < colSize; offset++)
+                    {
+                        int c;
+
+                        if (offset % 2 == 0)
+                        {
+                            c = offset / 2;
+                        }
+                        else
+                        {
+                            c = colSize - 1 - offset / 2;
+                        }
+
+                        if (c < 0 || c >= colSize)
+                        {
+                            continue;
+                        }
+
+                        if (usedCol[c])
+                        {
+                            continue;
+                        }
+
+                        if (newTable[0][c] == targetGroup)
+                        {
+                            for (int r = 0; r < rowSize; r++)
+                            {
+                                newTable[r][c] = table[r][dummyCol];
+                            }
+
+                            usedCol[c] = true;
+                            hasFixCounter++;
+                            fixedThisDummyCol = true;
+                            break;
+                        }
+                    }
+
+                    if (hasFixCounter >= static_cast<int>(dummyInfo.second.size()))
+                    {
+                        break;
+                    }
+
+                    if (!fixedThisDummyCol)
+                    {
+                        continue;
+                    }
+                }
+            }
+
+            // ======================================================
+            // 6. 檢查 dummy ratio
+            // ======================================================
+            int dummyGroupCount = 0;
+
+            for (int r = 0; r < rowSize; r++)
+            {
+                for (int c = 0; c < colSize; c++)
+                {
+                    if (newTable[r][c].HasDummyUnit())
+                    {
+                        dummyGroupCount++;
+                    }
+                }
+            }
+
+            if ((double)dummyGroupCount / (rowSize * colSize) > 0.4)
+            {
+                continue;
+            }
+
+            TableManager newTableManager(*this);
+            newTableManager.table = newTable;
+            newTableManager.GetCostMap();
+            ret.push_back(newTableManager);
+
+            // ======================================================
+            // 7. 上下翻轉 table
+            // ======================================================
+            vector<vector<Group>> flippedTable = newTable;
+
+            for (int r = 0; r < rowSize / 2; r++)
+            {
+                for (int c = 0; c < colSize; c++)
+                {
+                    swap(flippedTable[r][c], flippedTable[rowSize - 1 - r][c]);
+                }
+            }
+
+            if (flippedTable != newTable)
+            {
+                TableManager flippedTableManager(*this);
+                flippedTableManager.table = flippedTable;
+                flippedTableManager.GetCostMap();
+                ret.push_back(flippedTableManager);
+            }
+        }
+
+
+
     }
 
 	return ret;
 }
+
