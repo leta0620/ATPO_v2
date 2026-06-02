@@ -38,9 +38,9 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 	
-	if (argc != 10) {
+	if (argc != 10 && argc != 11) {
 		Test test; // Run tests
-		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D> <mode> <sa_round_per_temp> <intput_is_bus>" << endl;
+		cerr << "Usage: " << argv[0] << " <groupSize> <rowSize> <CDL_input_file_path> <output_file_path> <thread_num> <left_is_S_or_D> <mode> <sa_round_per_temp> <intput_is_bus> [force_direct_allocation]" << endl;
 		return 1;
 	}
 
@@ -122,6 +122,7 @@ int main(int argc, char* argv[]) {
 
 
 	bool busFlag = false;
+	bool forceDirectAllocation = (argc == 11) ? (stoi(argv[10]) != 0) : false;
 	if (input_is_bus == 0) busFlag = false;
 	else if (input_is_bus == 1) busFlag = true;
 	else {
@@ -129,7 +130,7 @@ int main(int argc, char* argv[]) {
 		busFlag = false;
 	}
 
-	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable(), costEnumList, busFlag);
+	InitialPlacement initialPlacement(groupSize, row_num, parser.GetNetlistLookupTable(), costEnumList, busFlag, forceDirectAllocation);
 	vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
 	for (auto& t : initialTableList)
 		t.SetCdlFilePath(cdl_input_file_path);//Add tablemanager known  parser 

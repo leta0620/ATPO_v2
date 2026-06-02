@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-InitialPlacement::InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist, std::vector<CostEnum> costEnumList, bool busFlag) : groupSize(groupSize), rowSize(rowSize), colSize(0), netListLookupTable(netlist), costEnumList(costEnumList), busFlag(busFlag)
+InitialPlacement::InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist, std::vector<CostEnum> costEnumList, bool busFlag, bool forceDirectAllocation) : groupSize(groupSize), rowSize(rowSize), colSize(0), netListLookupTable(netlist), costEnumList(costEnumList), busFlag(busFlag), forceDirectAllocation(forceDirectAllocation)
 {
 	//InitialTableList.resize(rowSize, TableManager(groupSize, rowSize, colSize, netListLookupTable));
 	this->GroupAllocation(); //floorplan
@@ -134,6 +134,384 @@ void AppendMirrorBranchPath(NetlistLookupTable& netlistLookupTable, const std::v
 	{
 		NetlistUnit unit = netlistLookupTable.GetNetlistUnit(*it);
 		currentPath.push_back(BuildDeviceUnit(unit, CellRotation::R0));
+	}
+}
+int CeilDiv(int numerator, int denominator)
+{
+	return (numerator + denominator - 1) / denominator;
+}
+
+int NextEven(int value)
+{
+	return (value % 2 == 0) ? value : value + 1;
+}
+
+std::vector<std::string> BuildMirroredSymbolList(const std::vector<std::string>& branch)
+{
+	std::vector<std::string> mirroredSymbols = branch;
+	if (mirroredSymbols.size() >= 2)
+	{
+		for (int i = static_cast<int>(mirroredSymbols.size()) - 2; i >= 0; --i)
+		{
+			mirroredSymbols.push_back(mirroredSymbols[i]);
+		}
+	}
+	return mirroredSymbols;
+}
+
+std::vector<int> BuildMirroredSlotConfiguration(const std::vector<int>& levelSlotSizes)
+{
+	std::vector<int> frontSlots;
+	std::vector<int> backSlots;
+	frontSlots.reserve(levelSlotSizes.size());
+	backSlots.reserve(levelSlotSizes.size());
+
+	for (size_t i = 0; i + 1 < levelSlotSizes.size(); ++i)
+	{
+		int slot = levelSlotSizes[i];
+		int half = slot / 2;
+		if (half % 2 != 0)
+		{
+			frontSlots.push_back(half);
+			backSlots.push_back(half);
+		}
+		else
+		{
+			frontSlots.push_back(half + 1);
+			backSlots.push_back(half - 1);
+		}
+	}
+
+	std::vector<int> mirroredSlotConfiguration;
+	mirroredSlotConfiguration.reserve(frontSlots.size() + 1 + backSlots.size());
+	mirroredSlotConfiguration.insert(mirroredSlotConfiguration.end(), frontSlots.begin(), frontSlots.end());
+	mirroredSlotConfiguration.push_back(levelSlotSizes.back());
+	for (auto it = backSlots.rbegin(); it != backSlots.rend(); ++it)
+	{
+		mirroredSlotConfiguration.push_back(*it);
+	}
+	return mirroredSlotConfiguration;
+}
+
+Group BuildGroupFromSymbolSlots(
+	NetlistLookupTable& netListLookupTable,
+	const std::vector<std::string>& mirroredSymbols,
+	const std::vector<int>& mirroredSlotConfiguration)
+{
+	std::vector<DeviceUnit> currentGroup;
+	std::unordered_map<std::string, int> symbolCount;
+	for (int i = 0; i < (int)mirroredSlotConfiguration.size(); ++i)
+	{
+		std::string currentNode = mirroredSymbols[i];
+		int slotCount = mirroredSlotConfiguration[i];
+		for (int count = 0; count < slotCount; ++count)
+		{
+			symbolCount[currentNode]++;
+			NetlistUnit unit = netListLookupTable.GetNetlistUnit(currentNode);
+			DeviceUnit deviceUnit;
+			deviceUnit.SetSymbol(unit.GetSynbolName());
+			deviceUnit.SetAnalogCellType(unit.GetAnalogType());
+			deviceUnit.SetWidth(unit.GetDeviceWidth());
+			deviceUnit.SetInstName(unit.GetInstName());
+			if (symbolCount[currentNode] % 2 == 1)
+			{
+				deviceUnit.SetRotation(CellRotation::MY);
+			}
+			else
+			{
+				deviceUnit.SetRotation(CellRotation::R0);
+			}
+			currentGroup.push_back(deviceUnit);
+		}
+	}
+
+	Group group;
+	group.SetDeviceUnits(currentGroup);
+	return group;
+}
+
+
+std::string BuildDirectAllocationKey(const std::vector<int>& levelSlotSizes, const std::vector<int>& branchGroupCounts)
+{
+	std::string key;
+	for (int slot : levelSlotSizes)
+	{
+		key += std::to_string(slot) + ",";
+	}
+	key += "|";
+	for (int count : branchGroupCounts)
+	{
+		key += std::to_string(count) + ",";
+	}
+	return key;
+}
+void BuildDirectAllocationGroups(
+	NetlistLookupTable& netListLookupTable,
+	std::vector<std::vector<Group>>& allConfigurationGroupForTables,
+	const std::vector<std::string>& commonSourceOrder)
+{
+	std::vector<std::vector<std::string>> branchSymbolsList;
+	branchSymbolsList.reserve(commonSourceOrder.size());
+	for (const std::string& commonSourceSymbol : commonSourceOrder)
+	{
+		branchSymbolsList.push_back(BuildDrainBranch(netListLookupTable, commonSourceSymbol));
+	}
+	if (branchSymbolsList.empty() || branchSymbolsList[0].empty())
+	{
+		return;
+	}
+
+	const int levelCount = (int)branchSymbolsList[0].size();
+	for (const auto& branchSymbols : branchSymbolsList)
+	{
+		if ((int)branchSymbols.size() != levelCount)
+		{
+			return;
+		}
+	}
+
+	int anchorLevel = 0;
+	int minDeviceCount = netListLookupTable.GetNetlistUnit(branchSymbolsList[0][0]).GetDeviceUnitCount();
+	for (int level = 0; level < levelCount; ++level)
+	{
+		for (const auto& branchSymbols : branchSymbolsList)
+		{
+			int deviceCount = netListLookupTable.GetNetlistUnit(branchSymbols[level]).GetDeviceUnitCount();
+			if (deviceCount < minDeviceCount)
+			{
+				minDeviceCount = deviceCount;
+				anchorLevel = level;
+			}
+		}
+	}
+
+	std::unordered_set<std::string> seenConfigurations;
+
+	int maxAnchorCount = 0;
+	for (const auto& branchSymbols : branchSymbolsList)
+	{
+		int anchorCount = netListLookupTable.GetNetlistUnit(branchSymbols[anchorLevel]).GetDeviceUnitCount();
+		maxAnchorCount = std::max(maxAnchorCount, anchorCount);
+	}
+
+	for (int anchorSlotSize = NextEven(maxAnchorCount); anchorSlotSize >= 2; anchorSlotSize -= 2)
+	{
+		std::vector<int> branchGroupCounts;
+		branchGroupCounts.reserve(branchSymbolsList.size());
+		for (const auto& branchSymbols : branchSymbolsList)
+		{
+			int anchorCount = netListLookupTable.GetNetlistUnit(branchSymbols[anchorLevel]).GetDeviceUnitCount();
+			branchGroupCounts.push_back(CeilDiv(anchorCount, anchorSlotSize));
+		}
+
+		std::vector<int> levelSlotSizes(levelCount, 0);
+		for (int level = 0; level < levelCount; ++level)
+		{
+			for (int branchIndex = 0; branchIndex < (int)branchSymbolsList.size(); ++branchIndex)
+			{
+				int deviceCount = netListLookupTable.GetNetlistUnit(branchSymbolsList[branchIndex][level]).GetDeviceUnitCount();
+				int requiredSlotSize = NextEven(CeilDiv(deviceCount, branchGroupCounts[branchIndex]));
+				levelSlotSizes[level] = std::max(levelSlotSizes[level], requiredSlotSize);
+			}
+		}
+
+
+		std::string key = BuildDirectAllocationKey(levelSlotSizes, branchGroupCounts);
+		if (seenConfigurations.find(key) != seenConfigurations.end())
+		{
+			continue;
+		}
+		seenConfigurations.insert(key);
+
+		std::vector<int> mirroredSlotConfiguration = BuildMirroredSlotConfiguration(levelSlotSizes);
+		std::vector<Group> allGroupsInATable;
+		for (int branchIndex = 0; branchIndex < (int)branchSymbolsList.size(); ++branchIndex)
+		{
+			std::vector<std::string> mirroredSymbols = BuildMirroredSymbolList(branchSymbolsList[branchIndex]);
+			if (mirroredSymbols.size() != mirroredSlotConfiguration.size())
+			{
+				continue;
+			}
+
+			Group group = BuildGroupFromSymbolSlots(netListLookupTable, mirroredSymbols, mirroredSlotConfiguration);
+			for (int count = 0; count < branchGroupCounts[branchIndex]; ++count)
+			{
+				allGroupsInATable.push_back(group);
+			}
+		}
+
+		std::vector<Group> reverseAllGroupsInATable;
+		int totalGroups = (int)allGroupsInATable.size();
+		for (int i = 0; i < totalGroups; ++i)
+		{
+			Group nowGroup = allGroupsInATable.back();
+			allGroupsInATable.pop_back();
+			reverseAllGroupsInATable.push_back(nowGroup);
+		}
+		allConfigurationGroupForTables.push_back(reverseAllGroupsInATable);
+	}
+}
+void BuildFactorAllocationConfigurations(
+	const std::vector<int>& deviceUnitCountList,
+	std::vector<std::vector<int>>& validGroupConfigurations,
+	std::vector<int>& validGroupNumberConfigurations)
+{
+	int gcdValue = deviceUnitCountList[0];
+	for (size_t i = 1; i < deviceUnitCountList.size(); ++i)
+	{
+		gcdValue = gcd(gcdValue, deviceUnitCountList[i]);
+	}
+	std::vector<int> commonDivisors;
+
+	for (int i = 1; i <= std::sqrt(gcdValue); ++i)
+	{
+		if (gcdValue % i == 0)
+		{
+			commonDivisors.push_back(i);
+
+			if (i != gcdValue / i)
+				commonDivisors.push_back(gcdValue / i);
+		}
+	}
+	std::sort(commonDivisors.begin(), commonDivisors.end());
+
+	for (auto& divisor : commonDivisors)
+	{
+		std::vector<int> currentGroupConfiguration;
+		bool validConfiguration = true;
+		for (auto& deviceUnitCount : deviceUnitCountList)
+		{
+			int groupUnitCount = deviceUnitCount / divisor;
+			if (groupUnitCount % 2 != 0)
+			{
+				validConfiguration = false;
+				break;
+			}
+			else
+			{
+				currentGroupConfiguration.push_back(groupUnitCount);
+			}
+		}
+		if (validConfiguration)
+		{
+			int pivot = currentGroupConfiguration.back();
+
+			std::vector<int> left;
+			std::vector<int> rightSmall;
+			left.reserve(currentGroupConfiguration.size() - 1);
+			rightSmall.reserve(currentGroupConfiguration.size() - 1);
+
+			for (size_t i = 0; i + 1 < currentGroupConfiguration.size(); ++i) {
+				int n = currentGroupConfiguration[i];
+				int half = n / 2;
+
+				int big, small;
+				if (half % 2 != 0) {
+					big = half;
+					small = half;
+				}
+				else {
+					big = half + 1;
+					small = half - 1;
+				}
+
+				left.push_back(big);
+				rightSmall.push_back(small);
+			}
+
+			std::vector<int> finalGroupConfiguration;
+			finalGroupConfiguration.reserve(left.size() + 1 + rightSmall.size());
+
+			finalGroupConfiguration.insert(finalGroupConfiguration.end(), left.begin(), left.end());
+			finalGroupConfiguration.push_back(pivot);
+
+			for (auto it = rightSmall.rbegin(); it != rightSmall.rend(); ++it) {
+				finalGroupConfiguration.push_back(*it);
+			}
+			validGroupConfigurations.push_back(finalGroupConfiguration);
+			validGroupNumberConfigurations.push_back(divisor);
+		}
+	}
+}
+
+void BuildGroupsFromConfigurations(
+	NetlistLookupTable& netListLookupTable,
+	std::vector<std::vector<Group>>& allConfigurationGroupForTables,
+	const std::vector<std::string>& commonSourceOrder,
+	int commonSourceGcdValue,
+	const std::vector<std::vector<int>>& validGroupConfigurations,
+	const std::vector<int>& validGroupNumberConfigurations)
+{
+	for (int i = 0; i < (int)validGroupConfigurations.size(); ++i)
+	{
+		std::vector<Group> allGroupsInATable;
+		for (int j = 0; j < commonSourceOrder.size(); ++j)
+		{
+			std::string nowNode = commonSourceOrder[j];
+			std::vector<std::string> currentGroupSymbolList;
+			int mutiNumber = netListLookupTable.GetNetlistUnit(nowNode).GetDeviceUnitCount() / commonSourceGcdValue;
+
+			while (nowNode != "")
+			{
+				currentGroupSymbolList.push_back(nowNode);
+				if (netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).first != nowNode)
+					nowNode = netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).first;
+				else
+					nowNode = "";
+			}
+			if (currentGroupSymbolList.size() >= 2)
+			{
+				for (int k = static_cast<int>(currentGroupSymbolList.size()) - 2; k >= 0; --k) {
+					currentGroupSymbolList.push_back(currentGroupSymbolList[k]);
+				}
+			}
+
+			std::vector<DeviceUnit> currentGroup;
+			std::vector<int> currentGroupConfiguration = validGroupConfigurations[i];
+			std::unordered_map<std::string, int> symbolCount;
+			for (int k = 0; k < (int)currentGroupConfiguration.size(); ++k)
+			{
+				std::string currentNode = currentGroupSymbolList[k];
+				int idxCount = currentGroupConfiguration[k];
+				for (int count = 0; count < idxCount; ++count)
+				{
+					symbolCount[currentNode]++;
+					NetlistUnit unit = netListLookupTable.GetNetlistUnit(currentNode);
+					DeviceUnit deviceUnit;
+					deviceUnit.SetSymbol(unit.GetSynbolName());
+					deviceUnit.SetAnalogCellType(unit.GetAnalogType());
+					deviceUnit.SetWidth(unit.GetDeviceWidth());
+					deviceUnit.SetInstName(unit.GetInstName());
+					if (symbolCount[currentNode] % 2 == 1)
+					{
+						deviceUnit.SetRotation(CellRotation::MY);
+					}
+					else
+					{
+						deviceUnit.SetRotation(CellRotation::R0);
+					}
+					currentGroup.push_back(deviceUnit);
+				}
+			}
+			Group actCurrentGroup;
+			actCurrentGroup.SetDeviceUnits(currentGroup);
+			int groupNumber = validGroupNumberConfigurations[i];
+			for (int k = 0; k < mutiNumber * groupNumber; ++k)
+			{
+				allGroupsInATable.push_back(actCurrentGroup);
+			}
+		}
+
+		std::vector<Group> reverseAllGroupsInATable;
+		int totalGroups = allGroupsInATable.size();
+		for (int i = 0; i < totalGroups; ++i)
+		{
+			Group nowGroup = allGroupsInATable.back();
+			allGroupsInATable.pop_back();
+
+			reverseAllGroupsInATable.push_back(nowGroup);
+		}
+		allConfigurationGroupForTables.push_back(reverseAllGroupsInATable);
 	}
 }
 }
@@ -417,189 +795,29 @@ void InitialPlacement::GroupAllocation()
 		nowSourceSymbol = netListLookupTable.GetPinDLinkWho(nowSourceSymbol).first;
 	}
 
-	int gcdValue = deviceUnitCountList[0];
-	for (size_t i = 1; i < deviceUnitCountList.size(); ++i)
-	{
-		gcdValue = gcd(gcdValue, deviceUnitCountList[i]);
-	}
-	std::vector<int> commonDivisors;
-
-	for (int i = 1; i <= std::sqrt(gcdValue); ++i)
-	{
-		if (gcdValue % i == 0)
-		{
-			commonDivisors.push_back(i);
-
-			if (i != gcdValue / i)
-				commonDivisors.push_back(gcdValue / i);
-		}
-	}
-	std::sort(commonDivisors.begin(), commonDivisors.end());
-	// commonDivisors 現在存有所有公因數，接下來依序嘗試這些公因數(可以將元件分成幾等分)，找到所有符合 group 的配置
 	std::vector<std::vector<int>> validGroupConfigurations;
 	std::vector<int> validGroupNumberConfigurations;
-	for(auto& divisor : commonDivisors)
+	if (this->forceDirectAllocation)
 	{
-
-		std::vector<int> currentGroupConfiguration;
-		bool validConfiguration = true;
-		for(auto& deviceUnitCount : deviceUnitCountList)
-		{
-			// 使用 groupCount 來建立 group 配置
-			int groupUnitCount = deviceUnitCount / divisor;
-			if (groupUnitCount % 2 != 0)
-			{
-				validConfiguration = false;
-				break; // 若有任何一個元件的 groupCount 為奇數，則跳出迴圈嘗試下一個公因數
-			}
-			else
-			{
-				currentGroupConfiguration.push_back(groupUnitCount);
-			}
-		}
-		if (validConfiguration)
-		{
-			int pivot = currentGroupConfiguration.back();
-
-			std::vector<int> left;       // 鏡像點前：放大(或相同)的那個
-			std::vector<int> rightSmall; // 收集小的那個，最後再反向當鏡像點後
-			left.reserve(currentGroupConfiguration.size() - 1);
-			rightSmall.reserve(currentGroupConfiguration.size() - 1);
-
-			// 除了最後一個數字之外處理
-			for (size_t i = 0; i + 1 < currentGroupConfiguration.size(); ++i) {
-				int n = currentGroupConfiguration[i];
-				int half = n / 2;
-
-				int big, small;
-				if (half % 2 != 0) {      // half 是奇數 -> (half, half)
-					big = half;
-					small = half;
-				}
-				else {                  // half 是偶數 -> (half+1, half-1)
-					big = half + 1;
-					small = half - 1;
-				}
-
-				left.push_back(big);
-				rightSmall.push_back(small);
-			}
-
-			// 重新生成結果數列
-			std::vector<int> finalGroupConfiguration;
-			finalGroupConfiguration.reserve(left.size() + 1 + rightSmall.size());
-
-			// 鏡像點前
-			finalGroupConfiguration.insert(finalGroupConfiguration.end(), left.begin(), left.end());
-
-			// 鏡像點
-			finalGroupConfiguration.push_back(pivot);
-
-			// 鏡像點後：小的那組反向塞回去
-			for (auto it = rightSmall.rbegin(); it != rightSmall.rend(); ++it) {
-				finalGroupConfiguration.push_back(*it);
-			}
-			validGroupConfigurations.push_back(finalGroupConfiguration);
-			validGroupNumberConfigurations.push_back(divisor);
-		}
+		BuildDirectAllocationGroups(this->netListLookupTable, this->allConfigurationGroupForTables, commonSourceOrder);
+		return;
 	}
-	// 至此，validGroupConfigurations 已經存有所有符合 group 配置的可能性
 
-	//for (auto& config : validGroupConfigurations)
-	//{
-	//	std::cout << "Valid Group Configuration: ";
-	//	for (auto& num : config)
-	//	{
-	//		std::cout << num << " ";
-	//	}
-	//	std::cout << std::endl;
-	//}
-	//for (size_t i = 0; i < validGroupNumberConfigurations.size(); ++i)
-	//{
-	//	std::cout << "Valid Group Number Configuration: " << validGroupNumberConfigurations[i] << std::endl;
-	//}
-
-
-	for (int i = 0; i < (int)validGroupConfigurations.size(); ++i)
+	BuildFactorAllocationConfigurations(deviceUnitCountList, validGroupConfigurations, validGroupNumberConfigurations);
+	if (validGroupConfigurations.empty())
 	{
-		// 針對 common source 代表元件依序建立 group
-		std::vector<Group> allGroupsInATable;
-		//排列finger元件順序
-		for (int j = 0; j < commonSourceOrder.size(); ++j)
-		{
-
-			std::string nowNode = commonSourceOrder[j];
-			std::vector<std::string> currentGroupSymbolList;
-			int mutiNumber = netListLookupTable.GetNetlistUnit(nowNode).GetDeviceUnitCount() / commonSourceGcdValue;
-			
-
-
-			while (nowNode != "")
-			{
-				currentGroupSymbolList.push_back(nowNode);
-				if (netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).first != nowNode)
-					nowNode = netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).first;
-				else 
-					nowNode = "";
-			}
-			if (currentGroupSymbolList.size() >= 2)
-			{
-				for (int k = static_cast<int>(currentGroupSymbolList.size()) - 2; k >= 0; --k) {
-					currentGroupSymbolList.push_back(currentGroupSymbolList[k]);
-				}
-			}
-
-
-
-			std::vector<DeviceUnit> currentGroup;
-			std::vector<int> currentGroupConfiguration = validGroupConfigurations[i];
-			std::unordered_map<std::string, int> symbolCount;
-			for (int k = 0; k < (int)currentGroupConfiguration.size(); ++k)
-			{
-				std::string currentNode = currentGroupSymbolList[k];
-				int idxCount = currentGroupConfiguration[k];
-				for (int count = 0; count < idxCount; ++count)
-				{
-					symbolCount[currentNode]++;
-					NetlistUnit unit = netListLookupTable.GetNetlistUnit(currentNode);
-					DeviceUnit deviceUnit;
-					deviceUnit.SetSymbol(unit.GetSynbolName());
-					deviceUnit.SetAnalogCellType(unit.GetAnalogType());
-					deviceUnit.SetWidth(unit.GetDeviceWidth());
-					deviceUnit.SetInstName(unit.GetInstName());
-					if (symbolCount[currentNode] % 2 == 1)
-					{
-						deviceUnit.SetRotation(CellRotation::MY);
-					}
-					else
-					{
-						deviceUnit.SetRotation(CellRotation::R0);
-					}
-					currentGroup.push_back(deviceUnit);
-				}
-			}
-			Group actCurrentGroup;
-			actCurrentGroup.SetDeviceUnits(currentGroup);
-			int groupNumber = validGroupNumberConfigurations[i];
-			for (int k = 0; k < mutiNumber*groupNumber; ++k)
-			{
-				allGroupsInATable.push_back(actCurrentGroup);
-			}
-		}
-
-		// 反轉 group 順序
-		std::vector<Group> reverseAllGroupsInATable;
-		int totalGroups = allGroupsInATable.size();
-		for (int i = 0 ; i < totalGroups; ++i)
-		{
-			Group nowGroup = allGroupsInATable.back();
-			allGroupsInATable.pop_back();
-
-
-			reverseAllGroupsInATable.push_back(nowGroup);
-		}
-		this->allConfigurationGroupForTables.push_back(reverseAllGroupsInATable);
+		BuildDirectAllocationGroups(this->netListLookupTable, this->allConfigurationGroupForTables, commonSourceOrder);
+		return;
 	}
+
+	BuildGroupsFromConfigurations(
+		this->netListLookupTable,
+		this->allConfigurationGroupForTables,
+		commonSourceOrder,
+		commonSourceGcdValue,
+		validGroupConfigurations,
+		validGroupNumberConfigurations);
+
 
 	//for (auto& groupsInATable : this->allConfigurationGroupForTables)
 	//{
@@ -1246,3 +1464,18 @@ void InitialPlacement::CalculateOddTableList()
 
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
