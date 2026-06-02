@@ -204,9 +204,16 @@ int main(int argc, char* argv[]) {
 
 			for (int i = 0; i < initialTableList.size(); ++i)
 			{
+				initialTableList[i].FlipLeftHalf();
 				cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
 				SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, saRoundPerTemp, true, sa_mode_str, costEnumList);
-				allNondominatedSolutions[i] = saManager.GetNondominatedSolution();
+				vector<TableManager> nondominatedSolutions = saManager.GetNondominatedSolution();
+				for (auto& table : nondominatedSolutions)
+				{
+					table.FlipRightHalf();
+				}
+
+				allNondominatedSolutions[i] = nondominatedSolutions;
 
 				cout << "\r";
 				cout << "                                        ";
@@ -245,10 +252,17 @@ int main(int argc, char* argv[]) {
 					if (i >= jobCount) break;
 
 					// 跑 SA（你的參數照舊）
-					SAManager saManager(initialTableList[i], netlistLUT, 0.9, 100.0, 1.0, saRoundPerTemp, false, sa_mode_str, costEnumList);
+					TableManager initialTableCopy = initialTableList[i]; // 確保每個 thread 都有自己的 TableManager 實例
+					initialTableCopy.FlipLeftHalf(); // 每個 thread 自己 flip，不會互相干擾
+					SAManager saManager(initialTableCopy, netlistLUT, 0.9, 100.0, 1.0, saRoundPerTemp, false, sa_mode_str, costEnumList);
 
 					// 每個 index 只被寫一次 -> 不需要 mutex
-					results[i] = saManager.GetNondominatedSolution();
+					vector<TableManager> nondominatedSolutions = saManager.GetNondominatedSolution();
+					for (auto& table : nondominatedSolutions)
+					{
+						table.FlipRightHalf();
+					}
+					results[i] = std::move(nondominatedSolutions);
 				}
 				};
 
@@ -262,6 +276,7 @@ int main(int argc, char* argv[]) {
 
 			// 組回你原本的 map<int, vector<TableManager>>
 			for (int i = 0; i < jobCount; ++i) {
+
 				allNondominatedSolutions[i] = std::move(results[i]);
 			}
 		}
