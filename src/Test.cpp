@@ -63,7 +63,7 @@ void Test::TestInitialPlacement(int groupSize, int rowNum, std::vector<CostEnum>
 			<< ", Device Unit Count: " << netlistUnit.GetDeviceUnitCount()
 			<< std::endl;
 	}
-	InitialPlacement initialPlacement(groupSize, rowNum, parser.GetNetlistLookupTable(), costEnumList, busFlag);
+	InitialPlacement initialPlacement(groupSize, rowNum, parser.GetNetlistLookupTable(), costEnumList, busFlag, false);
 	std::vector<TableManager>& initialTableList = initialPlacement.GetInitialTableList();
 	// Check if initialTableList is not empty
 	if (initialTableList.empty()) {

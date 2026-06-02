@@ -9,7 +9,7 @@
 class InitialPlacement
 {
 public:
-	InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist, std::vector<CostEnum> costEnumList, bool busFlag);
+	InitialPlacement(int groupSize, int rowSize, NetlistLookupTable netlist, std::vector<CostEnum> costEnumList, bool busFlag, bool forceDirectAllocation);
 
 	std::vector<TableManager>& GetInitialTableList() 
 	{
@@ -28,6 +28,7 @@ private:
 	int rowSize;
 	int colSize; // to be determined
 	bool busFlag; // to determine whether to use bus-based group allocation or odd-even group allocation
+	bool forceDirectAllocation; // force direct-allocation group configuration generation
 	std::vector<CostEnum> costEnumList;
 
 	// Calculate initial placement tables list
