@@ -6029,7 +6029,7 @@ vector<TableManager> TableManager::BuildAllCCTable()
 {
     vector<TableManager> ret;
 
-	// Calculate group num map and group sequences
+    // Calculate group num map and group sequences
     unordered_map<Group, int> groupNumMap;
     vector<Group> groupSeq;
     for (int c = 0; c < colSize; c++)
@@ -6040,18 +6040,18 @@ vector<TableManager> TableManager::BuildAllCCTable()
             if (groupNumMap.find(g) == groupNumMap.end())
             {
                 groupNumMap[g] = 1;
-				if (!g.HasDummyUnit())  groupSeq.push_back(g);
+                if (!g.HasDummyUnit())  groupSeq.push_back(g);
             }
             else
             {
                 groupNumMap[g]++;
             }
         }
-	}
+    }
 
     // 窮舉Seq的順序
     vector<vector<Group>> groupSeqPermutations;
-	GenerateCCGroupSequences(groupSeq, {}, &groupSeqPermutations);
+    GenerateCCGroupSequences(groupSeq, {}, &groupSeqPermutations);
 
     if (rowSize % 2 == 0)
     {
@@ -6453,11 +6453,166 @@ vector<TableManager> TableManager::BuildAllCCTable()
             }
 
             // ======================================================
+            // 3-4. 針對 orphan row 做垂直交錯修正
+            //
+            // 目前 realSeq 只保證同一 row 左右盡量交錯，
+            // 但奇數 row 補最後一排時，仍可能和相鄰 row 在同 column
+            // 出現完全相同 group，例如：
+            //     A B
+            //     B A
+            //     A B
+            //     B A
+            //     B A  <- 補入 row，和上一排相同
+            //
+            // 因此這裡會針對 bottom/top 的相鄰 row 分別挑一個
+            // vertical conflict 最少的 lastRow 版本。
+            // ======================================================
+            auto CountVerticalSameGroup = [](const vector<Group>& candidateRow, const vector<Group>& neighborRow)
+                {
+                    int sameCount = 0;
+
+                    int checkSize = min(static_cast<int>(candidateRow.size()), static_cast<int>(neighborRow.size()));
+
+                    for (int c = 0; c < checkSize; c++)
+                    {
+                        if (candidateRow[c].HasDummyUnit() || neighborRow[c].HasDummyUnit())
+                        {
+                            continue;
+                        }
+
+                        if (candidateRow[c] == neighborRow[c])
+                        {
+                            sameCount++;
+                        }
+                    }
+
+                    return sameCount;
+                };
+
+            auto CountHorizontalSameGroup = [](const vector<Group>& candidateRow)
+                {
+                    int sameCount = 0;
+
+                    for (int c = 1; c < static_cast<int>(candidateRow.size()); c++)
+                    {
+                        if (candidateRow[c - 1].HasDummyUnit() || candidateRow[c].HasDummyUnit())
+                        {
+                            continue;
+                        }
+
+                        if (candidateRow[c - 1] == candidateRow[c])
+                        {
+                            sameCount++;
+                        }
+                    }
+
+                    return sameCount;
+                };
+
+            auto BuildCandidateLastRow = [&](const vector<Group>& candidateRealSeq)
+                {
+                    vector<Group> candidateRow = lastRow;
+
+                    for (int c = leftCol; c <= rightCol; c++)
+                    {
+                        candidateRow[c] = dummyG;
+                    }
+
+                    int currentCol = leftCol;
+
+                    for (int i = 0; i < static_cast<int>(candidateRealSeq.size()); i++)
+                    {
+                        if (currentCol > rightCol)
+                        {
+                            break;
+                        }
+
+                        candidateRow[currentCol] = candidateRealSeq[i];
+                        currentCol++;
+                    }
+
+                    return candidateRow;
+                };
+
+            auto SelectBestLastRowByNeighbor = [&](const vector<Group>& neighborRow)
+                {
+                    vector<Group> bestRow = lastRow;
+                    int bestVerticalSame = 1000000000;
+                    int bestHorizontalSame = 1000000000;
+
+                    auto TryUpdateBestRow = [&](const vector<Group>& candidateRow)
+                        {
+                            int verticalSame = CountVerticalSameGroup(candidateRow, neighborRow);
+                            int horizontalSame = CountHorizontalSameGroup(candidateRow);
+
+                            // 垂直同 group 對齊是這次要修的主問題，優先權最高。
+                            // 水平相鄰同 group 只作為 tie-break，避免破壞原本 interleaving。
+                            if (verticalSame < bestVerticalSame ||
+                                (verticalSame == bestVerticalSame && horizontalSame < bestHorizontalSame))
+                            {
+                                bestRow = candidateRow;
+                                bestVerticalSame = verticalSame;
+                                bestHorizontalSame = horizontalSame;
+                            }
+                        };
+
+                    // 原始版本先納入候選。
+                    TryUpdateBestRow(lastRow);
+
+                    // 整排左右反轉也納入候選，dummy 仍會維持在外側。
+                    vector<Group> reversedWholeRow = lastRow;
+                    reverse(reversedWholeRow.begin(), reversedWholeRow.end());
+                    TryUpdateBestRow(reversedWholeRow);
+
+                    // realSeq 本身做左右反轉與 cyclic shift，挑 vertical conflict 最少者。
+                    vector<vector<Group>> sourceSeqList;
+                    sourceSeqList.push_back(realSeq);
+
+                    vector<Group> reversedRealSeq = realSeq;
+                    reverse(reversedRealSeq.begin(), reversedRealSeq.end());
+
+                    if (reversedRealSeq != realSeq)
+                    {
+                        sourceSeqList.push_back(reversedRealSeq);
+                    }
+
+                    for (auto& sourceSeq : sourceSeqList)
+                    {
+                        int seqSize = static_cast<int>(sourceSeq.size());
+
+                        if (seqSize == 0)
+                        {
+                            continue;
+                        }
+
+                        for (int shift = 0; shift < seqSize; shift++)
+                        {
+                            vector<Group> shiftedSeq;
+
+                            for (int i = 0; i < seqSize; i++)
+                            {
+                                shiftedSeq.push_back(sourceSeq[(i + shift) % seqSize]);
+                            }
+
+                            vector<Group> candidateRow = BuildCandidateLastRow(shiftedSeq);
+                            TryUpdateBestRow(candidateRow);
+                        }
+                    }
+
+                    return bestRow;
+                };
+
+            vector<Group> bottomLastRow = SelectBestLastRowByNeighbor(baseTable[targetRowSize - 1]);
+            vector<Group> topLastRow = SelectBestLastRowByNeighbor(baseTable[0]);
+
+            // ======================================================
             // 4. 組合成完整 odd-row table
             //
             // 產生兩種版本：
-            // 1. 多出來的 lastRow 放下面
-            // 2. 多出來的 lastRow 放上面
+            // 1. 多出來的 bottomLastRow 放下面
+            // 2. 多出來的 topLastRow 放上面
+            //
+            // 注意：bottom/top 使用不同 lastRow，因為它們接觸的相鄰 row 不同。
             // ======================================================
 
             // ------------------------------
@@ -6470,7 +6625,7 @@ vector<TableManager> TableManager::BuildAllCCTable()
                 bottomExtraTable[r] = baseTable[r];
             }
 
-            bottomExtraTable[rowSize - 1] = lastRow;
+            bottomExtraTable[rowSize - 1] = bottomLastRow;
 
 
             // ------------------------------
@@ -6478,7 +6633,7 @@ vector<TableManager> TableManager::BuildAllCCTable()
             // ------------------------------
             vector<vector<Group>> topExtraTable(rowSize, vector<Group>(colSize, dummyG));
 
-            topExtraTable[0] = lastRow;
+            topExtraTable[0] = topLastRow;
 
             for (int r = 0; r < targetRowSize; r++)
             {
@@ -6537,7 +6692,7 @@ vector<TableManager> TableManager::BuildAllCCTable()
         }
     }
 
-	return ret;
+    return ret;
 }
 
 bool TableManager::FixFinalDummy()
