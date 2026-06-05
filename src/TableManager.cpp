@@ -6540,3 +6540,146 @@ vector<TableManager> TableManager::BuildAllCCTable()
 	return ret;
 }
 
+bool TableManager::FixFinalDummy()
+{
+    // get real device num
+	unordered_map<string, int> realDeviceNumMap;
+    int totalRealDeviceNum = 0;
+
+    vector<string> symbolNames = this->netlist.GetAllSymbolNames();
+    for (auto& symbolName : symbolNames)
+    {
+        NetlistUnit unit = this->netlist.GetNetlistUnit(symbolName);
+		realDeviceNumMap[symbolName] = unit.GetDeviceUnitCount();
+	}
+
+    unordered_map<string, int> currentDeviceNumMap;
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize; c++)
+        {
+            Group g = table[r][c];
+			for (auto& device : g.GetDeviceUnits())
+			{
+				if (currentDeviceNumMap.find(device.GetSymbol()) == currentDeviceNumMap.end())
+				{
+					currentDeviceNumMap[device.GetSymbol()] = 0;
+				}
+
+				currentDeviceNumMap[device.GetSymbol()] += 1;
+			}
+        }
+	}
+
+	unordered_map<string, int> diffDeviceNumMap;
+    for (auto& realInfo : realDeviceNumMap)
+    {
+        string symbolName = realInfo.first;
+        int realCount = realInfo.second;
+        int currentCount = currentDeviceNumMap[symbolName];
+        diffDeviceNumMap[symbolName] = currentCount - realCount;
+    }
+
+    // fix dummy
+    for (auto& diffInfo : diffDeviceNumMap)
+    {
+		int r = 0, c = 0;
+		int diff = diffInfo.second;
+
+        if (diff < 0)
+        {
+			cout << "Current dummy less than expected: " << diffInfo.first << ", diff: " << diff << endl;
+			cout << "netlist: " << realDeviceNumMap[diffInfo.first] << ", current table: " << currentDeviceNumMap[diffInfo.first] << endl;
+			// print table
+            for (int rr = 0; rr < rowSize; rr++)
+            {
+                for (int cc = 0; cc < colSize; cc++)
+                {
+                    cout << table[rr][cc].GetSymbolNameSequence() << " ";
+                }
+                cout << endl;
+			}
+		}
+
+        while (diff > 0)
+        {
+			vector<Group*> candidateGroups;
+
+			candidateGroups.push_back(&table[r][c]);
+			candidateGroups.push_back(&table[rowSize - 1 - r][c]);
+			candidateGroups.push_back(&table[r][colSize - 1 - c]);
+			candidateGroups.push_back(&table[rowSize - 1 - r][colSize - 1 - c]);
+
+			//cout << "target:" << diffInfo.first << ", diff:" << diff << endl;
+            for (Group* g : candidateGroups)
+            {
+				//cout << "candidate:" << g->GetSymbolNameSequence() << endl;
+                for (int i = g->GetDeviceUnits().size() - 1; i >= 0; --i)
+                {
+					//cout << g->GetDeviceUnits()[i].GetSymbol() << " ";
+                    if (g->GetDeviceUnits()[i].GetSymbol() == diffInfo.first)
+                    {
+                        g->SetDummyPosition(i);
+                        diff--;
+
+                        if (diff <= 0)
+                        {
+                            break;
+						}
+                    }
+				}
+				//cout << endl;
+
+                if (diff <= 0)
+                {
+                    break;
+                }
+            }
+
+            if (diff <= 0)
+            {
+                break;
+            }
+
+            if (r <= c && r < (rowSize + 1) / 2) r++;
+			else if (r > c && c < (colSize + 1) / 2) c++;
+			else r++;
+
+            if (r >= (rowSize + 1) / 2 || c >= (colSize + 1) / 2)
+            {
+				return false; // no more candidate groups to fix dummy, but still have diff > 0, return false to indicate failure
+			}
+        }
+	}
+
+	// get now real device num after fixing dummy
+    unordered_map<string, int> finalDeviceNumMap;
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize; c++)
+        {
+            Group g = table[r][c];
+            for (auto& device : g.GetDeviceUnits())
+            {
+                if (finalDeviceNumMap.find(device.GetSymbol()) == finalDeviceNumMap.end())
+                {
+                    finalDeviceNumMap[device.GetSymbol()] = 0;
+                }
+                finalDeviceNumMap[device.GetSymbol()] += 1;
+            }
+        }
+    }
+    // check if final device num matches real device num
+    for (auto& realInfo : realDeviceNumMap)
+    {
+        string symbolName = realInfo.first;
+        int realCount = realInfo.second;
+        int finalCount = finalDeviceNumMap[symbolName];
+        if (finalCount != realCount)
+        {
+            return false; // still have mismatch, return false to indicate failure
+        }
+	}
+
+	return true; // all dummy fixed successfully
+}

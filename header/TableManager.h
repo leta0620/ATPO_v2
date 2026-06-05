@@ -85,6 +85,17 @@ public:
 	void FlipLeftHalf();
 	void FlipRightHalf();
 
+	bool FixFinalDummy();
+
+	// cost part
+	std::unordered_map<CostEnum, double> costMap;
+	// Routing length switch: 0 = skip in dominance/perturbation, 1 = include.
+	// Static so free functions (e.g. doesADominateB) can query without an instance.
+	// Value is still always computed and written to costMap for reporting.
+	static int routingLengthEnable;
+	static void SetRoutingLengthEnable(int v) { routingLengthEnable = (v != 0) ? 1 : 0; }
+	static int  GetRoutingLengthEnable() { return routingLengthEnable; }
+
 private:
 	std::vector<std::vector<Group>> table;
 	int rowSize = 0;
@@ -104,17 +115,6 @@ private:
 	bool RowRuleCheck(int rowPlace, int colPlace, Group& group);
 
 	std::vector<CostEnum> costEnumList = { CostEnum::ccCost, CostEnum::rCost, CostEnum::cCost, CostEnum::sperationCost, CostEnum::dummyCost, CostEnum::routing_lengthCost, CostEnum::mildCost, CostEnum::congestionCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
-
-
-public:
-	// cost part
-	std::unordered_map<CostEnum, double> costMap;
-	// Routing length switch: 0 = skip in dominance/perturbation, 1 = include.
-	// Static so free functions (e.g. doesADominateB) can query without an instance.
-	// Value is still always computed and written to costMap for reporting.
-	static int routingLengthEnable;
-	static void SetRoutingLengthEnable(int v) { routingLengthEnable = (v != 0) ? 1 : 0; }
-	static int  GetRoutingLengthEnable() { return routingLengthEnable; }
 
 private:
 	void CalculateCCCost();

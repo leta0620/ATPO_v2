@@ -157,10 +157,26 @@ int main(int argc, char* argv[]) {
 				continue;
 			}
 
+			vector<int> tablesToRemove;
+			for (int tableIndex = 0; tableIndex < ccTables.size(); ++tableIndex)
+			{
+				if (!ccTables[tableIndex].FixFinalDummy()) {
+					cerr << "Error: Failed to fix final dummy for a CC table. This table will be skipped." << endl;
+					tablesToRemove.push_back(tableIndex);
+				}
+			}
+
+			// Remove tables that failed to fix final dummy
+			for (int i = tablesToRemove.size() - 1; i >= 0; --i) {
+				ccTables.erase(ccTables.begin() + tablesToRemove[i]);
+			}
+
 			for (auto& table : ccTables)
 			{
 				table.FlipLeftHalf();
 			}
+
+			
 
 			allNondominatedSolutions[i] = ccTables;
 			cout << "\r";
@@ -181,6 +197,20 @@ int main(int argc, char* argv[]) {
 			vector<TableManager> interleavingTables = initialTableList[i].BuildAllInterleavingTable();
 			if (interleavingTables.empty()) {
 				continue;
+			}
+
+			vector<int> tablesToRemove;
+			for (int tableIndex = 0; tableIndex < interleavingTables.size(); ++tableIndex)
+			{
+				if (!interleavingTables[tableIndex].FixFinalDummy()) {
+					cerr << "Error: Failed to fix final dummy for an interleaving table. This table will be skipped." << endl;
+					tablesToRemove.push_back(tableIndex);
+				}
+			}
+
+			// Remove tables that failed to fix final dummy
+			for (int i = tablesToRemove.size() - 1; i >= 0; --i) {
+				interleavingTables.erase(interleavingTables.begin() + tablesToRemove[i]);
 			}
 
 			for (auto& table : interleavingTables)
@@ -209,6 +239,22 @@ int main(int argc, char* argv[]) {
 				cout << "round: " << i + 1 << "/" << initialTableList.size() << endl;
 				SAManager saManager(initialTableList[i], parser.GetNetlistLookupTable(), 0.9, 100.0, 1.0, saRoundPerTemp, true, sa_mode_str, costEnumList);
 				vector<TableManager> nondominatedSolutions = saManager.GetNondominatedSolution();
+
+				// fix final dummy
+				vector<int> tablesToRemove;
+				for (int tableIndex = 0; tableIndex < nondominatedSolutions.size(); ++tableIndex)
+				{
+					if (!nondominatedSolutions[tableIndex].FixFinalDummy()) {
+						cerr << "Error: Failed to fix final dummy for an interleaving table. This table will be skipped." << endl;
+						tablesToRemove.push_back(tableIndex);
+					}
+				}
+
+				// Remove tables that failed to fix final dummy
+				for (int i = tablesToRemove.size() - 1; i >= 0; --i) {
+					nondominatedSolutions.erase(nondominatedSolutions.begin() + tablesToRemove[i]);
+				}
+
 				for (auto& table : nondominatedSolutions)
 				{
 					table.FlipRightHalf();
@@ -259,6 +305,21 @@ int main(int argc, char* argv[]) {
 
 					// 每個 index 只被寫一次 -> 不需要 mutex
 					vector<TableManager> nondominatedSolutions = saManager.GetNondominatedSolution();
+					// fix final dummy
+					vector<int> tablesToRemove;
+					for (int tableIndex = 0; tableIndex < nondominatedSolutions.size(); ++tableIndex)
+					{
+						if (!nondominatedSolutions[tableIndex].FixFinalDummy()) {
+							cerr << "Error: Failed to fix final dummy for a SA table. This table will be skipped." << endl;
+							tablesToRemove.push_back(tableIndex);
+						}
+					}
+
+					// Remove tables that failed to fix final dummy
+					for (int j = tablesToRemove.size() - 1; j >= 0; --j) {
+						nondominatedSolutions.erase(nondominatedSolutions.begin() + tablesToRemove[j]);
+					}
+
 					for (auto& table : nondominatedSolutions)
 					{
 						table.FlipRightHalf();
