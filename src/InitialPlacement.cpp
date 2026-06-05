@@ -841,7 +841,7 @@ void InitialPlacement::CalculateInitialTableList()
 	for (auto& groupsInATable : this->allConfigurationGroupForTables)
 	{
 		
-		int tableSize = groupsInATable.size() / 2;
+		int tableSize = int(groupsInATable.size() + 1) / 2;
 		int nowTableColSize = ((tableSize + rowSize - 1) / rowSize) * 2;// ceiling division
 		int nowTableGroupSize = groupsInATable[0].GetDeviceUnits().size();
 		//std::cout << "Calculated column size: " << this->colSize << std::endl;
