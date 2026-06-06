@@ -86,6 +86,7 @@ public:
 	void FlipRightHalf();
 
 	bool FixFinalDummy();
+	bool FixFinalDummyColFirst(bool leftFirst);
 
 	// cost part
 	std::unordered_map<CostEnum, double> costMap;
@@ -95,6 +96,8 @@ public:
 	static int routingLengthEnable;
 	static void SetRoutingLengthEnable(int v) { routingLengthEnable = (v != 0) ? 1 : 0; }
 	static int  GetRoutingLengthEnable() { return routingLengthEnable; }
+
+	bool operator==(const TableManager& other) const;
 
 private:
 	std::vector<std::vector<Group>> table;
