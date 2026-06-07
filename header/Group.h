@@ -67,6 +67,23 @@ public:
 		return true;
 	}
 
+	void SetDummyPosition(int pos) 
+	{
+		if (pos < 0 || pos >= deviceUnits.size()) {
+			std::cerr << "Error: Dummy position out of range." << std::endl;
+			return;
+		}
+
+		if (deviceUnits[pos].GetSymbol() == "d") {
+			std::cerr << "Warning: Position " << pos << " is already a dummy unit." << std::endl;
+			return;
+		}
+
+		deviceUnits[pos].SetSymbol("d");
+		dummyNum++;
+		CalculateTypeHash();
+	}
+
 private:
 	//std::string name;
 	std::vector<DeviceUnit> deviceUnits;

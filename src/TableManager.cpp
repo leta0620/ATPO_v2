@@ -16,6 +16,20 @@
 
 using namespace std;
 
+bool TableManager::operator==(const TableManager& other) const {
+    if (rowSize != other.rowSize || colSize != other.colSize || groupSize != other.groupSize) {
+        return false;
+    }
+    for (int i = 0; i < rowSize; ++i) {
+        for (int j = 0; j < colSize; ++j) {
+            if (!(table[i][j] == other.table[i][j])) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 // Static member definition: routing length perturbation switch (default = on)
 int TableManager::routingLengthEnable = 1;
 
@@ -228,8 +242,8 @@ std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
             // HierCongestion 暫時保留程式碼但不擾動 SA:寫 0 維持 costMap entry,
             // 函式定義在 line ~2172 仍然完整保留(SHARED-tree 版本)。
             // 要重啟,刪除下面 = 0 那行並還原 CalculateHierCongestionCost() 呼叫。
-            //this->CalculateHierCongestionCost();
-            costMap[CostEnum::hierCongestionCost] = 0.0;
+            this->CalculateHierCongestionCost();
+            //costMap[CostEnum::hierCongestionCost] = 0.0;
             break;
         case CostEnum::hierCCost:
             this->CalculateHierCCost();
@@ -1576,7 +1590,7 @@ std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValu
     {
         // HierCongestion 暫時停用 → 從輸出顯示中隱藏
         // 函式定義 (line ~2172) 跟 case (line ~227) 都保留,要恢復就把這幾行 // 拿掉
-        if (costEnum == CostEnum::hierCongestionCost) continue;
+        //if (costEnum == CostEnum::hierCongestionCost) continue;
 
         std::string costName;
 
@@ -3547,434 +3561,226 @@ vector<Group> BuildBalancedInterleavingGroups(
 )
 {
     vector<Group> groups;
-    vector<int> totalCount;
+    vector<int> originalCount;
+    vector<int> remainingCount;
+    vector<int> usedCount;
 
-    int totalSize = 0;
+    int totalCount = 0;
 
-    for (const auto& groupCol : groupColVec)
+    for (const auto& item : groupColVec)
     {
-        if (groupCol.second <= 0)
+        if (item.second <= 0)
         {
             continue;
         }
 
-        groups.push_back(groupCol.first);
-        totalCount.push_back(groupCol.second);
-        totalSize += groupCol.second;
+        groups.push_back(item.first);
+        originalCount.push_back(item.second);
+        remainingCount.push_back(item.second);
+        usedCount.push_back(0);
+        totalCount += item.second;
     }
 
-    if (groups.empty() || totalSize <= 0)
+    vector<Group> result;
+
+    if (groups.empty() || totalCount <= 0)
     {
-        return {};
-    }
-
-    auto GcdInt = [](int a, int b) -> int {
-        if (a < 0)
-        {
-            a = -a;
-        }
-
-        if (b < 0)
-        {
-            b = -b;
-        }
-
-        while (b != 0)
-        {
-            int t = a % b;
-            a = b;
-            b = t;
-        }
-
-        return a;
-    };
-
-    int countGcd = 0;
-
-    for (int count : totalCount)
-    {
-        countGcd = GcdInt(countGcd, count);
-    }
-
-    if (countGcd <= 0)
-    {
-        countGcd = 1;
-    }
-
-    vector<int> templateCount;
-
-    for (int count : totalCount)
-    {
-        templateCount.push_back(count / countGcd);
-    }
-
-    int templateSize = 0;
-
-    for (int count : templateCount)
-    {
-        templateSize += count;
-    }
-
-    auto FindGroupIndex = [&](const Group& g) -> int {
-        for (int i = 0; i < static_cast<int>(groups.size()); i++)
-        {
-            if (groups[i] == g)
-            {
-                return i;
-            }
-        }
-
-        return -1;
-    };
-
-    auto BuildOneSequence = [&](const vector<int>& countList, int firstIndex) -> vector<Group> {
-        int currentTotalSize = 0;
-
-        for (int count : countList)
-        {
-            currentTotalSize += count;
-        }
-
-        vector<int> remainCount = countList;
-        vector<int> placedCount(groups.size(), 0);
-
-        vector<Group> result;
-        result.reserve(currentTotalSize);
-
-        if (
-            firstIndex >= 0 &&
-            firstIndex < static_cast<int>(groups.size()) &&
-            remainCount[firstIndex] > 0
-            )
-        {
-            result.push_back(groups[firstIndex]);
-            remainCount[firstIndex]--;
-            placedCount[firstIndex]++;
-        }
-
-        while (static_cast<int>(result.size()) < currentTotalSize)
-        {
-            int pos = static_cast<int>(result.size());
-            bool isLastPosition = (pos == currentTotalSize - 1);
-
-            bool hasNonSameCandidate = false;
-            bool hasNonCircularCandidate = false;
-
-            for (int i = 0; i < static_cast<int>(groups.size()); i++)
-            {
-                if (remainCount[i] <= 0)
-                {
-                    continue;
-                }
-
-                if (!result.empty() && groups[i] == result.back())
-                {
-                    continue;
-                }
-
-                hasNonSameCandidate = true;
-
-                if (
-                    isLastPosition &&
-                    !result.empty() &&
-                    groups[i] == result.front()
-                    )
-                {
-                    continue;
-                }
-
-                hasNonCircularCandidate = true;
-            }
-
-            int bestIndex = -1;
-            double bestScore = -1e100;
-
-            for (int i = 0; i < static_cast<int>(groups.size()); i++)
-            {
-                if (remainCount[i] <= 0)
-                {
-                    continue;
-                }
-
-                if (
-                    hasNonSameCandidate &&
-                    !result.empty() &&
-                    groups[i] == result.back()
-                    )
-                {
-                    continue;
-                }
-
-                if (
-                    hasNonCircularCandidate &&
-                    isLastPosition &&
-                    !result.empty() &&
-                    groups[i] == result.front()
-                    )
-                {
-                    continue;
-                }
-
-                double nextIdealPosition =
-                    (static_cast<double>(placedCount[i]) + 0.5) *
-                    static_cast<double>(currentTotalSize) /
-                    static_cast<double>(countList[i]);
-
-                double urgency =
-                    static_cast<double>(pos) - nextIdealPosition;
-
-                double score = 0.0;
-
-                score += urgency * 10000.0;
-                score += static_cast<double>(remainCount[i]) * 10.0;
-
-                if (
-                    result.size() >= 2 &&
-                    groups[i] == result[result.size() - 2]
-                    )
-                {
-                    score -= 1.0;
-                }
-
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    bestIndex = i;
-                }
-            }
-
-            if (bestIndex == -1)
-            {
-                break;
-            }
-
-            result.push_back(groups[bestIndex]);
-            remainCount[bestIndex]--;
-            placedCount[bestIndex]++;
-        }
-
         return result;
-    };
+    }
 
-    auto ExpandTemplate = [&](const vector<Group>& templateSeq, int repeatCount) -> vector<Group> {
-        vector<Group> result;
+    int groupCount = static_cast<int>(groups.size());
 
-        result.reserve(static_cast<int>(templateSeq.size()) * repeatCount);
+    auto GetMaxCount = [&](const vector<int>& counts) -> int {
+        int maxCount = 0;
 
-        for (int r = 0; r < repeatCount; r++)
+        for (int value : counts)
         {
-            for (const Group& g : templateSeq)
+            if (value > maxCount)
             {
-                result.push_back(g);
+                maxCount = value;
             }
         }
 
-        return result;
-    };
+        return maxCount;
+        };
 
-    auto CountAdjacentSame = [&](const vector<Group>& seq) -> int {
-        int count = 0;
+    auto GetSumCount = [&](const vector<int>& counts) -> int {
+        int sum = 0;
 
-        for (int i = 0; i + 1 < static_cast<int>(seq.size()); i++)
+        for (int value : counts)
         {
-            if (seq[i] == seq[i + 1])
+            sum += value;
+        }
+
+        return sum;
+        };
+
+    auto CanFinishWithoutAdjacent = [&](const vector<int>& counts, int lastIndex) -> bool {
+        int sum = GetSumCount(counts);
+
+        if (sum <= 0)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < static_cast<int>(counts.size()); i++)
+        {
+            int sameCount = counts[i];
+            int otherCount = sum - sameCount;
+
+            if (i == lastIndex)
             {
-                count++;
-            }
-        }
-
-        return count;
-    };
-
-    auto CountCircularSame = [&](const vector<Group>& seq) -> int {
-        if (seq.size() <= 1)
-        {
-            return 0;
-        }
-
-        return seq.front() == seq.back() ? 1 : 0;
-    };
-
-    auto GetMaxRunLength = [&](const vector<Group>& seq) -> int {
-        if (seq.empty())
-        {
-            return 0;
-        }
-
-        int maxRun = 1;
-        int currentRun = 1;
-
-        for (int i = 1; i < static_cast<int>(seq.size()); i++)
-        {
-            if (seq[i] == seq[i - 1])
-            {
-                currentRun++;
-                maxRun = max(maxRun, currentRun);
+                // 下一個不能再放 lastIndex，所以 lastIndex 的剩餘數量
+                // 必須被其他 group 隔開。
+                if (sameCount > otherCount)
+                {
+                    return false;
+                }
             }
             else
             {
-                currentRun = 1;
-            }
-        }
-
-        return maxRun;
-    };
-
-    auto IsMaxCountGroup = [&](int index, const vector<int>& countList) -> bool {
-        int maxCount = 0;
-
-        for (int count : countList)
-        {
-            maxCount = max(maxCount, count);
-        }
-
-        return countList[index] == maxCount;
-    };
-
-    auto IsMinCountGroup = [&](int index, const vector<int>& countList) -> bool {
-        int minCount = countList[0];
-
-        for (int count : countList)
-        {
-            minCount = min(minCount, count);
-        }
-
-        return countList[index] == minCount;
-    };
-
-    auto ScoreSequence = [&](const vector<Group>& seq, const vector<int>& countList, int firstIndex) -> long long {
-        if (seq.empty())
-        {
-            return -9000000000000000000LL;
-        }
-
-        int currentTotalSize = static_cast<int>(seq.size());
-
-        long long score = 0;
-
-        score -= static_cast<long long>(CountAdjacentSame(seq)) * 1000000000LL;
-        score -= static_cast<long long>(CountCircularSame(seq)) * 500000000LL;
-        score -= static_cast<long long>(GetMaxRunLength(seq)) * 1000000LL;
-
-        vector<int> prefixCount(groups.size(), 0);
-        long long balancePenalty = 0;
-
-        for (int pos = 0; pos < currentTotalSize; pos++)
-        {
-            int groupIndex = FindGroupIndex(seq[pos]);
-
-            if (groupIndex >= 0)
-            {
-                prefixCount[groupIndex]++;
-            }
-
-            for (int i = 0; i < static_cast<int>(groups.size()); i++)
-            {
-                long long actual = static_cast<long long>(prefixCount[i]) * currentTotalSize;
-                long long ideal = static_cast<long long>(pos + 1) * countList[i];
-
-                long long diff = actual - ideal;
-
-                if (diff < 0)
+                // 其他 group 可以多一個，放在頭尾。
+                if (sameCount > otherCount + 1)
                 {
-                    diff = -diff;
+                    return false;
+                }
+            }
+        }
+
+        return true;
+        };
+
+    int initialMaxCount = GetMaxCount(originalCount);
+    bool canStrictInterleave =
+        initialMaxCount <= totalCount - initialMaxCount + 1;
+
+    for (int pos = 0; pos < totalCount; pos++)
+    {
+        int lastIndex = -1;
+
+        if (!result.empty())
+        {
+            for (int i = 0; i < groupCount; i++)
+            {
+                if (groups[i] == result.back())
+                {
+                    lastIndex = i;
+                    break;
+                }
+            }
+        }
+
+        int bestIndex = -1;
+        double bestDuePosition = 1e100;
+
+        for (int i = 0; i < groupCount; i++)
+        {
+            if (remainingCount[i] <= 0)
+            {
+                continue;
+            }
+
+            if (canStrictInterleave && i == lastIndex)
+            {
+                continue;
+            }
+
+            vector<int> testRemaining = remainingCount;
+            testRemaining[i]--;
+
+            if (canStrictInterleave)
+            {
+                if (!CanFinishWithoutAdjacent(testRemaining, i))
+                {
+                    continue;
+                }
+            }
+
+            // 越早該出現的 group，duePosition 越小。
+            // 這可以讓 group 依照比例平均分散，而不是把少數 group 太早用完。
+            double duePosition =
+                (static_cast<double>(usedCount[i]) + 0.5)
+                * static_cast<double>(totalCount)
+                / static_cast<double>(originalCount[i]);
+
+            bool better = false;
+
+            if (bestIndex == -1)
+            {
+                better = true;
+            }
+            else if (duePosition < bestDuePosition - 1e-9)
+            {
+                better = true;
+            }
+            else if (abs(duePosition - bestDuePosition) <= 1e-9)
+            {
+                if (remainingCount[i] > remainingCount[bestIndex])
+                {
+                    better = true;
+                }
+            }
+
+            if (better)
+            {
+                bestIndex = i;
+                bestDuePosition = duePosition;
+            }
+        }
+
+        // 理論上 canStrictInterleave 成立時不應該走到這裡。
+        // 但保險起見，如果嚴格條件找不到，就放寬條件。
+        if (bestIndex == -1)
+        {
+            for (int i = 0; i < groupCount; i++)
+            {
+                if (remainingCount[i] <= 0)
+                {
+                    continue;
                 }
 
-                balancePenalty += diff;
+                double duePosition =
+                    (static_cast<double>(usedCount[i]) + 0.5)
+                    * static_cast<double>(totalCount)
+                    / static_cast<double>(originalCount[i]);
+
+                bool better = false;
+
+                if (bestIndex == -1)
+                {
+                    better = true;
+                }
+                else if (duePosition < bestDuePosition - 1e-9)
+                {
+                    better = true;
+                }
+                else if (abs(duePosition - bestDuePosition) <= 1e-9)
+                {
+                    if (remainingCount[i] > remainingCount[bestIndex])
+                    {
+                        better = true;
+                    }
+                }
+
+                if (better)
+                {
+                    bestIndex = i;
+                    bestDuePosition = duePosition;
+                }
             }
         }
 
-        score -= balancePenalty * 100LL;
-
-        if (
-            groups.size() > 1 &&
-            firstIndex >= 0 &&
-            IsMaxCountGroup(firstIndex, countList)
-            )
+        if (bestIndex == -1)
         {
-            score -= 100000LL;
+            break;
         }
 
-        if (
-            groups.size() > 1 &&
-            firstIndex >= 0 &&
-            IsMinCountGroup(firstIndex, countList)
-            )
-        {
-            score += 100000LL;
-        }
-
-        return score;
-    };
-
-    vector<Group> bestSequence;
-    long long bestScore = -9000000000000000000LL;
-
-    if (templateSize > 0)
-    {
-        for (int firstIndex = 0; firstIndex < static_cast<int>(groups.size()); firstIndex++)
-        {
-            if (templateCount[firstIndex] <= 0)
-            {
-                continue;
-            }
-
-            vector<Group> templateSeq = BuildOneSequence(templateCount, firstIndex);
-
-            if (static_cast<int>(templateSeq.size()) != templateSize)
-            {
-                continue;
-            }
-
-            vector<Group> expandedSeq = ExpandTemplate(templateSeq, countGcd);
-
-            if (static_cast<int>(expandedSeq.size()) != totalSize)
-            {
-                continue;
-            }
-
-            long long score = ScoreSequence(expandedSeq, totalCount, firstIndex);
-
-            if (!templateSeq.empty() && templateSeq.front() == templateSeq.back())
-            {
-                score -= 1000000000LL;
-            }
-
-            if (score > bestScore)
-            {
-                bestScore = score;
-                bestSequence = expandedSeq;
-            }
-        }
+        result.push_back(groups[bestIndex]);
+        usedCount[bestIndex]++;
+        remainingCount[bestIndex]--;
     }
 
-    if (bestSequence.empty())
-    {
-        for (int firstIndex = 0; firstIndex < static_cast<int>(groups.size()); firstIndex++)
-        {
-            if (totalCount[firstIndex] <= 0)
-            {
-                continue;
-            }
-
-            vector<Group> seq = BuildOneSequence(totalCount, firstIndex);
-
-            if (static_cast<int>(seq.size()) != totalSize)
-            {
-                continue;
-            }
-
-            long long score = ScoreSequence(seq, totalCount, firstIndex);
-
-            if (score > bestScore)
-            {
-                bestScore = score;
-                bestSequence = seq;
-            }
-        }
-    }
-
-    return bestSequence;
+    return result;
 }
 
 bool RepairAndValidateFinalTable(
@@ -4836,40 +4642,72 @@ vector<vector<Group>> MergeOuterDummyColsByTypeHash(
     return mergedTable;
 }
 
+void FillDummyToGeneralGroup(vector<vector<Group>>& table)
+{
+	// print table before filling dummy
+    for (auto& row : table)
+    {
+        for (auto& group : row)
+        {
+            cout << group.GetSymbolNameSequence() << " ";
+        }
+        cout << endl;
+	}
+    vector<Group> dummyGroups;
+
+    for (int c = 0; c < static_cast<int>(table[0].size()); c++)
+    {
+        Group noneDummyGroup;
+        for (int r = 0; r < static_cast<int>(table.size()); r++)
+        {
+
+            if (!table[r][c].HasDummyUnit())
+            {
+                dummyGroups.push_back(table[r][c]);
+                noneDummyGroup = table[r][c];
+				break;
+            }
+        }
+
+        if (noneDummyGroup.GetSymbolNameSequence().empty())
+        {
+            cerr << "Error: No non-dummy group found in column " << c << endl;
+            continue;
+        }
+    }
+
+    for (int c = 0; c < static_cast<int>(table[0].size()); c++)
+    {
+        for (int r = 0; r < static_cast<int>(table.size()); r++)
+        {
+            if (table[r][c].HasDummyUnit())
+            {
+                table[r][c] = dummyGroups[c];
+            }
+        }
+    }
+
+    cout << endl;
+    for (auto& row : table)
+    {
+        for (auto& group : row)
+        {
+            cout << group.GetSymbolNameSequence() << " ";
+        }
+        cout << endl;
+    }
+}
+
 
 vector<TableManager> TableManager::BuildAllInterleavingTable()
 {
-	//cout << "original table: \n";
- //   cout << "\n" << groupSize << endl;
-	//PrintTableToConsole();
+    vector<TableManager> ret;
 
-	vector<TableManager> ret;
-
-	//unordered_map<Group, int> groupColMap;
- //   for (int c = 0; c < colSize; c++)
- //   {
-	//	bool findNoDummyGroup = false;
- //       for (int r = 0; r < rowSize; r++)
-	//	{
- //           if (table[r][c].HasDummyUnit())
- //           {
- //               continue;
-	//		}
-
- //           findNoDummyGroup = true;
- //           groupColMap[table[r][c]]++;
-	//		break; // 只考慮每行第一個非 dummy 的 group
- //       }
-
-    struct DummyColInfo
-    {
-        Group targetGroup;
-        int originCol;
-        int dummyCount;
-    };
+    // 如果你現在確定 dummy 最後才處理，
+    // 這裡可以保留，但建議把裡面的 cout 拿掉。
+    FillDummyToGeneralGroup(table);
 
     unordered_map<Group, int> groupColMap;
-    vector<DummyColInfo> dummyColInfos;
     vector<Group> groupOrder;
 
     auto AddGroupOrderIfNeeded = [&](const Group& g) {
@@ -4882,26 +4720,20 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
         }
 
         groupOrder.push_back(g);
-    };
+        };
 
     for (int c = 0; c < colSize; c++)
     {
-        Group currentGroup;
         bool hasRealGroup = false;
-        bool hasDummyGroup = false;
-        int dummyCount = 0;
+        Group currentGroup;
 
         for (int r = 0; r < rowSize; r++)
         {
-            if (table[r][c].HasDummyUnit())
-            {
-                hasDummyGroup = true;
-                dummyCount++;
-            }
-            else if (!hasRealGroup)
+            if (!table[r][c].HasDummyUnit())
             {
                 currentGroup = table[r][c];
                 hasRealGroup = true;
+                break;
             }
         }
 
@@ -4910,25 +4742,11 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
             continue;
         }
 
-        if (hasDummyGroup)
-        {
-            DummyColInfo info;
-            info.targetGroup = currentGroup;
-            info.originCol = c;
-            info.dummyCount = dummyCount;
-
-            dummyColInfos.push_back(info);
-        }
-        else
-        {
-            // 只有完全沒有 dummy 的 column 才拿去做 interleaving
-            AddGroupOrderIfNeeded(currentGroup);
-            groupColMap[currentGroup]++;
-        }
+        AddGroupOrderIfNeeded(currentGroup);
+        groupColMap[currentGroup]++;
     }
 
-	// sort col numbers by group count
-	vector<pair<Group, int>> groupColVec;
+    vector<pair<Group, int>> groupColVec;
 
     for (const Group& g : groupOrder)
     {
@@ -4940,123 +4758,19 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
         }
     }
 
-    stable_sort(groupColVec.begin(), groupColVec.end(), [](const pair<Group, int>& a, const pair<Group, int>& b) {
-        return a.second > b.second;
-        });
-    sort(dummyColInfos.begin(), dummyColInfos.end(), [](const DummyColInfo& a, const DummyColInfo& b) {
-        if (a.dummyCount != b.dummyCount)
-        {
-            return a.dummyCount > b.dummyCount;
+    stable_sort(groupColVec.begin(), groupColVec.end(),
+        [](const pair<Group, int>& a, const pair<Group, int>& b) {
+            return a.second > b.second;
         }
+    );
 
-        return a.originCol < b.originCol;
-        });
-
-	//// 求groupColVec的最小比值，例如40:30:20:20，最簡的比值是4:3:2:2，用這個做colSequences，再重複插入group到colSequences，這樣可以讓group平均分佈在table中，增加interleaving的效果
-	//vector< pair<Group, int>> simplifiedGroupColVec;
- //   int muitiplier = 0;
- //   for (int m = (groupColVec.end()-1)->second; m >= 1 ; m--)
- //   {
-	//	bool canDivide = true;
- //       for (const auto& groupCol : groupColVec)
- //       {
- //           if (groupCol.second % m != 0)
- //           {
- //               canDivide = false;
- //               break;
- //           }
- //       }
- //       if (canDivide)
- //       {
- //           muitiplier = m;
- //           for (const auto& groupCol : groupColVec)
- //           {
- //               simplifiedGroupColVec.push_back({ groupCol.first, groupCol.second / muitiplier });
-	//		}
- //           break;
- //       }
- //   }
-
-
-	//vector<vector<Group>> colSequencesTemplate;
-	//int gapCount = 0;
- //   for (const auto& groupCol : simplifiedGroupColVec)
- //   {
- //       if (colSequencesTemplate.size() == 0)
- //       {
- //           colSequencesTemplate.resize(groupCol.second + 1);
- //           for (int i = 0; i < groupCol.second; i++)
- //           {
- //               colSequencesTemplate[i + 1].push_back(groupCol.first);
- //           }
- //   
- //           gapCount = colSequencesTemplate.size();
- //       }
- //       else
- //       {
-	//		int currentSize = groupCol.second;
- //           // Calaulate insert position
-	//		for (int i = 0; i < currentSize; i++)
- //           {
-	//			int insertGap = (i) * (gapCount / currentSize); // Calculate the ideal insert position
- //               if (insertGap >= gapCount) insertGap = gapCount - 1; // Ensure the insert position is within bounds
- //               colSequencesTemplate[insertGap].push_back(groupCol.first);
- //           }
- //       }
-	//}
-
-	//// print colSequencesTemplate
- ////   cout << "colSequencesTemplate: \n";
- ////   for (int i = 0; i < colSequencesTemplate.size(); i++)
- ////   {
- ////       cout << "Gap " << i << ": ";
- ////       for (auto& g : colSequencesTemplate[i])
- ////       {
- ////           cout << g.GetSymbolNameSequence() << " ";
- ////       }
- ////       cout << "\n";
-	////}
-	////cout << "multiplier: " << muitiplier << "\n";
-
-	//// copy small template to all colSequences
-	//vector<vector<Group>> colSequences;
- //   for (int i = 0; i < muitiplier; i++)
- //   {
- //       for (const auto& colSequenceTemplate : colSequencesTemplate)
- //       {
- //           colSequences.push_back(colSequenceTemplate);
- //       }
- //   }
-
-    vector<Group> balancedInterleavedGroups =
+    vector<Group> interleavedGroups =
         BuildBalancedInterleavingGroups(groupColVec);
 
-
-
-    /*for (int i = 0; i < 2; i++)
+    if (interleavedGroups.empty())
     {
-        vector<Group> interleavedGroups;
-
-        if (i % 2 == 0)
-        {
-            for (auto& g : colSequences)
-            {
-                for (auto& group : g)
-                {
-                    interleavedGroups.push_back(group);
-                }
-            }
-        }
-        else
-        {
-            for (auto it = colSequences.rbegin(); it != colSequences.rend(); ++it)
-            {
-                for (auto itG = it->rbegin(); itG != it->rend(); ++itG)
-                {
-                    interleavedGroups.push_back(*itG);
-                }
-			}
-        }*/
+        return ret;
+    }
 
     auto GetCurrentRowSize = [&](const vector<vector<Group>>& currentTable) -> int {
         return static_cast<int>(currentTable.size());
@@ -5088,7 +4802,7 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
         return dummyGroupCount;
         };
 
-    auto IsDummyRatioTooHigh = [&](const vector<vector<Group>>& currentTable) -> bool {
+    auto IsDummyRatioTooHigh = [&](vector<vector<Group>>& currentTable) -> bool {
         int currentRowSize = GetCurrentRowSize(currentTable);
         int currentColSize = GetCurrentColSize(currentTable);
 
@@ -5098,11 +4812,20 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
         }
 
         int dummyGroupCount = CountDummyGroupInTable(currentTable);
+		cout << "Current dummy group count: " << dummyGroupCount << endl;
+        for (int r = 0; r < static_cast<int>(currentTable.size()); r++)
+        {
+            for (int c = 0; c < static_cast<int>(currentTable[r].size()); c++)
+            {
+                cout << currentTable[r][c].GetSymbolNameSequence() << " ";
+            }
+            cout << endl;
+		}
 
-        return (double)dummyGroupCount / (currentRowSize * currentColSize) > 0.4;
+        return static_cast<double>(dummyGroupCount)
+            / static_cast<double>(currentRowSize * currentColSize) > 0.4;
         };
-
-    auto PushTableManagerIfLegal = [&](const vector<vector<Group>>& inputTable) {
+    auto PushTableManagerIfLegal = [&](const vector<vector<Group>>& inputTable, bool fixDummyLeftFirst) {
         vector<vector<Group>> currentTable = inputTable;
 
         int currentRowSize = GetCurrentRowSize(currentTable);
@@ -5113,13 +4836,6 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
             return;
         }
 
-        // 先做 final repair。
-        // 這裡會：
-        // 1. 刪除全 dummy column
-        // 2. dummy 越多越靠外
-        // 3. 左右 dummy col 數量差 <= 1
-        // 4. 修正相鄰 single-group column 違規
-        // 5. 修不掉就 return false
         bool legal = RepairAndValidateFinalTable(
             currentTable,
             groupSize
@@ -5138,353 +4854,118 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
             return;
         }
 
-        if (IsDummyRatioTooHigh(currentTable))
-        {
-            return;
-        }
-
         TableManager currentTableManager(*this);
         currentTableManager.table = currentTable;
         currentTableManager.rowSize = currentRowSize;
         currentTableManager.colSize = currentColSize;
+
+        // ✅ 真正放 dummy / 修 final dummy 的地方
+        if (!currentTableManager.FixFinalDummyColFirst(fixDummyLeftFirst))
+        {
+            return;
+        }
+
+        // ✅ FixFinalDummy 後 table 可能改變，所以重新更新 row/col
+        currentTableManager.rowSize =
+            static_cast<int>(currentTableManager.table.size());
+
+        if (currentTableManager.table.empty())
+        {
+            return;
+        }
+
+        currentTableManager.colSize =
+            static_cast<int>(currentTableManager.table[0].size());
+
+        if (currentTableManager.rowSize <= 0 || currentTableManager.colSize <= 0)
+        {
+            return;
+        }
+
+        // ✅ dummy ratio 要放在 FixFinalDummy 後面
+        //if (IsDummyRatioTooHigh(currentTableManager.table))
+        //{
+        //    return;
+        //}
+
         currentTableManager.GetCostMap();
 
         ret.push_back(currentTableManager);
         };
 
-    for (int i = 0; i < 2; i++)
+    for (int mode = 0; mode < 2; mode++)
     {
-        vector<Group> interleavedGroups = balancedInterleavedGroups;
+        vector<Group> currentSequence = interleavedGroups;
 
-        if (i % 2 == 1)
+        if (mode == 1)
         {
-            reverse(interleavedGroups.begin(), interleavedGroups.end());
+            reverse(currentSequence.begin(), currentSequence.end());
         }
 
-//        // Build new tables based on interleaved groups
-//        vector<vector<Group>> newTable;
-//
-//        for (int r = 0; r < rowSize; r++)
-//        {
-//            newTable.push_back(interleavedGroups);
-//        }
-//        
-//
-//       
-//
-//        // new dummy fix
-//        // ==========================================================
-//// fix dummy
-////
-//// 目標：
-//// 1. 有 dummy 的 column 盡量貼左右側
-//// 2. dummy 越多的 column 越靠外
-//// 3. 左右兩側 dummy 數量盡量平均
-//// 4. 不重複替換同一個 newTable column
-//// ==========================================================
-//
-//
-//
-//        vector<DummyColInfo> dummyColInfos;
-//
-//        // ----------------------------------------------------------
-//        // 1. 收集原本有哪些 column 有 dummy，並計算 dummy 數量
-//        // ----------------------------------------------------------
-//        for (int c = 0; c < colSize; c++)
-//        {
-//            Group currentGroup;
-//            bool hasRealGroup = false;
-//            int dummyCount = 0;
-//
-//            for (int r = 0; r < rowSize; r++)
-//            {
-//                if (table[r][c].HasDummyUnit())
-//                {
-//                    dummyCount++;
-//                }
-//                else if (!hasRealGroup)
-//                {
-//                    currentGroup = table[r][c];
-//                    hasRealGroup = true;
-//                }
-//            }
-//
-//            if (hasRealGroup && dummyCount > 0)
-//            {
-//                DummyColInfo info;
-//                info.targetGroup = currentGroup;
-//                info.originCol = c;
-//                info.dummyCount = dummyCount;
-//
-//                dummyColInfos.push_back(info);
-//            }
-//        }
-//
-//        // ----------------------------------------------------------
-//        // 2. dummy 越多的 column 越優先處理
-//        //    因為越早處理，越容易拿到最外側位置
-//        // ----------------------------------------------------------
-//        sort(dummyColInfos.begin(), dummyColInfos.end(), [](const DummyColInfo& a, const DummyColInfo& b) {
-//            if (a.dummyCount != b.dummyCount)
-//            {
-//                return a.dummyCount > b.dummyCount;
-//            }
-//
-//            return a.originCol < b.originCol;
-//            });
-//
-//        // ----------------------------------------------------------
-//        // 3. 記錄 newTable 每個 column 原本對應的 group
-//        //
-//        // 注意：
-//        // 後面替換 column 後，newTable[0][c] 可能會變 dummy，
-//        // 所以不能一直用 newTable[0][c] 判斷它原本是哪個 group。
-//        // ----------------------------------------------------------
-//        vector<Group> newColGroup(colSize);
-//
-//        for (int c = 0; c < colSize; c++)
-//        {
-//            newColGroup[c] = newTable[0][c];
-//        }
-//
-//        vector<bool> usedCol(colSize, false);
-//
-//        int leftDummyLoad = 0;
-//        int rightDummyLoad = 0;
-//
-//        // ----------------------------------------------------------
-//        // 4. 從指定側邊找可以替換的 target column
-//        //
-//        // searchLeft = true：從左側往中間找
-//        // searchLeft = false：從右側往中間找
-//        // ----------------------------------------------------------
-//        auto FindTargetColFromSide = [&](const Group& targetGroup, bool searchLeft) -> int {
-//            if (searchLeft)
-//            {
-//                for (int c = 0; c < colSize; c++)
-//                {
-//                    if (usedCol[c])
-//                    {
-//                        continue;
-//                    }
-//
-//                    if (newColGroup[c] == targetGroup)
-//                    {
-//                        return c;
-//                    }
-//                }
-//            }
-//            else
-//            {
-//                for (int c = colSize - 1; c >= 0; c--)
-//                {
-//                    if (usedCol[c])
-//                    {
-//                        continue;
-//                    }
-//
-//                    if (newColGroup[c] == targetGroup)
-//                    {
-//                        return c;
-//                    }
-//                }
-//            }
-//
-//            return -1;
-//            };
-//
-//        auto ReplaceColumn = [&](int targetCol, int originCol) {
-//            for (int r = 0; r < rowSize; r++)
-//            {
-//                newTable[r][targetCol] = table[r][originCol];
-//            }
-//
-//            usedCol[targetCol] = true;
-//            };
-//
-//        // ----------------------------------------------------------
-//        // 5. 依照 dummy 數量由大到小，把 dummy column 放到左右外側
-//        // ----------------------------------------------------------
-//        for (const DummyColInfo& info : dummyColInfos)
-//        {
-//            bool preferLeft = (leftDummyLoad <= rightDummyLoad);
-//
-//            int targetCol = -1;
-//
-//            // 先嘗試 dummy 負載比較小的那一側
-//            if (preferLeft)
-//            {
-//                targetCol = FindTargetColFromSide(info.targetGroup, true);
-//
-//                if (targetCol == -1)
-//                {
-//                    targetCol = FindTargetColFromSide(info.targetGroup, false);
-//                }
-//            }
-//            else
-//            {
-//                targetCol = FindTargetColFromSide(info.targetGroup, false);
-//
-//                if (targetCol == -1)
-//                {
-//                    targetCol = FindTargetColFromSide(info.targetGroup, true);
-//                }
-//            }
-//
-//            if (targetCol == -1)
-//            {
-//                continue;
-//            }
-//
-//            ReplaceColumn(targetCol, info.originCol);
-//
-//            if (targetCol < colSize / 2)
-//            {
-//                leftDummyLoad += info.dummyCount;
-//            }
-//            else
-//            {
-//                rightDummyLoad += info.dummyCount;
-//            }
-//        }
+        int newColSize = static_cast<int>(currentSequence.size());
 
-        // ==========================================================
-        // Build new table
-        //
-        // dummy column 直接放左右側
-        // pure interleaving columns 放中間
-        // ==========================================================
-        Group dummyG = Group();
-        dummyG.BuildAllDummyGroup(groupSize);
+        vector<vector<Group>> newTable(
+            rowSize,
+            vector<Group>(newColSize)
+        );
 
-        vector<vector<Group>> newTable(rowSize, vector<Group>(colSize, dummyG));
-
-        // ----------------------------------------------------------
-        // 1. 決定 dummy column 要放在哪些 column
-        //
-        // dummy 越多越靠外，左右 dummy load 盡量平均。
-        // ----------------------------------------------------------
-        vector<int> dummyTargetCol(dummyColInfos.size(), -1);
-
-        int leftCol = 0;
-        int rightCol = colSize - 1;
-
-        int leftDummyLoad = 0;
-        int rightDummyLoad = 0;
-
-        for (int k = 0; k < static_cast<int>(dummyColInfos.size()); k++)
+        for (int c = 0; c < newColSize; c++)
         {
-            const DummyColInfo& info = dummyColInfos[k];
-
-            if (leftDummyLoad <= rightDummyLoad)
-            {
-                dummyTargetCol[k] = leftCol;
-                leftCol++;
-                leftDummyLoad += info.dummyCount;
-            }
-            else
-            {
-                dummyTargetCol[k] = rightCol;
-                rightCol--;
-                rightDummyLoad += info.dummyCount;
-            }
-        }
-
-        // ----------------------------------------------------------
-        // 2. 把 dummy column pattern 貼到左右側
-        // ----------------------------------------------------------
-        for (int k = 0; k < static_cast<int>(dummyColInfos.size()); k++)
-        {
-            int targetCol = dummyTargetCol[k];
-            int originCol = dummyColInfos[k].originCol;
-
-            if (targetCol < 0 || targetCol >= colSize)
-            {
-                continue;
-            }
-
             for (int r = 0; r < rowSize; r++)
             {
-                newTable[r][targetCol] = table[r][originCol];
+                newTable[r][c] = currentSequence[c];
             }
         }
 
-        // ----------------------------------------------------------
-        // 3. 剩下中間區域放 interleavedGroups
-        // ----------------------------------------------------------
-        int centerStartCol = leftCol;
-        int centerEndCol = rightCol;
-
-        int centerCapacity = centerEndCol - centerStartCol + 1;
-
-        if (centerCapacity < 0)
-        {
-            centerCapacity = 0;
-        }
-
-        // 如果 interleavedGroups 比中間容量還長，代表前面的統計有問題。
-        // 正常情況下應該剛好等於 centerCapacity。
-        if (static_cast<int>(interleavedGroups.size()) > centerCapacity)
-        {
-            interleavedGroups.resize(centerCapacity);
-        }
-
-        // 讓 real group 放在中間，不夠的話 dummy 自然留在中心區域外緣。
-        // 正常情況應該不會不夠。
-        int startCol = centerStartCol + (centerCapacity - static_cast<int>(interleavedGroups.size())) / 2;
-
-        for (int i = 0; i < static_cast<int>(interleavedGroups.size()); i++)
-        {
-            int targetCol = startCol + i;
-
-            if (targetCol < centerStartCol || targetCol > centerEndCol)
-            {
-                continue;
-            }
-
-            for (int r = 0; r < rowSize; r++)
-            {
-                newTable[r][targetCol] = interleavedGroups[i];
-            }
-        }
-
-
-		// check id too many dummy group in table, if > 40%, then skip this table
-		int dummyGroupCount = 0;
-        // ======================================================
-// 4. 檢查 newTable dummy ratio，合法才加入結果
-// ======================================================
-        if (IsDummyRatioTooHigh(newTable))
-        {
-            continue;
-        }
-
-        PushTableManagerIfLegal(newTable);
-
-        // ======================================================
-        // 6. 上下翻轉 table
-        // ======================================================
-        vector<vector<Group>> flippedTable = newTable;
-
-        int flippedRowSize = GetCurrentRowSize(flippedTable);
-        int flippedColSize = GetCurrentColSize(flippedTable);
-
-        for (int r = 0; r < flippedRowSize / 2; r++)
-        {
-            for (int c = 0; c < flippedColSize; c++)
-            {
-                swap(flippedTable[r][c], flippedTable[flippedRowSize - 1 - r][c]);
-            }
-        }
-
-        if (flippedTable != newTable)
-        {
-            PushTableManagerIfLegal(flippedTable);
-        }
-
+        PushTableManagerIfLegal(newTable, true);
+        PushTableManagerIfLegal(newTable, false);
     }
 
-	return ret;
+    // 上下翻轉table
+    vector<TableManager> LegalFlipTables;
+    for (auto& tm : ret)
+    {
+		TableManager flippedTm = tm;
+        reverse(flippedTm.table.begin(), flippedTm.table.end());
+		LegalFlipTables.push_back(flippedTm);
+	}
+	ret.insert(ret.end(), LegalFlipTables.begin(), LegalFlipTables.end());
+
+	// print all generated tables
+    for (TableManager& tm : ret)
+    {
+        cout << "Generated Table:" << endl;
+        for (auto& row : tm.table)
+        {
+            for (auto& group : row)
+            {
+                cout << group.GetSymbolNameSequence() << " ";
+            }
+            cout << endl;
+        }
+        cout << endl;
+    }
+
+	// if has same table, only keep one
+	vector<TableManager> uniqueRet;
+    for (const TableManager& tm : ret)
+    {
+        bool isDuplicate = false;
+        for (const TableManager& uniqueTm : uniqueRet)
+        {
+            if (tm == uniqueTm)
+            {
+                isDuplicate = true;
+                break;
+            }
+        }
+        if (!isDuplicate)
+        {
+            uniqueRet.push_back(tm);
+        }
+	}
+
+    return uniqueRet;
 }
 
 
@@ -5517,6 +4998,8 @@ void GenerateCCGroupSequences(vector<Group> unSelectG, vector<Group> hsaSelectG,
 
     
 }
+
+
 
 vector<vector<Group>> GenerateCCGroupTable(int rowSize, int colSize, int groupSize, vector<Group> groupSeq, unordered_map<Group, int> groupNumMap)
 {
@@ -6025,11 +5508,13 @@ vector<vector<Group>> GenerateCCGroupTable(int rowSize, int colSize, int groupSi
     return newTable;
 }
 
+
+
 vector<TableManager> TableManager::BuildAllCCTable()
 {
     vector<TableManager> ret;
 
-	// Calculate group num map and group sequences
+    // Calculate group num map and group sequences
     unordered_map<Group, int> groupNumMap;
     vector<Group> groupSeq;
     for (int c = 0; c < colSize; c++)
@@ -6040,18 +5525,18 @@ vector<TableManager> TableManager::BuildAllCCTable()
             if (groupNumMap.find(g) == groupNumMap.end())
             {
                 groupNumMap[g] = 1;
-				if (!g.HasDummyUnit())  groupSeq.push_back(g);
+                if (!g.HasDummyUnit())  groupSeq.push_back(g);
             }
             else
             {
                 groupNumMap[g]++;
             }
         }
-	}
+    }
 
     // 窮舉Seq的順序
     vector<vector<Group>> groupSeqPermutations;
-	GenerateCCGroupSequences(groupSeq, {}, &groupSeqPermutations);
+    GenerateCCGroupSequences(groupSeq, {}, &groupSeqPermutations);
 
     if (rowSize % 2 == 0)
     {
@@ -6453,11 +5938,166 @@ vector<TableManager> TableManager::BuildAllCCTable()
             }
 
             // ======================================================
+            // 3-4. 針對 orphan row 做垂直交錯修正
+            //
+            // 目前 realSeq 只保證同一 row 左右盡量交錯，
+            // 但奇數 row 補最後一排時，仍可能和相鄰 row 在同 column
+            // 出現完全相同 group，例如：
+            //     A B
+            //     B A
+            //     A B
+            //     B A
+            //     B A  <- 補入 row，和上一排相同
+            //
+            // 因此這裡會針對 bottom/top 的相鄰 row 分別挑一個
+            // vertical conflict 最少的 lastRow 版本。
+            // ======================================================
+            auto CountVerticalSameGroup = [](const vector<Group>& candidateRow, const vector<Group>& neighborRow)
+                {
+                    int sameCount = 0;
+
+                    int checkSize = min(static_cast<int>(candidateRow.size()), static_cast<int>(neighborRow.size()));
+
+                    for (int c = 0; c < checkSize; c++)
+                    {
+                        if (candidateRow[c].HasDummyUnit() || neighborRow[c].HasDummyUnit())
+                        {
+                            continue;
+                        }
+
+                        if (candidateRow[c] == neighborRow[c])
+                        {
+                            sameCount++;
+                        }
+                    }
+
+                    return sameCount;
+                };
+
+            auto CountHorizontalSameGroup = [](const vector<Group>& candidateRow)
+                {
+                    int sameCount = 0;
+
+                    for (int c = 1; c < static_cast<int>(candidateRow.size()); c++)
+                    {
+                        if (candidateRow[c - 1].HasDummyUnit() || candidateRow[c].HasDummyUnit())
+                        {
+                            continue;
+                        }
+
+                        if (candidateRow[c - 1] == candidateRow[c])
+                        {
+                            sameCount++;
+                        }
+                    }
+
+                    return sameCount;
+                };
+
+            auto BuildCandidateLastRow = [&](const vector<Group>& candidateRealSeq)
+                {
+                    vector<Group> candidateRow = lastRow;
+
+                    for (int c = leftCol; c <= rightCol; c++)
+                    {
+                        candidateRow[c] = dummyG;
+                    }
+
+                    int currentCol = leftCol;
+
+                    for (int i = 0; i < static_cast<int>(candidateRealSeq.size()); i++)
+                    {
+                        if (currentCol > rightCol)
+                        {
+                            break;
+                        }
+
+                        candidateRow[currentCol] = candidateRealSeq[i];
+                        currentCol++;
+                    }
+
+                    return candidateRow;
+                };
+
+            auto SelectBestLastRowByNeighbor = [&](const vector<Group>& neighborRow)
+                {
+                    vector<Group> bestRow = lastRow;
+                    int bestVerticalSame = 1000000000;
+                    int bestHorizontalSame = 1000000000;
+
+                    auto TryUpdateBestRow = [&](const vector<Group>& candidateRow)
+                        {
+                            int verticalSame = CountVerticalSameGroup(candidateRow, neighborRow);
+                            int horizontalSame = CountHorizontalSameGroup(candidateRow);
+
+                            // 垂直同 group 對齊是這次要修的主問題，優先權最高。
+                            // 水平相鄰同 group 只作為 tie-break，避免破壞原本 interleaving。
+                            if (verticalSame < bestVerticalSame ||
+                                (verticalSame == bestVerticalSame && horizontalSame < bestHorizontalSame))
+                            {
+                                bestRow = candidateRow;
+                                bestVerticalSame = verticalSame;
+                                bestHorizontalSame = horizontalSame;
+                            }
+                        };
+
+                    // 原始版本先納入候選。
+                    TryUpdateBestRow(lastRow);
+
+                    // 整排左右反轉也納入候選，dummy 仍會維持在外側。
+                    vector<Group> reversedWholeRow = lastRow;
+                    reverse(reversedWholeRow.begin(), reversedWholeRow.end());
+                    TryUpdateBestRow(reversedWholeRow);
+
+                    // realSeq 本身做左右反轉與 cyclic shift，挑 vertical conflict 最少者。
+                    vector<vector<Group>> sourceSeqList;
+                    sourceSeqList.push_back(realSeq);
+
+                    vector<Group> reversedRealSeq = realSeq;
+                    reverse(reversedRealSeq.begin(), reversedRealSeq.end());
+
+                    if (reversedRealSeq != realSeq)
+                    {
+                        sourceSeqList.push_back(reversedRealSeq);
+                    }
+
+                    for (auto& sourceSeq : sourceSeqList)
+                    {
+                        int seqSize = static_cast<int>(sourceSeq.size());
+
+                        if (seqSize == 0)
+                        {
+                            continue;
+                        }
+
+                        for (int shift = 0; shift < seqSize; shift++)
+                        {
+                            vector<Group> shiftedSeq;
+
+                            for (int i = 0; i < seqSize; i++)
+                            {
+                                shiftedSeq.push_back(sourceSeq[(i + shift) % seqSize]);
+                            }
+
+                            vector<Group> candidateRow = BuildCandidateLastRow(shiftedSeq);
+                            TryUpdateBestRow(candidateRow);
+                        }
+                    }
+
+                    return bestRow;
+                };
+
+            vector<Group> bottomLastRow = SelectBestLastRowByNeighbor(baseTable[targetRowSize - 1]);
+            vector<Group> topLastRow = SelectBestLastRowByNeighbor(baseTable[0]);
+
+            // ======================================================
             // 4. 組合成完整 odd-row table
             //
             // 產生兩種版本：
-            // 1. 多出來的 lastRow 放下面
-            // 2. 多出來的 lastRow 放上面
+            // 1. 多出來的 bottomLastRow 放下面
+            // 2. 多出來的 topLastRow 放上面
+            //
+            // 注意：bottom/top 使用不同 lastRow，因為它們接觸的相鄰 row 不同。
             // ======================================================
 
             // ------------------------------
@@ -6470,7 +6110,7 @@ vector<TableManager> TableManager::BuildAllCCTable()
                 bottomExtraTable[r] = baseTable[r];
             }
 
-            bottomExtraTable[rowSize - 1] = lastRow;
+            bottomExtraTable[rowSize - 1] = bottomLastRow;
 
 
             // ------------------------------
@@ -6478,7 +6118,7 @@ vector<TableManager> TableManager::BuildAllCCTable()
             // ------------------------------
             vector<vector<Group>> topExtraTable(rowSize, vector<Group>(colSize, dummyG));
 
-            topExtraTable[0] = lastRow;
+            topExtraTable[0] = topLastRow;
 
             for (int r = 0; r < targetRowSize; r++)
             {
@@ -6536,7 +6176,332 @@ vector<TableManager> TableManager::BuildAllCCTable()
             }
         }
     }
-
-	return ret;
+    return ret;
 }
 
+bool TableManager::FixFinalDummy()
+{
+    // get real device num
+	unordered_map<string, int> realDeviceNumMap;
+    int totalRealDeviceNum = 0;
+
+    vector<string> symbolNames = this->netlist.GetAllSymbolNames();
+    for (auto& symbolName : symbolNames)
+    {
+        NetlistUnit unit = this->netlist.GetNetlistUnit(symbolName);
+		realDeviceNumMap[symbolName] = unit.GetDeviceUnitCount();
+	}
+
+    unordered_map<string, int> currentDeviceNumMap;
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize; c++)
+        {
+            Group g = table[r][c];
+			for (auto& device : g.GetDeviceUnits())
+			{
+				if (currentDeviceNumMap.find(device.GetSymbol()) == currentDeviceNumMap.end())
+				{
+					currentDeviceNumMap[device.GetSymbol()] = 0;
+				}
+
+				currentDeviceNumMap[device.GetSymbol()] += 1;
+			}
+        }
+	}
+
+	unordered_map<string, int> diffDeviceNumMap;
+    for (auto& realInfo : realDeviceNumMap)
+    {
+        string symbolName = realInfo.first;
+        int realCount = realInfo.second;
+        int currentCount = currentDeviceNumMap[symbolName];
+        diffDeviceNumMap[symbolName] = currentCount - realCount;
+    }
+
+    // fix dummy
+    for (auto& diffInfo : diffDeviceNumMap)
+    {
+		int r = 0, c = 0;
+		int diff = diffInfo.second;
+
+        if (diff < 0)
+        {
+			cout << "Current dummy less than expected: " << diffInfo.first << ", diff: " << diff << endl;
+			cout << "netlist: " << realDeviceNumMap[diffInfo.first] << ", current table: " << currentDeviceNumMap[diffInfo.first] << endl;
+			// print table
+            for (int rr = 0; rr < rowSize; rr++)
+            {
+                for (int cc = 0; cc < colSize; cc++)
+                {
+                    cout << table[rr][cc].GetSymbolNameSequence() << " ";
+                }
+                cout << endl;
+			}
+		}
+
+        while (diff > 0)
+        {
+			vector<Group*> candidateGroups;
+
+			candidateGroups.push_back(&table[r][c]);
+			candidateGroups.push_back(&table[rowSize - 1 - r][c]);
+			candidateGroups.push_back(&table[r][colSize - 1 - c]);
+			candidateGroups.push_back(&table[rowSize - 1 - r][colSize - 1 - c]);
+
+			//cout << "target:" << diffInfo.first << ", diff:" << diff << endl;
+            for (Group* g : candidateGroups)
+            {
+				//cout << "candidate:" << g->GetSymbolNameSequence() << endl;
+                for (int i = g->GetDeviceUnits().size() - 1; i >= 0; --i)
+                {
+					//cout << g->GetDeviceUnits()[i].GetSymbol() << " ";
+                    if (g->GetDeviceUnits()[i].GetSymbol() == diffInfo.first)
+                    {
+                        g->SetDummyPosition(i);
+                        diff--;
+
+                        if (diff <= 0)
+                        {
+                            break;
+						}
+                    }
+				}
+				//cout << endl;
+
+                if (diff <= 0)
+                {
+                    break;
+                }
+            }
+
+            if (diff <= 0)
+            {
+                break;
+            }
+
+            /*if (r >= c && c < (colSize + 1) / 2) c++;
+			else if (r < c && r < (rowSize + 1) / 2) r++;
+			else r++;*/
+
+            if (r < (rowSize + 1) / 2)
+            {
+                r++;
+            }
+            else if (c < (colSize + 1) / 2)
+            {
+                c++;
+				r = 0;
+			}
+
+            if (r > (rowSize + 1) / 2 || c > (colSize + 1) / 2)
+            {
+				return false; // no more candidate groups to fix dummy, but still have diff > 0, return false to indicate failure
+			}
+        }
+	}
+
+	// get now real device num after fixing dummy
+    unordered_map<string, int> finalDeviceNumMap;
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize; c++)
+        {
+            Group g = table[r][c];
+            for (auto& device : g.GetDeviceUnits())
+            {
+                if (finalDeviceNumMap.find(device.GetSymbol()) == finalDeviceNumMap.end())
+                {
+                    finalDeviceNumMap[device.GetSymbol()] = 0;
+                }
+                finalDeviceNumMap[device.GetSymbol()] += 1;
+            }
+        }
+    }
+    // check if final device num matches real device num
+    for (auto& realInfo : realDeviceNumMap)
+    {
+        string symbolName = realInfo.first;
+        int realCount = realInfo.second;
+        int finalCount = finalDeviceNumMap[symbolName];
+        if (finalCount != realCount)
+        {
+            cout << "Mismatch for symbol: " << symbolName << ", real count: " << realCount << ", final count: " << finalCount << endl;
+            return false; // still have mismatch, return false to indicate failure
+        }
+	}
+
+	return true; // all dummy fixed successfully
+}
+
+bool TableManager::FixFinalDummyColFirst(bool leftFirst)
+{
+    // get real device num
+    unordered_map<string, int> realDeviceNumMap;
+    int totalRealDeviceNum = 0;
+
+    vector<string> symbolNames = this->netlist.GetAllSymbolNames();
+    for (auto& symbolName : symbolNames)
+    {
+        NetlistUnit unit = this->netlist.GetNetlistUnit(symbolName);
+        realDeviceNumMap[symbolName] = unit.GetDeviceUnitCount();
+    }
+
+    unordered_map<string, int> currentDeviceNumMap;
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize; c++)
+        {
+            Group g = table[r][c];
+            for (auto& device : g.GetDeviceUnits())
+            {
+                if (currentDeviceNumMap.find(device.GetSymbol()) == currentDeviceNumMap.end())
+                {
+                    currentDeviceNumMap[device.GetSymbol()] = 0;
+                }
+
+                currentDeviceNumMap[device.GetSymbol()] += 1;
+            }
+        }
+    }
+
+    unordered_map<string, int> diffDeviceNumMap;
+    for (auto& realInfo : realDeviceNumMap)
+    {
+        string symbolName = realInfo.first;
+        int realCount = realInfo.second;
+        int currentCount = currentDeviceNumMap[symbolName];
+        diffDeviceNumMap[symbolName] = currentCount - realCount;
+    }
+
+    // fix dummy
+    for (auto& diffInfo : diffDeviceNumMap)
+    {
+        int c = 0;
+        int diff = diffInfo.second;
+
+        if (diff < 0)
+        {
+            cout << "Current dummy less than expected: " << diffInfo.first << ", diff: " << diff << endl;
+            cout << "netlist: " << realDeviceNumMap[diffInfo.first] << ", current table: " << currentDeviceNumMap[diffInfo.first] << endl;
+            // print table
+            for (int rr = 0; rr < rowSize; rr++)
+            {
+                for (int cc = 0; cc < colSize; cc++)
+                {
+                    cout << table[rr][cc].GetSymbolNameSequence() << " ";
+                }
+                cout << endl;
+            }
+        }
+
+        while (diff > 0)
+        {
+            vector<Group*> candidateGroups;
+
+            //candidateGroups.push_back(&table[r][c]);
+            //candidateGroups.push_back(&table[rowSize - 1 - r][c]);
+            //candidateGroups.push_back(&table[r][colSize - 1 - c]);
+            //candidateGroups.push_back(&table[rowSize - 1 - r][colSize - 1 - c]);
+
+
+            if (leftFirst)
+            {
+                for (; c < (colSize + 1) / 2; c++)
+                {
+                    for (int r = 0; r < (rowSize + 1) / 2; r++)
+                    {
+                        candidateGroups.push_back(&table[r][c]);
+                        candidateGroups.push_back(&table[rowSize - 1 - r][c]);
+                    }
+
+                    for (int r = 0; r < (rowSize + 1) / 2; r++)
+                    {
+                        candidateGroups.push_back(&table[r][colSize - 1 - c]);
+                        candidateGroups.push_back(&table[rowSize - 1 - r][colSize - 1 - c]);
+                    }
+                }
+            }
+            else
+            {
+                for (; c < (colSize + 1) / 2; c++)
+                {
+                    for (int r = 0; r < (rowSize + 1) / 2; r++)
+                    {
+                        candidateGroups.push_back(&table[r][colSize - 1 - c]);
+                        candidateGroups.push_back(&table[rowSize - 1 - r][colSize - 1 - c]);
+                    }
+                    for (int r = 0; r < (rowSize + 1) / 2; r++)
+                    {
+                        candidateGroups.push_back(&table[r][c]);
+                        candidateGroups.push_back(&table[rowSize - 1 - r][c]);
+                    }
+				}
+            }
+           
+
+            //cout << "target:" << diffInfo.first << ", diff:" << diff << endl;
+            for (Group* g : candidateGroups)
+            {
+                //cout << "candidate:" << g->GetSymbolNameSequence() << endl;
+                for (int i = g->GetDeviceUnits().size() - 1; i >= 0; --i)
+                {
+                    //cout << g->GetDeviceUnits()[i].GetSymbol() << " ";
+                    if (g->GetDeviceUnits()[i].GetSymbol() == diffInfo.first)
+                    {
+                        g->SetDummyPosition(i);
+                        diff--;
+
+                        if (diff <= 0)
+                        {
+                            break;
+                        }
+                    }
+                }
+                //cout << endl;
+
+                if (diff <= 0)
+                {
+                    break;
+                }
+            }
+
+            if (diff <= 0)
+            {
+                break;
+            }
+        }
+    }
+
+    // get now real device num after fixing dummy
+    unordered_map<string, int> finalDeviceNumMap;
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize; c++)
+        {
+            Group g = table[r][c];
+            for (auto& device : g.GetDeviceUnits())
+            {
+                if (finalDeviceNumMap.find(device.GetSymbol()) == finalDeviceNumMap.end())
+                {
+                    finalDeviceNumMap[device.GetSymbol()] = 0;
+                }
+                finalDeviceNumMap[device.GetSymbol()] += 1;
+            }
+        }
+    }
+    // check if final device num matches real device num
+    for (auto& realInfo : realDeviceNumMap)
+    {
+        string symbolName = realInfo.first;
+        int realCount = realInfo.second;
+        int finalCount = finalDeviceNumMap[symbolName];
+        if (finalCount != realCount)
+        {
+            cout << "Mismatch for symbol: " << symbolName << ", real count: " << realCount << ", final count: " << finalCount << endl;
+            return false; // still have mismatch, return false to indicate failure
+        }
+    }
+
+    return true; // all dummy fixed successfully
+}

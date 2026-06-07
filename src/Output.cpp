@@ -212,10 +212,10 @@ void Output::WriteSignificantNondominatedSolutionsToFile(std::string fileName)
 
 			// output pattern file
 			string patternFileName = fileName + "_" + costItem + "_Solution_" + to_string(i + 1) + ".csv";
-			//vector<string> pattern = sol.second[i].GetTableStringPattern();
-			//vector<string> rotationPattern = sol.second[i].GetTableRotationPattern(leftS);
-			vector<string> pattern = sol.second[i].GetTableStringPatternInRealDummyLength();
-			vector<string> rotationPattern = sol.second[i].GetTableRotationPatternInRealDummyLength(leftS);
+			vector<string> pattern = sol.second[i].GetTableStringPattern();
+			vector<string> rotationPattern = sol.second[i].GetTableRotationPattern(leftS);
+			//vector<string> pattern = sol.second[i].GetTableStringPatternInRealDummyLength();
+			//vector<string> rotationPattern = sol.second[i].GetTableRotationPatternInRealDummyLength(leftS);
 
 
 			ofstream patternOutFile(patternFileName);
@@ -641,8 +641,12 @@ void Output::WriteCSVCoBetterSolutionToFile(int topN, std::string fileName)
 			return;
 		}
 
-		vector<string> pattern = tableScore.first.GetTableStringPatternInRealDummyLengthUseStartDummy();
-		vector<string> rotationPattern = tableScore.first.GetTableRotationPatternInRealDummyLength(leftS);
+		/*vector<string> pattern = tableScore.first.GetTableStringPatternInRealDummyLengthUseStartDummy();
+		vector<string> rotationPattern = tableScore.first.GetTableRotationPatternInRealDummyLength(leftS);*/
+
+		vector<string> pattern = tableScore.first.GetTableStringPattern();
+		vector<string> rotationPattern = tableScore.first.GetTableRotationPattern(leftS);
+
 
 		ofstream patternOutFile(patternFileName);
 
@@ -711,8 +715,12 @@ void Output::WriteCSVCoBetterSolutionPartitionByGroupSizeToFile(int topN, std::s
 				cerr << "Error opening file: " << patternFileName << endl;
 				return;
 			}
-			vector<string> pattern = tableScore.first.GetTableStringPatternInRealDummyLength();
-			vector<string> rotationPattern = tableScore.first.GetTableRotationPatternInRealDummyLength(leftS);
+			//vector<string> pattern = tableScore.first.GetTableStringPatternInRealDummyLength();
+			//vector<string> rotationPattern = tableScore.first.GetTableRotationPatternInRealDummyLength(leftS);
+
+			vector<string> pattern = tableScore.first.GetTableStringPattern();
+			vector<string> rotationPattern = tableScore.first.GetTableRotationPattern(leftS);
+
 			ofstream patternOutFile(patternFileName);
 			if (!patternOutFile.is_open())
 			{

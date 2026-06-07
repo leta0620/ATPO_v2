@@ -123,7 +123,7 @@ void Group::BuildAllDummyGroup(int groupSize)
 	this->deviceUnits.clear();
 	DeviceUnit dummyUnit;
 	dummyUnit.SetSymbol("d");
-	dummyUnit.SetInstName("d");
+	dummyUnit.SetInstName("*");
 	dummyUnit.SetAnalogCellType("DUMMY");
 	dummyUnit.SetWidth(1);
 	dummyUnit.SetRotation(CellRotation::R0);
