@@ -5830,6 +5830,166 @@ vector<TableManager> TableManager::BuildAllCCTable()
         Group dummyG = Group();
         dummyG.BuildAllDummyGroup(groupSize);
 
+        if (rowSize == 1)
+        {
+            // row=1 時沒有 baseTable，也沒有上下鄰居。
+            // 直接產生一列 interleaving row。
+            for (auto& gSeq : groupSeqPermutations)
+            {
+                unordered_map<Group, int> remainMap;
+                int dummyCount = 0;
+                int realTotal = 0;
+
+                for (auto& groupInfo : groupNumMap)
+                {
+                    Group currentGroup = groupInfo.first;
+                    int currentCount = groupInfo.second;
+
+                    if (currentGroup.HasDummyUnit())
+                    {
+                        dummyCount += currentCount;
+                    }
+                    else
+                    {
+                        remainMap[currentGroup] += currentCount;
+                        realTotal += currentCount;
+                    }
+                }
+
+                vector<Group> singleRow(colSize, dummyG);
+
+                // dummy 優先放左右角落
+                int leftCol = 0;
+                int rightCol = colSize - 1;
+                int dummyLeft = dummyCount;
+
+                while (dummyLeft > 0 && leftCol <= rightCol)
+                {
+                    singleRow[leftCol] = dummyG;
+                    leftCol++;
+                    dummyLeft--;
+
+                    if (dummyLeft <= 0)
+                    {
+                        break;
+                    }
+
+                    if (leftCol <= rightCol)
+                    {
+                        singleRow[rightCol] = dummyG;
+                        rightCol--;
+                        dummyLeft--;
+                    }
+                }
+
+                // real group 做水平 interleaving
+                vector<Group> realSeq;
+
+                Group previousGroup;
+                bool hasPreviousGroup = false;
+
+                while (static_cast<int>(realSeq.size()) < realTotal)
+                {
+                    Group bestGroup;
+                    int bestCount = -1;
+                    bool foundBestGroup = false;
+
+                    Group fallbackGroup;
+                    int fallbackCount = -1;
+                    bool foundFallbackGroup = false;
+
+                    for (auto& group : gSeq)
+                    {
+                        if (remainMap[group] <= 0)
+                        {
+                            continue;
+                        }
+
+                        if (!foundFallbackGroup || remainMap[group] > fallbackCount)
+                        {
+                            fallbackGroup = group;
+                            fallbackCount = remainMap[group];
+                            foundFallbackGroup = true;
+                        }
+
+                        if (hasPreviousGroup && group == previousGroup)
+                        {
+                            continue;
+                        }
+
+                        if (!foundBestGroup || remainMap[group] > bestCount)
+                        {
+                            bestGroup = group;
+                            bestCount = remainMap[group];
+                            foundBestGroup = true;
+                        }
+                    }
+
+                    Group selectedGroup;
+
+                    if (foundBestGroup)
+                    {
+                        selectedGroup = bestGroup;
+                    }
+                    else if (foundFallbackGroup)
+                    {
+                        selectedGroup = fallbackGroup;
+                    }
+                    else
+                    {
+                        break;
+                    }
+
+                    realSeq.push_back(selectedGroup);
+                    remainMap[selectedGroup]--;
+
+                    previousGroup = selectedGroup;
+                    hasPreviousGroup = true;
+                }
+
+                int writeCol = leftCol;
+
+                for (int i = 0; i < static_cast<int>(realSeq.size()); i++)
+                {
+                    if (writeCol > rightCol)
+                    {
+                        break;
+                    }
+
+                    singleRow[writeCol] = realSeq[i];
+                    writeCol++;
+                }
+
+                vector<vector<Group>> singleRowTable;
+                singleRowTable.push_back(singleRow);
+
+                int dummyGroupCount = 0;
+
+                for (int c = 0; c < colSize; c++)
+                {
+                    if (singleRowTable[0][c].HasDummyUnit())
+                    {
+                        dummyGroupCount++;
+                    }
+                }
+
+                if ((double)dummyGroupCount / colSize > 0.4)
+                {
+                    continue;
+                }
+
+                TableManager singleRowTableManager(*this);
+                singleRowTableManager.table = singleRowTable;
+                singleRowTableManager.rowSize = 1;
+                singleRowTableManager.colSize = colSize;
+                singleRowTableManager.GetCostMap();
+
+                ret.push_back(singleRowTableManager);
+            }
+
+            return ret;
+        }
+
         int targetRowSize = rowSize - 1;
 
         // ==========================================================
@@ -6516,11 +6676,11 @@ bool TableManager::FixFinalDummy()
 			else if (r < c && r < (rowSize + 1) / 2) r++;
 			else r++;*/
 
-            if (r < (rowSize + 1) / 2)
+            if (r < (rowSize + 1) / 2 && r < rowSize - 1)
             {
                 r++;
             }
-            else if (c < (colSize + 1) / 2)
+            else if (c < (colSize + 1) / 2 && c < colSize - 1)
             {
                 c++;
 				r = 0;
