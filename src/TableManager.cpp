@@ -100,16 +100,86 @@ void TableManager::InitializeTable()
 
 std::vector<std::string> TableManager::GetTableStringFormat()
 {
+    vector<vector<DeviceUnit>> tablePattern;
+    for (auto& row : table)
+    {
+        vector<DeviceUnit> rowPattern;
+        for (auto& group : row)
+        {
+            for (const auto& deviceUnit : group.GetDeviceUnits())
+            {
+                rowPattern.push_back(deviceUnit);
+            }
+        }
+        tablePattern.push_back(rowPattern);
+    }
+
+    int leftDummyUnit = 0, rightDummyUnit = 0;
+    if (netlist.GetAllDeviceOnlyOneUnitFlag())
+    {
+        for (int cUnit = 0; cUnit < tablePattern[0].size(); cUnit++)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                leftDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        for (int cUnit = (int)tablePattern[0].size() - 1; cUnit >= 0; cUnit--)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                rightDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    int deviceUnitLength = tablePattern[0].size();
     std::vector<std::string> tableStrings;
 
     for (auto& row : table)
     {
         std::string rowString;
+        int outputDeviceUnitCounter = 0;
         for (auto& group : row)
         {
             for (const auto& deviceUnit : group.GetDeviceUnits())
             {
+                if (outputDeviceUnitCounter < leftDummyUnit || outputDeviceUnitCounter >= deviceUnitLength - rightDummyUnit)
+                {
+                    outputDeviceUnitCounter++;
+                    continue;
+				}
                 rowString += deviceUnit.GetSymbol();
+				outputDeviceUnitCounter++;
             }
         }
         tableStrings.push_back(rowString);
@@ -121,23 +191,94 @@ std::vector<std::string> TableManager::GetTableStringFormat()
 std::vector<std::string> TableManager::GetTableStringPattern()
 {
     std::vector<std::string> tableStrings;
+    vector<vector<DeviceUnit>> tablePattern;
+    for (auto& row : table)
+    {
+        vector<DeviceUnit> rowPattern;
+        for (auto& group : row)
+        {
+            for (const auto& deviceUnit : group.GetDeviceUnits())
+            {
+                rowPattern.push_back(deviceUnit);
+            }
+        }
+        tablePattern.push_back(rowPattern);
+	}
 
+	int leftDummyUnit = 0, rightDummyUnit = 0;
+    if (netlist.GetAllDeviceOnlyOneUnitFlag())
+    {
+        for (int cUnit = 0; cUnit < tablePattern[0].size(); cUnit++)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                leftDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        for (int cUnit = (int)tablePattern[0].size() - 1; cUnit >= 0; cUnit--)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                rightDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+	int deviceUnitLength = tablePattern[0].size();
     for (size_t rowIndex = 0; rowIndex < table.size(); rowIndex++)
     {
         auto& row = table[rowIndex];
         std::string rowString;
+        int outputDeviceUnitCounter = 0;
         for (auto& group : row)
         {
             auto deviceUnits = group.GetDeviceUnits();
             for (size_t i = 0; i < deviceUnits.size(); i++)
             {
+                if (outputDeviceUnitCounter < leftDummyUnit || outputDeviceUnitCounter >= deviceUnitLength - rightDummyUnit)
+                {
+                    outputDeviceUnitCounter++;
+                    continue;
+                }
+
                 //rowString += deviceUnits[i].GetSymbol();
                 rowString += deviceUnits[i].GetInstName();
 
-                if (i < deviceUnits.size() - 1)
+                if (i < deviceUnits.size() - 1 && outputDeviceUnitCounter < deviceUnitLength - rightDummyUnit - 1)
                 {
                     rowString += ", ";
                 }
+
+                outputDeviceUnitCounter++;
             }
             if (&group < &row.back())
             {
@@ -170,26 +311,100 @@ std::vector<std::string> TableManager::GetTableRotationFormat(bool leftS)
 
 std::vector<std::string> TableManager::GetTableRotationPattern(bool leftS)
 {
+    vector<vector<DeviceUnit>> tablePattern;
+    for (auto& row : table)
+    {
+        vector<DeviceUnit> rowPattern;
+        for (auto& group : row)
+        {
+            for (const auto& deviceUnit : group.GetDeviceUnits())
+            {
+                rowPattern.push_back(deviceUnit);
+            }
+        }
+        tablePattern.push_back(rowPattern);
+    }
+
+    int leftDummyUnit = 0, rightDummyUnit = 0;
+    if (netlist.GetAllDeviceOnlyOneUnitFlag())
+    {
+        for (int cUnit = 0; cUnit < tablePattern[0].size(); cUnit++)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                leftDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        for (int cUnit = (int)tablePattern[0].size() - 1; cUnit >= 0; cUnit--)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                rightDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    int deviceUnitLength = tablePattern[0].size();
+
     std::vector<std::string> tableRotations;
     for (size_t rowIndex = 0; rowIndex < table.size(); rowIndex++)
     {
         auto& row = table[rowIndex];
         std::string rowRotation;
+        int outputDeviceUnitCounter = 0;
         for (auto& group : row)
         {
             auto deviceUnits = group.GetDeviceUnits();
             for (size_t i = 0; i < deviceUnits.size(); i++)
             {
+                if (outputDeviceUnitCounter < leftDummyUnit || outputDeviceUnitCounter >= deviceUnitLength - rightDummyUnit)
+                {
+                    outputDeviceUnitCounter++;
+                    continue;
+				}
+
                 rowRotation += deviceUnits[i].GetStringRotation(leftS);
-                if (i < deviceUnits.size() - 1)
+                if (i < deviceUnits.size() - 1 && outputDeviceUnitCounter < deviceUnitLength - rightDummyUnit - 1)
                 {
                     rowRotation += ", ";
                 }
+
+				outputDeviceUnitCounter++;
             }
             if (&group < &row.back())
             {
                 rowRotation += ", ";
             }
+			
         }
         tableRotations.push_back(rowRotation);
     }
@@ -4823,7 +5038,7 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
 		}
 
         return static_cast<double>(dummyGroupCount)
-            / static_cast<double>(currentRowSize * currentColSize) > 0.4;
+            / static_cast<double>(currentRowSize * currentColSize) > 0.51;
         };
     auto PushTableManagerIfLegal = [&](const vector<vector<Group>>& inputTable, bool fixDummyLeftFirst) {
         vector<vector<Group>> currentTable = inputTable;
@@ -4932,7 +5147,7 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
 	ret.insert(ret.end(), LegalFlipTables.begin(), LegalFlipTables.end());
 
 	// print all generated tables
-    for (TableManager& tm : ret)
+    /*for (TableManager& tm : ret)
     {
         cout << "Generated Table:" << endl;
         for (auto& row : tm.table)
@@ -4944,7 +5159,7 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
             cout << endl;
         }
         cout << endl;
-    }
+    }*/
 
 	// if has same table, only keep one
 	vector<TableManager> uniqueRet;
@@ -4964,6 +5179,23 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
             uniqueRet.push_back(tm);
         }
 	}
+
+	// print unique tables
+	//cout << "Unique Tables:" << endl;
+	//int index = 1;
+ //   for (TableManager& tm : uniqueRet)
+ //   {
+ //       cout << "Unique Table " << index << endl;
+ //       for (auto& row : tm.table)
+ //       {
+ //           for (auto& group : row)
+ //           {
+ //               cout << group.GetSymbolNameSequence() << " ";
+ //           }
+ //           cout << endl;
+ //       }
+ //       cout << endl;
+	//}
 
     return uniqueRet;
 }
@@ -5567,10 +5799,10 @@ vector<TableManager> TableManager::BuildAllCCTable()
             //newTableManager.PrintTableToConsole();
             //cout << "\n-----------------------------\n";
 
-            if ((double)dummyGroupCount / (rowSize * colSize) > 0.4)
-            {
-                continue; // skip this table
-            }
+            //if ((double)dummyGroupCount / (rowSize * colSize) > 0.51)
+            //{
+            //    continue; // skip this table
+            //}
 
             ret.push_back(newTableManager);
 
@@ -5597,6 +5829,166 @@ vector<TableManager> TableManager::BuildAllCCTable()
     {
         Group dummyG = Group();
         dummyG.BuildAllDummyGroup(groupSize);
+
+        if (rowSize == 1)
+        {
+            // row=1 時沒有 baseTable，也沒有上下鄰居。
+            // 直接產生一列 interleaving row。
+            for (auto& gSeq : groupSeqPermutations)
+            {
+                unordered_map<Group, int> remainMap;
+                int dummyCount = 0;
+                int realTotal = 0;
+
+                for (auto& groupInfo : groupNumMap)
+                {
+                    Group currentGroup = groupInfo.first;
+                    int currentCount = groupInfo.second;
+
+                    if (currentGroup.HasDummyUnit())
+                    {
+                        dummyCount += currentCount;
+                    }
+                    else
+                    {
+                        remainMap[currentGroup] += currentCount;
+                        realTotal += currentCount;
+                    }
+                }
+
+                vector<Group> singleRow(colSize, dummyG);
+
+                // dummy 優先放左右角落
+                int leftCol = 0;
+                int rightCol = colSize - 1;
+                int dummyLeft = dummyCount;
+
+                while (dummyLeft > 0 && leftCol <= rightCol)
+                {
+                    singleRow[leftCol] = dummyG;
+                    leftCol++;
+                    dummyLeft--;
+
+                    if (dummyLeft <= 0)
+                    {
+                        break;
+                    }
+
+                    if (leftCol <= rightCol)
+                    {
+                        singleRow[rightCol] = dummyG;
+                        rightCol--;
+                        dummyLeft--;
+                    }
+                }
+
+                // real group 做水平 interleaving
+                vector<Group> realSeq;
+
+                Group previousGroup;
+                bool hasPreviousGroup = false;
+
+                while (static_cast<int>(realSeq.size()) < realTotal)
+                {
+                    Group bestGroup;
+                    int bestCount = -1;
+                    bool foundBestGroup = false;
+
+                    Group fallbackGroup;
+                    int fallbackCount = -1;
+                    bool foundFallbackGroup = false;
+
+                    for (auto& group : gSeq)
+                    {
+                        if (remainMap[group] <= 0)
+                        {
+                            continue;
+                        }
+
+                        if (!foundFallbackGroup || remainMap[group] > fallbackCount)
+                        {
+                            fallbackGroup = group;
+                            fallbackCount = remainMap[group];
+                            foundFallbackGroup = true;
+                        }
+
+                        if (hasPreviousGroup && group == previousGroup)
+                        {
+                            continue;
+                        }
+
+                        if (!foundBestGroup || remainMap[group] > bestCount)
+                        {
+                            bestGroup = group;
+                            bestCount = remainMap[group];
+                            foundBestGroup = true;
+                        }
+                    }
+
+                    Group selectedGroup;
+
+                    if (foundBestGroup)
+                    {
+                        selectedGroup = bestGroup;
+                    }
+                    else if (foundFallbackGroup)
+                    {
+                        selectedGroup = fallbackGroup;
+                    }
+                    else
+                    {
+                        break;
+                    }
+
+                    realSeq.push_back(selectedGroup);
+                    remainMap[selectedGroup]--;
+
+                    previousGroup = selectedGroup;
+                    hasPreviousGroup = true;
+                }
+
+                int writeCol = leftCol;
+
+                for (int i = 0; i < static_cast<int>(realSeq.size()); i++)
+                {
+                    if (writeCol > rightCol)
+                    {
+                        break;
+                    }
+
+                    singleRow[writeCol] = realSeq[i];
+                    writeCol++;
+                }
+
+                vector<vector<Group>> singleRowTable;
+                singleRowTable.push_back(singleRow);
+
+                int dummyGroupCount = 0;
+
+                for (int c = 0; c < colSize; c++)
+                {
+                    if (singleRowTable[0][c].HasDummyUnit())
+                    {
+                        dummyGroupCount++;
+                    }
+                }
+
+                //if ((double)dummyGroupCount / colSize > 0.51)
+                //{
+                //    continue;
+                //}
+
+                TableManager singleRowTableManager(*this);
+                singleRowTableManager.table = singleRowTable;
+                singleRowTableManager.rowSize = 1;
+                singleRowTableManager.colSize = colSize;
+                singleRowTableManager.GetCostMap();
+
+                ret.push_back(singleRowTableManager);
+            }
+
+            return ret;
+        }
 
         int targetRowSize = rowSize - 1;
 
@@ -6142,13 +6534,13 @@ vector<TableManager> TableManager::BuildAllCCTable()
                 }
             }
 
-            if ((double)dummyGroupCount / (rowSize * colSize) <= 0.4)
-            {
+            //if ((double)dummyGroupCount / (rowSize * colSize) <= 0.4)
+            //{
                 TableManager bottomTableManager(*this);
                 bottomTableManager.table = bottomExtraTable;
                 bottomTableManager.GetCostMap();
                 ret.push_back(bottomTableManager);
-            }
+            //}
 
 
             // ======================================================
@@ -6167,13 +6559,13 @@ vector<TableManager> TableManager::BuildAllCCTable()
                 }
             }
 
-            if ((double)dummyGroupCount / (rowSize * colSize) <= 0.4)
-            {
+            //if ((double)dummyGroupCount / (rowSize * colSize) <= 0.4)
+            //{
                 TableManager topTableManager(*this);
                 topTableManager.table = topExtraTable;
                 topTableManager.GetCostMap();
                 ret.push_back(topTableManager);
-            }
+            //}
         }
     }
     return ret;
@@ -6284,11 +6676,11 @@ bool TableManager::FixFinalDummy()
 			else if (r < c && r < (rowSize + 1) / 2) r++;
 			else r++;*/
 
-            if (r < (rowSize + 1) / 2)
+            if (r < (rowSize + 1) / 2 && r < rowSize - 1)
             {
                 r++;
             }
-            else if (c < (colSize + 1) / 2)
+            else if (c < (colSize + 1) / 2 && c < colSize - 1)
             {
                 c++;
 				r = 0;
@@ -6504,4 +6896,31 @@ bool TableManager::FixFinalDummyColFirst(bool leftFirst)
     }
 
     return true; // all dummy fixed successfully
+}
+
+void TableManager::FixNoAllSourceCommonFlagDummy()
+{
+    if (netlist.GetNoAllSourceCommonFlag() == false)
+    {
+        return;
+	}
+
+    DeviceUnit dummyUnit;
+    dummyUnit.SetAnalogCellType("dummy");
+    dummyUnit.SetSymbol("d");
+    dummyUnit.SetInstName("*");
+    dummyUnit.SetRotation(CellRotation::R0);
+    dummyUnit.SetWidth(1);
+
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize - 1; c++)
+        {
+            Group& g = table[r][c];
+
+			g.AddDeviceUnit(dummyUnit);
+        }
+	}
+
+	this->groupSize += 1;
 }

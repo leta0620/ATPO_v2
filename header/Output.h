@@ -1,6 +1,7 @@
 #pragma once
 #include "TableManager.h"
 #include "OuterInput.h"
+#include "NetListLookupTable.h"
 #include <map>
 #include <vector>
 #include <string>
@@ -8,8 +9,8 @@
 class Output
 {
 public:
-	Output(int group, int rowSize, std::map<int, std::vector<TableManager>>& allNondominatedSolutions, std::string sOrD, std::unordered_map<std::string, std::string> labelNameMapInstName, std::unordered_map<std::string, std::string> instNameMapLabelName, bool flipLeftHalf) :
-		group(group), rowSize(rowSize), allNondominatedSolutions(allNondominatedSolutions), labelNameMapInstName(labelNameMapInstName), instNameMapLabelName(instNameMapLabelName), flipLeftHalf(flipLeftHalf)
+	Output(int group, int rowSize, std::map<int, std::vector<TableManager>>& allNondominatedSolutions, std::string sOrD, std::unordered_map<std::string, std::string> labelNameMapInstName, std::unordered_map<std::string, std::string> instNameMapLabelName, bool flipLeftHalf, NetlistLookupTable netlist) :
+		group(group), rowSize(rowSize), allNondominatedSolutions(allNondominatedSolutions), labelNameMapInstName(labelNameMapInstName), instNameMapLabelName(instNameMapLabelName), flipLeftHalf(flipLeftHalf), netlist(netlist)
 	{  
 		if (sOrD == "S" || sOrD == "s")
 			leftS = true;
@@ -68,4 +69,6 @@ private:
 
 	std::unordered_map<std::string, std::string> labelNameMapInstName; // label name -> inst name
 	std::unordered_map<std::string, std::string> instNameMapLabelName; // inst name -> label name
+
+	NetlistLookupTable netlist;
 };
