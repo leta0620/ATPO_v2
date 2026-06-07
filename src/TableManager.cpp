@@ -6505,3 +6505,30 @@ bool TableManager::FixFinalDummyColFirst(bool leftFirst)
 
     return true; // all dummy fixed successfully
 }
+
+void TableManager::FixNoAllSourceCommonFlagDummy()
+{
+    if (netlist.GetNoAllSourceCommonFlag() == false)
+    {
+        return;
+	}
+
+    DeviceUnit dummyUnit;
+    dummyUnit.SetAnalogCellType("dummy");
+    dummyUnit.SetSymbol("d");
+    dummyUnit.SetInstName("*");
+    dummyUnit.SetRotation(CellRotation::R0);
+    dummyUnit.SetWidth(1);
+
+    for (int r = 0; r < rowSize; r++)
+    {
+        for (int c = 0; c < colSize - 1; c++)
+        {
+            Group& g = table[r][c];
+
+			g.AddDeviceUnit(dummyUnit);
+        }
+	}
+
+	this->groupSize += 1;
+}

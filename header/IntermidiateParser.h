@@ -28,6 +28,8 @@ private:
 	std::vector<std::string> commonSourceCellList;
 	NetlistLookupTable netlistLookupTable;
 
+	bool commonSourceFlag = false; // if true, means there is common source case, so the commonSourceCellList is valid and can be used
+
 	// Device instances tmp data
 	std::vector<std::tuple< std::string, std::string, std::string, int, int>> deviceInstanceList; // cellName, synbolName, analogcellType, unitCount), Device instances tmp data. e.g. MM0 A analogcell 720
 	std::vector<std::vector<std::string>> connectionList; // each connection is a list of net names, Device instances tmp data

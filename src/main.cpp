@@ -176,7 +176,10 @@ int main(int argc, char* argv[]) {
 				table.FlipLeftHalf();
 			}
 
-			
+			for (auto& table : ccTables)
+			{
+				table.FixNoAllSourceCommonFlagDummy();
+			}
 
 			allNondominatedSolutions[i] = ccTables;
 			cout << "\r";
@@ -218,6 +221,11 @@ int main(int argc, char* argv[]) {
 				table.FlipLeftHalf();
 			}
 
+			for (auto& table : interleavingTables)
+			{
+				table.FixNoAllSourceCommonFlagDummy();
+			}
+
 			allNondominatedSolutions[i] = interleavingTables;
 
 			cout << "\r";
@@ -232,7 +240,6 @@ int main(int argc, char* argv[]) {
 		if (thread_num == 1)
 		{
 			// Single thread SA
-
 			for (int i = 0; i < initialTableList.size(); ++i)
 			{
 				initialTableList[i].FlipLeftHalf();
@@ -258,6 +265,11 @@ int main(int argc, char* argv[]) {
 				for (auto& table : nondominatedSolutions)
 				{
 					table.FlipRightHalf();
+				}
+
+				for (auto& table : nondominatedSolutions)
+				{
+					table.FixNoAllSourceCommonFlagDummy();
 				}
 
 				allNondominatedSolutions[i] = nondominatedSolutions;
@@ -324,6 +336,12 @@ int main(int argc, char* argv[]) {
 					{
 						table.FlipRightHalf();
 					}
+
+					for (auto& table : nondominatedSolutions)
+					{
+						table.FixNoAllSourceCommonFlagDummy();
+					}
+
 					results[i] = std::move(nondominatedSolutions);
 				}
 				};
@@ -366,7 +384,7 @@ int main(int argc, char* argv[]) {
 
 	if (stoi(sa_mode_str) == 2)
 	{
-		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), true);
+		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), true, parser.GetNetlistLookupTable());
 
 		output.WriteAllResultToFile(output_file_path + "all_results.txt");
 		//output.PrintAllResult();
@@ -387,7 +405,7 @@ int main(int argc, char* argv[]) {
 	}
 	else
 	{
-		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), false);
+		Output output(groupSize, row_num, allNondominatedSolutions, left_is_S_or_D, outerInput.GetLabelNameMapInstName(), outerInput.GetInstNameMapLabelName(), false, parser.GetNetlistLookupTable());
 
 		output.WriteAllResultToFile(output_file_path + "all_results.txt");
 		//output.PrintAllResult();

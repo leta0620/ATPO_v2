@@ -88,6 +88,8 @@ public:
 	bool FixFinalDummy();
 	bool FixFinalDummyColFirst(bool leftFirst);
 
+	void FixNoAllSourceCommonFlagDummy();
+
 	// cost part
 	std::unordered_map<CostEnum, double> costMap;
 	// Routing length switch: 0 = skip in dominance/perturbation, 1 = include.

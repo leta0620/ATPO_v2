@@ -20,8 +20,12 @@ public:
 
 	std::vector<std::string> GetAllSymbolNames();
 
+	bool GetNoAllSourceCommonFlag() const { return noAllSourceCommonFlag; }
+	void SetNoAllSourceCommonFlag(bool flag) { noAllSourceCommonFlag = flag; }
 private:
 	std::vector<std::string> commonSourceList;
 
 	std::unordered_map<std::string, NetlistUnit> netlistUnitMap; // key(synbolName) -> NetlistUnit
+
+	bool noAllSourceCommonFlag = false;// true : common source沒有全部連在一起
 };

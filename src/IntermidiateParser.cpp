@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 using namespace std;
 
 bool IntermidiateParser::Parse()
@@ -144,6 +145,62 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 		unit.SetDeviceWidth(deviceWidth);
 		tempNetlistMap[synbolName] = unit;
 	}
+
+	// check connection list中是否有單獨S pin但不在common source list中
+	// 移除，並加入common source list，因為這些S pin也是source common的
+	// 設定noAllSourceCommonFlag為false，表示有source common的情況，commonSourceCellList是有效的，可以使用
+	// 同時這些S pin的symbol name也要加入common source list中，因為在後續建立netlist lookup table的時候會根據common source list來建立source common的net connection
+	vector<int> removeFromConnectionList; // to store the connection that need to be removed from connection list after iterating, because we cannot modify the connection list while iterating
+	for (int i = 0; i < this->connectionList.size(); i++)
+	{
+		if (connectionList[i].size() > 2)
+		{
+			cerr << "Error: More than two connections in other connection list." << endl;
+			return false;
+		}
+		else if (connectionList[i].size() == 0)
+		{
+			cerr << "Error: Empty connection in other connection list." << endl;
+			return false;
+		}
+		else if (connectionList[i].size() == 2) continue; // if there are 2 connections, it is not source common case, so skip
+		else if (connectionList[i].size() == 1)
+		{
+			string deviceWithPin = connectionList[i][0];
+			string synbolName, pinName;
+			size_t pos = deviceWithPin.find('.');
+			if (pos == string::npos)
+			{
+				cerr << "Error: Invalid cell name format in other connection list: " << deviceWithPin << endl;
+				return false;
+			}
+			else
+			{
+				//synbolName = deviceWithPin.substr(0, pos);
+				//pinName = deviceWithPin.substr(pos + 1);
+				pair<string, string> cellAndPin = SplitCellAndPin(deviceWithPin);
+				synbolName = cellAndPin.first;
+				pinName = cellAndPin.second;
+
+				if (pinName == "S")
+				{
+					// if the pin is S pin, but not in common source list, then add it to common source list
+					if (find(this->commonSourceCellList.begin(), this->commonSourceCellList.end(), deviceWithPin) == this->commonSourceCellList.end())
+					{
+						this->commonSourceCellList.push_back(deviceWithPin);
+						this->netlistLookupTable.SetNoAllSourceCommonFlag(true);
+						removeFromConnectionList.push_back(i); // mark this connection to be removed from connection list later
+					}
+				}
+			}
+		}
+	}
+
+	for (int i = removeFromConnectionList.size() - 1; i >= 0; i--)
+	{
+		connectionList.erase(connectionList.begin() + removeFromConnectionList[i]);
+	}
+	
 
 	// build real common source device list
 	vector<string> realCommonSourceList;
