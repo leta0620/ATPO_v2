@@ -242,8 +242,8 @@ std::unordered_map<CostEnum, double> TableManager::CalculateTableCost()
             // HierCongestion 暫時保留程式碼但不擾動 SA:寫 0 維持 costMap entry,
             // 函式定義在 line ~2172 仍然完整保留(SHARED-tree 版本)。
             // 要重啟,刪除下面 = 0 那行並還原 CalculateHierCongestionCost() 呼叫。
-            //this->CalculateHierCongestionCost();
-            costMap[CostEnum::hierCongestionCost] = 0.0;
+            this->CalculateHierCongestionCost();
+            //costMap[CostEnum::hierCongestionCost] = 0.0;
             break;
         case CostEnum::hierCCost:
             this->CalculateHierCCost();
@@ -1590,7 +1590,7 @@ std::vector<std::pair<std::string, double>> TableManager::GetCostNameAndCostValu
     {
         // HierCongestion 暫時停用 → 從輸出顯示中隱藏
         // 函式定義 (line ~2172) 跟 case (line ~227) 都保留,要恢復就把這幾行 // 拿掉
-        if (costEnum == CostEnum::hierCongestionCost) continue;
+        //if (costEnum == CostEnum::hierCongestionCost) continue;
 
         std::string costName;
 
@@ -4883,10 +4883,10 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
         }
 
         // ✅ dummy ratio 要放在 FixFinalDummy 後面
-        if (IsDummyRatioTooHigh(currentTableManager.table))
-        {
-            return;
-        }
+        //if (IsDummyRatioTooHigh(currentTableManager.table))
+        //{
+        //    return;
+        //}
 
         currentTableManager.GetCostMap();
 
