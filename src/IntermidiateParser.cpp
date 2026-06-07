@@ -155,8 +155,9 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 	{
 		if (connectionList[i].size() > 2)
 		{
-			cerr << "Error: More than two connections in other connection list." << endl;
-			return false;
+			//cerr << "Error: More than two connections in other connection list." << endl;
+			//return false;
+			cout << "Warning: More than two connections in other connection list. Ignore this connection." << endl;
 		}
 		else if (connectionList[i].size() == 0)
 		{
@@ -259,8 +260,9 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 	{
 		if (linkList.size() > 2)
 		{
-			cerr << "Error: More than two connections in other connection list." << endl;
-			return false;
+			//cerr << "Error: More than two connections in other connection list." << endl;
+			//return false;
+			cout << "Warning: More than two connections in other connection list. Ignore this connection." << endl;
 		}
 		else if (linkList.size() == 2)
 		{

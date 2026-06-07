@@ -111,7 +111,7 @@ std::vector<std::string> BuildDrainBranch(NetlistLookupTable& netlistLookupTable
 		visited.insert(currentSymbol);
 
 		auto next = netlistLookupTable.GetPinDLinkWho(currentSymbol);
-		if (next.first.empty() || next.second.empty())
+		if (next.first.empty() || next.second.empty() || next.second == "D")
 		{
 			break;
 		}
@@ -454,7 +454,7 @@ void BuildGroupsFromConfigurations(
 			while (nowNode != "")
 			{
 				currentGroupSymbolList.push_back(nowNode);
-				if (netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).first != nowNode)
+				if (netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).first != nowNode && netListLookupTable.GetPinDLinkWho(nowNode).second != "D")
 					nowNode = netListLookupTable.GetPinDLinkWho(commonSourceOrder[j]).first;
 				else
 					nowNode = "";
@@ -792,7 +792,10 @@ void InitialPlacement::GroupAllocation()
 	{
 		NetlistUnit unit = netListLookupTable.GetNetlistUnit(nowSourceSymbol);
 		deviceUnitCountList.push_back(unit.GetDeviceUnitCount() / baseScale);
-		nowSourceSymbol = netListLookupTable.GetPinDLinkWho(nowSourceSymbol).first;
+		if (netListLookupTable.GetPinDLinkWho(nowSourceSymbol).first != nowSourceSymbol && netListLookupTable.GetPinDLinkWho(nowSourceSymbol).second != "D")
+			nowSourceSymbol = netListLookupTable.GetPinDLinkWho(nowSourceSymbol).first;
+		else
+			nowSourceSymbol = "";
 	}
 
 	std::vector<std::vector<int>> validGroupConfigurations;
