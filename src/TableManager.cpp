@@ -5799,10 +5799,10 @@ vector<TableManager> TableManager::BuildAllCCTable()
             //newTableManager.PrintTableToConsole();
             //cout << "\n-----------------------------\n";
 
-            if ((double)dummyGroupCount / (rowSize * colSize) > 0.4)
-            {
-                continue; // skip this table
-            }
+            //if ((double)dummyGroupCount / (rowSize * colSize) > 0.51)
+            //{
+            //    continue; // skip this table
+            //}
 
             ret.push_back(newTableManager);
 
@@ -5973,10 +5973,10 @@ vector<TableManager> TableManager::BuildAllCCTable()
                     }
                 }
 
-                if ((double)dummyGroupCount / colSize > 0.4)
-                {
-                    continue;
-                }
+                //if ((double)dummyGroupCount / colSize > 0.51)
+                //{
+                //    continue;
+                //}
 
                 TableManager singleRowTableManager(*this);
                 singleRowTableManager.table = singleRowTable;
@@ -6534,13 +6534,13 @@ vector<TableManager> TableManager::BuildAllCCTable()
                 }
             }
 
-            if ((double)dummyGroupCount / (rowSize * colSize) <= 0.4)
-            {
+            //if ((double)dummyGroupCount / (rowSize * colSize) <= 0.4)
+            //{
                 TableManager bottomTableManager(*this);
                 bottomTableManager.table = bottomExtraTable;
                 bottomTableManager.GetCostMap();
                 ret.push_back(bottomTableManager);
-            }
+            //}
 
 
             // ======================================================
@@ -6559,13 +6559,13 @@ vector<TableManager> TableManager::BuildAllCCTable()
                 }
             }
 
-            if ((double)dummyGroupCount / (rowSize * colSize) <= 0.4)
-            {
+            //if ((double)dummyGroupCount / (rowSize * colSize) <= 0.4)
+            //{
                 TableManager topTableManager(*this);
                 topTableManager.table = topExtraTable;
                 topTableManager.GetCostMap();
                 ret.push_back(topTableManager);
-            }
+            //}
         }
     }
     return ret;
