@@ -273,7 +273,7 @@ std::vector<std::string> TableManager::GetTableStringPattern()
                 //rowString += deviceUnits[i].GetSymbol();
                 rowString += deviceUnits[i].GetInstName();
 
-                if (i < deviceUnits.size() - 1)
+                if (i < deviceUnits.size() - 1 && outputDeviceUnitCounter < deviceUnitLength - rightDummyUnit - 1)
                 {
                     rowString += ", ";
                 }
@@ -393,7 +393,7 @@ std::vector<std::string> TableManager::GetTableRotationPattern(bool leftS)
 				}
 
                 rowRotation += deviceUnits[i].GetStringRotation(leftS);
-                if (i < deviceUnits.size() - 1)
+                if (i < deviceUnits.size() - 1 && outputDeviceUnitCounter < deviceUnitLength - rightDummyUnit - 1)
                 {
                     rowRotation += ", ";
                 }
