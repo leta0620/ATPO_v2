@@ -372,5 +372,23 @@ bool IntermidiateParser::GenerateNetlistLookupTable()
 		this->netlistLookupTable.AddNetlistUnit(pair.second);
 	}
 
+	CheckAllDeviceOnlyOneUnit();
+	this->netlistLookupTable.SetAllDeviceOnlyOneUnitFlag(this->AllDeviceOnlyOneUnitFlag);
+
 	return true;
+}
+
+void IntermidiateParser::CheckAllDeviceOnlyOneUnit()
+{
+	bool allOneUnit = true;
+	for (const auto& deviceInstance : this->deviceInstanceList)
+	{
+		const auto& [instName, synbolName, analogcellType, unitCount, deviceWidth] = deviceInstance;
+		if (unitCount != 1)
+		{
+			allOneUnit = false;
+			break;
+		}
+	}
+	this->AllDeviceOnlyOneUnitFlag = allOneUnit;
 }

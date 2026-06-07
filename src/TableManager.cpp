@@ -100,16 +100,86 @@ void TableManager::InitializeTable()
 
 std::vector<std::string> TableManager::GetTableStringFormat()
 {
+    vector<vector<DeviceUnit>> tablePattern;
+    for (auto& row : table)
+    {
+        vector<DeviceUnit> rowPattern;
+        for (auto& group : row)
+        {
+            for (const auto& deviceUnit : group.GetDeviceUnits())
+            {
+                rowPattern.push_back(deviceUnit);
+            }
+        }
+        tablePattern.push_back(rowPattern);
+    }
+
+    int leftDummyUnit = 0, rightDummyUnit = 0;
+    if (netlist.GetAllDeviceOnlyOneUnitFlag())
+    {
+        for (int cUnit = 0; cUnit < tablePattern[0].size(); cUnit++)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                leftDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        for (int cUnit = (int)tablePattern[0].size() - 1; cUnit >= 0; cUnit--)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                rightDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    int deviceUnitLength = tablePattern[0].size();
     std::vector<std::string> tableStrings;
 
     for (auto& row : table)
     {
         std::string rowString;
+        int outputDeviceUnitCounter = 0;
         for (auto& group : row)
         {
             for (const auto& deviceUnit : group.GetDeviceUnits())
             {
+                if (outputDeviceUnitCounter < leftDummyUnit || outputDeviceUnitCounter >= deviceUnitLength - rightDummyUnit)
+                {
+                    outputDeviceUnitCounter++;
+                    continue;
+				}
                 rowString += deviceUnit.GetSymbol();
+				outputDeviceUnitCounter++;
             }
         }
         tableStrings.push_back(rowString);
@@ -121,16 +191,85 @@ std::vector<std::string> TableManager::GetTableStringFormat()
 std::vector<std::string> TableManager::GetTableStringPattern()
 {
     std::vector<std::string> tableStrings;
+    vector<vector<DeviceUnit>> tablePattern;
+    for (auto& row : table)
+    {
+        vector<DeviceUnit> rowPattern;
+        for (auto& group : row)
+        {
+            for (const auto& deviceUnit : group.GetDeviceUnits())
+            {
+                rowPattern.push_back(deviceUnit);
+            }
+        }
+        tablePattern.push_back(rowPattern);
+	}
 
+	int leftDummyUnit = 0, rightDummyUnit = 0;
+    if (netlist.GetAllDeviceOnlyOneUnitFlag())
+    {
+        for (int cUnit = 0; cUnit < tablePattern[0].size(); cUnit++)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                leftDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        for (int cUnit = (int)tablePattern[0].size() - 1; cUnit >= 0; cUnit--)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                rightDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+	int deviceUnitLength = tablePattern[0].size();
     for (size_t rowIndex = 0; rowIndex < table.size(); rowIndex++)
     {
         auto& row = table[rowIndex];
         std::string rowString;
+        int outputDeviceUnitCounter = 0;
         for (auto& group : row)
         {
             auto deviceUnits = group.GetDeviceUnits();
             for (size_t i = 0; i < deviceUnits.size(); i++)
             {
+                if (outputDeviceUnitCounter < leftDummyUnit || outputDeviceUnitCounter >= deviceUnitLength - rightDummyUnit)
+                {
+                    outputDeviceUnitCounter++;
+                    continue;
+                }
+
                 //rowString += deviceUnits[i].GetSymbol();
                 rowString += deviceUnits[i].GetInstName();
 
@@ -138,6 +277,8 @@ std::vector<std::string> TableManager::GetTableStringPattern()
                 {
                     rowString += ", ";
                 }
+
+                outputDeviceUnitCounter++;
             }
             if (&group < &row.back())
             {
@@ -170,26 +311,100 @@ std::vector<std::string> TableManager::GetTableRotationFormat(bool leftS)
 
 std::vector<std::string> TableManager::GetTableRotationPattern(bool leftS)
 {
+    vector<vector<DeviceUnit>> tablePattern;
+    for (auto& row : table)
+    {
+        vector<DeviceUnit> rowPattern;
+        for (auto& group : row)
+        {
+            for (const auto& deviceUnit : group.GetDeviceUnits())
+            {
+                rowPattern.push_back(deviceUnit);
+            }
+        }
+        tablePattern.push_back(rowPattern);
+    }
+
+    int leftDummyUnit = 0, rightDummyUnit = 0;
+    if (netlist.GetAllDeviceOnlyOneUnitFlag())
+    {
+        for (int cUnit = 0; cUnit < tablePattern[0].size(); cUnit++)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                leftDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        for (int cUnit = (int)tablePattern[0].size() - 1; cUnit >= 0; cUnit--)
+        {
+            bool columnAllDummy = true;
+            for (int rUnit = 0; rUnit < tablePattern.size(); rUnit++)
+            {
+                auto& deviceUnit = tablePattern[rUnit][cUnit];
+                if (deviceUnit.GetSymbol() != "d")
+                {
+                    columnAllDummy = false;
+                    break;
+                }
+            }
+            if (columnAllDummy)
+            {
+                rightDummyUnit += 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    int deviceUnitLength = tablePattern[0].size();
+
     std::vector<std::string> tableRotations;
     for (size_t rowIndex = 0; rowIndex < table.size(); rowIndex++)
     {
         auto& row = table[rowIndex];
         std::string rowRotation;
+        int outputDeviceUnitCounter = 0;
         for (auto& group : row)
         {
             auto deviceUnits = group.GetDeviceUnits();
             for (size_t i = 0; i < deviceUnits.size(); i++)
             {
+                if (outputDeviceUnitCounter < leftDummyUnit || outputDeviceUnitCounter >= deviceUnitLength - rightDummyUnit)
+                {
+                    outputDeviceUnitCounter++;
+                    continue;
+				}
+
                 rowRotation += deviceUnits[i].GetStringRotation(leftS);
                 if (i < deviceUnits.size() - 1)
                 {
                     rowRotation += ", ";
                 }
+
+				outputDeviceUnitCounter++;
             }
             if (&group < &row.back())
             {
                 rowRotation += ", ";
             }
+			
         }
         tableRotations.push_back(rowRotation);
     }
@@ -4823,7 +5038,7 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
 		}
 
         return static_cast<double>(dummyGroupCount)
-            / static_cast<double>(currentRowSize * currentColSize) > 0.4;
+            / static_cast<double>(currentRowSize * currentColSize) > 0.51;
         };
     auto PushTableManagerIfLegal = [&](const vector<vector<Group>>& inputTable, bool fixDummyLeftFirst) {
         vector<vector<Group>> currentTable = inputTable;
@@ -4932,7 +5147,7 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
 	ret.insert(ret.end(), LegalFlipTables.begin(), LegalFlipTables.end());
 
 	// print all generated tables
-    for (TableManager& tm : ret)
+    /*for (TableManager& tm : ret)
     {
         cout << "Generated Table:" << endl;
         for (auto& row : tm.table)
@@ -4944,7 +5159,7 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
             cout << endl;
         }
         cout << endl;
-    }
+    }*/
 
 	// if has same table, only keep one
 	vector<TableManager> uniqueRet;
@@ -4964,6 +5179,23 @@ vector<TableManager> TableManager::BuildAllInterleavingTable()
             uniqueRet.push_back(tm);
         }
 	}
+
+	// print unique tables
+	//cout << "Unique Tables:" << endl;
+	//int index = 1;
+ //   for (TableManager& tm : uniqueRet)
+ //   {
+ //       cout << "Unique Table " << index << endl;
+ //       for (auto& row : tm.table)
+ //       {
+ //           for (auto& group : row)
+ //           {
+ //               cout << group.GetSymbolNameSequence() << " ";
+ //           }
+ //           cout << endl;
+ //       }
+ //       cout << endl;
+	//}
 
     return uniqueRet;
 }

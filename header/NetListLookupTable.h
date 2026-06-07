@@ -22,10 +22,13 @@ public:
 
 	bool GetNoAllSourceCommonFlag() const { return noAllSourceCommonFlag; }
 	void SetNoAllSourceCommonFlag(bool flag) { noAllSourceCommonFlag = flag; }
+	void SetAllDeviceOnlyOneUnitFlag(bool flag) { allDeviceOnlyOneUnitFlag = flag; }
+	bool GetAllDeviceOnlyOneUnitFlag() const { return allDeviceOnlyOneUnitFlag; }
 private:
 	std::vector<std::string> commonSourceList;
 
 	std::unordered_map<std::string, NetlistUnit> netlistUnitMap; // key(synbolName) -> NetlistUnit
 
 	bool noAllSourceCommonFlag = false;// true : common source沒有全部連在一起
+	bool allDeviceOnlyOneUnitFlag = false; // true : all device only have one unit, so the group allocation can be simplified, and some cost can be simplified as well
 };

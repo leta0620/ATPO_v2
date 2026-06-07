@@ -138,6 +138,8 @@ int main(int argc, char* argv[]) {
 
 	map<int, vector<TableManager>> allNondominatedSolutions;
 	
+
+	
 	// Calculate non-dominated solutions for each round
 	if (stoi(sa_mode_str) == 4)
 	{
