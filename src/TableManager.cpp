@@ -884,7 +884,7 @@ void TableManager::CalculateSpetationCost() {
     }
 
     const double rho_u = 0.5;
-    const double l_r = 1.0;
+    const double l_r = 2.3;   // K=2.3: vertical/horizontal center-to-center ratio
     const double l_c = 1.0;
 
     auto rho_of = [&](const Pt& a, const Pt& b)->double {
@@ -987,7 +987,7 @@ void TableManager::CalculateRoutinglength()
     for (int r = 0; r + 1 < R; ++r)
         for (int c = 0; c < C; ++c)
             if (isAllSameSig(r, r + 2, c, c + 1)) cnt_v++;
-    const bool h_init = (cnt_h >= cnt_v);
+    const bool h_init = false;  // forced: always vertical-first (2x1)
 
     vector<std::pair<int, int>> steps;
     {
@@ -2476,7 +2476,7 @@ void TableManager::CalculateHierCongestionCost()
     for (int r = 0; r + 1 < R; ++r)
         for (int c = 0; c < C; ++c)
             if (isAllSameSig(r, r + 2, c, c + 1)) cnt_v++;
-    const bool h_init = (cnt_h >= cnt_v);
+    const bool h_init = false;  // forced: always vertical-first (2x1)
 
     vector<std::pair<int, int>> steps;
     {
@@ -3087,7 +3087,7 @@ void TableManager::CalculateHierCCost()
     for (int r = 0; r + 1 < R; ++r)
         for (int c = 0; c < C; ++c)
             if (isAllSameSig(r, r + 2, c, c + 1)) cnt_v++;
-    const bool h_init = (cnt_h >= cnt_v);
+    const bool h_init = false;  // forced: always vertical-first (2x1)
 
     vector<std::pair<int, int>> steps;
     {

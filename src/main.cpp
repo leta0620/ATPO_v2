@@ -67,7 +67,9 @@ int main(int argc, char* argv[]) {
 		break;
 	case 1:
 		// CC Mode
-		costEnumList = { CostEnum::sperationCost, CostEnum::mildCost, CostEnum::hierCongestionCost, CostEnum::hierCCost };
+		// routing_lengthCost (SHARED-tree wire length) added so wirelength
+		// participates in CC-mode optimization; hierCongestionCost removed.
+		costEnumList = { CostEnum::sperationCost, CostEnum::mildCost, CostEnum::hierCCost, CostEnum::routing_lengthCost };
 		break;
 	case 2:
 		// Interleaving Mode
